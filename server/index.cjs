@@ -1,15 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import fetch from 'node-fetch';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { config } from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
-
-config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,15 +14,25 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Cliente Supabase com service_role (bypass RLS)
-const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
-  : null;
+// Cliente Supabase com service_role (bypass RLS) - carregado dinamicamente
+let supabaseAdmin = null;
+
+async function initSupabase() {
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+      console.log('Supabase Admin inicializado com sucesso');
+    } catch (error) {
+      console.error('Erro ao inicializar Supabase:', error.message);
+    }
+  }
+}
 
 // Middleware
 app.use(cors());
@@ -55,6 +57,12 @@ function formatInstanceName(name) {
     .replace(/\s+/g, '');
 }
 
+// Função para fazer fetch (compatível com Node.js)
+async function fetchAPI(url, options = {}) {
+  const fetch = (await import('node-fetch')).default;
+  return fetch(url, options);
+}
+
 // Endpoint para criar instância
 app.post('/api/instance/create', async (req, res) => {
   try {
@@ -73,7 +81,7 @@ app.post('/api/instance/create', async (req, res) => {
     
     const body = {
       instanceName: formattedName,
-      token: '', // Deixar vazio para criar dinamicamente
+      token: '',
       qrcode: true,
       number: phoneNumber,
       integration: 'WHATSAPP-BAILEYS',
@@ -92,7 +100,7 @@ app.post('/api/instance/create', async (req, res) => {
     console.log('Body:', JSON.stringify(body, null, 2));
     console.log('API Key:', EVOLUTION_API_KEY ? 'Configurada' : 'NÃO CONFIGURADA');
 
-    const response = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,8 +127,6 @@ app.post('/api/instance/create', async (req, res) => {
       return res.status(response.status).json(data);
     }
 
-    // Retornar dados da criação sem tentar obter QR Code ainda
-    // O frontend deverá chamar o endpoint connect separadamente
     console.log('Instância criada com sucesso, aguardando conexão...');
     res.json(data);
   } catch (error) {
@@ -146,7 +152,7 @@ app.get('/api/instance/connect/:instanceName', async (req, res) => {
 
     console.log('URL da requisição:', url);
 
-    const response = await fetch(url, {
+    const response = await fetchAPI(url, {
       method: 'GET',
       headers: {
         'apikey': EVOLUTION_API_KEY
@@ -183,7 +189,7 @@ app.get('/api/instance/connect/:instanceName', async (req, res) => {
 // Endpoint para buscar instâncias
 app.get('/api/instance/fetchInstances', async (req, res) => {
   try {
-    const response = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
         'apikey': EVOLUTION_API_KEY
@@ -211,7 +217,7 @@ app.get('/api/instance/status/:instanceName', async (req, res) => {
     console.log('=== VERIFICANDO STATUS ===');
     console.log('InstanceName:', instanceName);
 
-    const response = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
       method: 'GET',
       headers: {
         'apikey': EVOLUTION_API_KEY
@@ -236,7 +242,6 @@ app.get('/api/instance/status/:instanceName', async (req, res) => {
       return res.status(response.status).json(data);
     }
 
-    // Encontrar a instância específica
     const instance = data.find(inst => inst.name === instanceName);
     
     if (!instance) {
@@ -268,7 +273,7 @@ app.post('/api/chat/findChats/:instanceName', async (req, res) => {
     console.log('=== BUSCANDO CHATS ===');
     console.log('InstanceName:', instanceName);
 
-    const response = await fetch(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -306,7 +311,7 @@ app.post('/api/chat/findMessages/:instanceName', async (req, res) => {
       return res.status(400).json({ error: 'remoteJid é obrigatório' });
     }
 
-    const response = await fetch(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -347,7 +352,7 @@ app.post('/api/chat/fetchProfilePictureUrl/:instanceName', async (req, res) => {
     console.log('InstanceName:', instanceName);
     console.log('Number:', number);
 
-    const response = await fetch(`${EVOLUTION_API_URL}/chat/fetchProfilePictureUrl/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/fetchProfilePictureUrl/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -384,7 +389,7 @@ app.post('/api/message/sendText/:instanceName', async (req, res) => {
       return res.status(400).json({ error: 'number e text são obrigatórios' });
     }
 
-    const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -426,7 +431,7 @@ app.post('/api/message/sendMedia/:instanceName', async (req, res) => {
       return res.status(400).json({ error: 'number, media e mediatype são obrigatórios' });
     }
 
-    const response = await fetch(`${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -471,7 +476,7 @@ app.post('/api/message/sendAudio/:instanceName', async (req, res) => {
       return res.status(400).json({ error: 'number e audio são obrigatórios' });
     }
 
-    const response = await fetch(`${EVOLUTION_API_URL}/message/sendWhatsAppAudio/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/message/sendWhatsAppAudio/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -498,7 +503,7 @@ app.post('/api/message/sendAudio/:instanceName', async (req, res) => {
   }
 });
 
-// Endpoint para buscar mídia em base64 (para exibir imagens/áudios/documentos)
+// Endpoint para buscar mídia em base64
 app.post('/api/chat/getBase64/:instanceName', async (req, res) => {
   try {
     const { instanceName } = req.params;
@@ -511,7 +516,7 @@ app.post('/api/chat/getBase64/:instanceName', async (req, res) => {
       return res.status(400).json({ error: 'message é obrigatório' });
     }
 
-    const response = await fetch(`${EVOLUTION_API_URL}/chat/getBase64/${instanceName}`, {
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/getBase64/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -567,11 +572,10 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('Criando usuário no Auth:', email);
 
-    // 1. Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Confirma email automaticamente
+      email_confirm: true,
       user_metadata: {
         full_name: userName
       }
@@ -584,7 +588,6 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('Usuário Auth criado:', authData.user.id);
 
-    // 2. Criar igreja na tabela churches
     const slug = generateSlug(churchName);
     const { data: churchData, error: churchError } = await supabaseAdmin
       .from('churches')
@@ -600,14 +603,12 @@ app.post('/api/auth/register', async (req, res) => {
 
     if (churchError) {
       console.error('Erro ao criar igreja:', churchError);
-      // Tentar deletar usuário Auth se falhar
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return res.status(400).json({ error: 'Erro ao criar igreja: ' + churchError.message });
     }
 
     console.log('Igreja criada:', churchData.id);
 
-    // 3. Criar perfil do usuário na tabela users
     const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
@@ -623,7 +624,6 @@ app.post('/api/auth/register', async (req, res) => {
 
     if (userError) {
       console.error('Erro ao criar perfil:', userError);
-      // Tentar deletar igreja e usuário Auth se falhar
       await supabaseAdmin.from('churches').delete().eq('id', churchData.id);
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return res.status(400).json({ error: 'Erro ao criar perfil: ' + userError.message });
@@ -653,7 +653,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Endpoint para criar usuário em igreja existente (admin cria membro)
+// Endpoint para criar usuário em igreja existente
 app.post('/api/auth/create-user', async (req, res) => {
   try {
     console.log('=== CRIAÇÃO DE USUÁRIO ===');
@@ -671,7 +671,6 @@ app.post('/api/auth/create-user', async (req, res) => {
 
     console.log('Criando usuário no Auth:', email);
 
-    // 1. Criar usuário no Supabase Auth (sem logar automaticamente)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -688,7 +687,6 @@ app.post('/api/auth/create-user', async (req, res) => {
 
     console.log('Usuário Auth criado:', authData.user.id);
 
-    // 2. Criar perfil do usuário na tabela users
     const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
@@ -704,7 +702,6 @@ app.post('/api/auth/create-user', async (req, res) => {
 
     if (userError) {
       console.error('Erro ao criar perfil:', userError);
-      // Deletar usuário Auth se falhar
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return res.status(400).json({ error: 'Erro ao criar perfil: ' + userError.message });
     }
@@ -729,7 +726,7 @@ app.post('/api/auth/create-user', async (req, res) => {
   }
 });
 
-// Servir frontend em produção (apenas se não for rota de API)
+// Servir frontend em produção
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return next();
@@ -737,8 +734,15 @@ app.use((req, res, next) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`API Evolution: ${EVOLUTION_API_URL}`);
-  console.log(`Supabase Admin: ${supabaseAdmin ? 'Configurado' : 'NÃO CONFIGURADO'}`);
-});
+// Inicializar servidor
+async function startServer() {
+  await initSupabase();
+  
+  app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`API Evolution: ${EVOLUTION_API_URL}`);
+    console.log(`Supabase Admin: ${supabaseAdmin ? 'Configurado' : 'NÃO CONFIGURADO'}`);
+  });
+}
+
+startServer();
