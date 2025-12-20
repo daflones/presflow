@@ -1,0 +1,10 @@
+export { clientsService } from './clients';
+export { calendarService } from './calendar';
+export { aiConfigService } from './aiConfig';
+export { conversationsService, messagesService } from './conversations';
+export { dashboardService } from './dashboard';
+export { whatsappDbService } from './whatsapp';
+export { whatsappMessagesService } from './whatsappMessages';
+export { arquivosIAService } from './arquivosIA';
+export { adminService } from './admin';
+export { churchProfileService } from './churchProfile';
