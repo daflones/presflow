@@ -42,8 +42,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Em desenvolvimento, não servir arquivos estáticos
-if (process.env.NODE_ENV !== 'production') {
+// Em produção, servir arquivos estáticos do build
+if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../dist')));
 }
 
