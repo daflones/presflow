@@ -14,24 +14,47 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Cliente Supabase com service_role (bypass RLS) - carregado dinamicamente
-let supabaseAdmin = null;
-
-async function initSupabase() {
-  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { createClient } = await import('@supabase/supabase-js');
-      supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      });
-      console.log('Supabase Admin inicializado com sucesso');
-    } catch (error) {
-      console.error('Erro ao inicializar Supabase:', error.message);
+// Helper para fazer chamadas ao Supabase REST API
+async function supabaseRequest(endpoint, options = {}) {
+  const fetch = (await import('node-fetch')).default;
+  const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || 'return=representation',
+      ...options.headers
     }
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'Supabase request failed');
   }
+  return data;
+}
+
+// Helper para Supabase Auth Admin API
+async function supabaseAuthAdmin(endpoint, options = {}) {
+  const fetch = (await import('node-fetch')).default;
+  const url = `${SUPABASE_URL}/auth/v1/admin/${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.error || data.msg || 'Supabase Auth request failed');
+  }
+  return data;
 }
 
 // Middleware
@@ -559,8 +582,8 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     console.log('=== REGISTRO DE IGREJA ===');
     
-    if (!supabaseAdmin) {
-      console.error('Supabase Admin não configurado');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase não configurado');
       return res.status(500).json({ error: 'Servidor não configurado corretamente' });
     }
 
@@ -572,76 +595,65 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('Criando usuário no Auth:', email);
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: userName
-      }
+    // 1. Criar usuário no Auth
+    const authData = await supabaseAuthAdmin('users', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: userName
+        }
+      })
     });
 
-    if (authError) {
-      console.error('Erro ao criar usuário Auth:', authError);
-      return res.status(400).json({ error: authError.message });
-    }
-
-    console.log('Usuário Auth criado:', authData.user.id);
+    console.log('Usuário Auth criado:', authData.id);
 
     const slug = generateSlug(churchName);
-    const { data: churchData, error: churchError } = await supabaseAdmin
-      .from('churches')
-      .insert({
+    
+    // 2. Criar igreja
+    const churchData = await supabaseRequest('churches', {
+      method: 'POST',
+      body: JSON.stringify({
         name: churchName,
         slug: slug,
         email: email,
         plan: 'free',
         is_active: true
       })
-      .select()
-      .single();
+    });
 
-    if (churchError) {
-      console.error('Erro ao criar igreja:', churchError);
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return res.status(400).json({ error: 'Erro ao criar igreja: ' + churchError.message });
-    }
+    const church = Array.isArray(churchData) ? churchData[0] : churchData;
+    console.log('Igreja criada:', church.id);
 
-    console.log('Igreja criada:', churchData.id);
-
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        auth_id: authData.user.id,
-        church_id: churchData.id,
+    // 3. Criar perfil do usuário
+    const userData = await supabaseRequest('users', {
+      method: 'POST',
+      body: JSON.stringify({
+        auth_id: authData.id,
+        church_id: church.id,
         name: userName,
         email: email,
         role: 'owner',
         is_active: true
       })
-      .select()
-      .single();
+    });
 
-    if (userError) {
-      console.error('Erro ao criar perfil:', userError);
-      await supabaseAdmin.from('churches').delete().eq('id', churchData.id);
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return res.status(400).json({ error: 'Erro ao criar perfil: ' + userError.message });
-    }
-
-    console.log('Perfil criado:', userData.id);
+    const user = Array.isArray(userData) ? userData[0] : userData;
+    console.log('Perfil criado:', user.id);
 
     res.json({
       success: true,
       message: 'Cadastro realizado com sucesso!',
       user: {
-        id: userData.id,
-        auth_id: authData.user.id,
+        id: user.id,
+        auth_id: authData.id,
         email: email,
         name: userName
       },
       church: {
-        id: churchData.id,
+        id: church.id,
         name: churchName,
         slug: slug
       }
@@ -658,8 +670,8 @@ app.post('/api/auth/create-user', async (req, res) => {
   try {
     console.log('=== CRIAÇÃO DE USUÁRIO ===');
     
-    if (!supabaseAdmin) {
-      console.error('Supabase Admin não configurado');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase não configurado');
       return res.status(500).json({ error: 'Servidor não configurado corretamente' });
     }
 
@@ -671,49 +683,43 @@ app.post('/api/auth/create-user', async (req, res) => {
 
     console.log('Criando usuário no Auth:', email);
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: userName
-      }
+    // 1. Criar usuário no Auth
+    const authData = await supabaseAuthAdmin('users', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: userName
+        }
+      })
     });
 
-    if (authError) {
-      console.error('Erro ao criar usuário Auth:', authError);
-      return res.status(400).json({ error: authError.message });
-    }
+    console.log('Usuário Auth criado:', authData.id);
 
-    console.log('Usuário Auth criado:', authData.user.id);
-
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        auth_id: authData.user.id,
+    // 2. Criar perfil do usuário
+    const userData = await supabaseRequest('users', {
+      method: 'POST',
+      body: JSON.stringify({
+        auth_id: authData.id,
         church_id: churchId,
         name: userName,
         email: email,
         role: role,
         is_active: true
       })
-      .select()
-      .single();
+    });
 
-    if (userError) {
-      console.error('Erro ao criar perfil:', userError);
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return res.status(400).json({ error: 'Erro ao criar perfil: ' + userError.message });
-    }
-
-    console.log('Perfil criado:', userData.id);
+    const user = Array.isArray(userData) ? userData[0] : userData;
+    console.log('Perfil criado:', user.id);
 
     res.json({
       success: true,
       message: 'Usuário criado com sucesso!',
       user: {
-        id: userData.id,
-        auth_id: authData.user.id,
+        id: user.id,
+        auth_id: authData.id,
         email: email,
         name: userName,
         role: role
@@ -735,14 +741,8 @@ app.use((req, res, next) => {
 });
 
 // Inicializar servidor
-async function startServer() {
-  await initSupabase();
-  
-  app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-    console.log(`API Evolution: ${EVOLUTION_API_URL}`);
-    console.log(`Supabase Admin: ${supabaseAdmin ? 'Configurado' : 'NÃO CONFIGURADO'}`);
-  });
-}
-
-startServer();
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`API Evolution: ${EVOLUTION_API_URL}`);
+  console.log(`Supabase: ${SUPABASE_URL ? 'Configurado' : 'NÃO CONFIGURADO'}`);
+});
