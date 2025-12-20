@@ -61,7 +61,7 @@ function toLocalInputValue(iso: string) {
 
 export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -75,7 +75,7 @@ function KanbanColumn({
   );
 }
 
-function KanbanCard({ client, onEdit, onDelete, onView }: { client: Client; onEdit: () => void; onDelete: () => void; onView: () => void }) {
+function KanbanCard({ client, onEdit, onView }: { client: Client; onEdit: () => void; onDelete?: () => void; onView: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: client.id });
 
   const style = {
@@ -156,8 +156,8 @@ export function ContactsPage() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [_isLoading, setIsLoading] = useState(true);
+  const [_isSaving, setIsSaving] = useState(false);
   const [clientEvents, setClientEvents] = useState<CalendarEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
