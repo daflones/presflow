@@ -104,19 +104,19 @@ export function AdminIgrejas() {
     const newRole = currentIsManager ? null : 'manager';
 
     try {
-      // Atualizar role na tabela profiles
+      // Atualizar role na tabela churches
       const { error } = await supabase
-        .from('profiles')
+        .from('churches')
         .update({ role: newRole })
-        .eq('id', church.owner_id);
+        .eq('id', church.id);
 
       if (error) throw error;
 
-      toast.success(currentIsManagchurchPermissão de manager removida' : 'Permissão de manager concedida');
+      toast.success(currentIsManager ? 'Permissão de manager removida' : 'Permissão de manager concedida');
       loadChurches();
-    } catch (erchuochny) {
+    } catch (error: any) {
       console.error('Erro ao alterar role:', error);
-      toast.error('Erro arar permissão: ' + error.message);
+      toast.error('Erro ao alterar permissão: ' + error.message);
     }
   }
 
