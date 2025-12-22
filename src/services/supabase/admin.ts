@@ -32,10 +32,15 @@ export const adminService = {
 
   async createChurch(input: {
     name: string;
+    slug: string;
     email?: string;
     phone?: string;
     address?: string;
     owner_id: string;
+    timezone?: string;
+    language?: string;
+    plan?: string;
+    is_active?: boolean;
   }): Promise<Church | null> {
     const { data, error } = await supabase
       .from('churches')

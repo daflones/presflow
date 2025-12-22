@@ -30,8 +30,7 @@ export function AdminIgrejas() {
     phone: '',
     address: '',
     userName: '',
-    userPassword: '',
-    owner_id: ''
+    userPassword: ''
   });
 
   useEffect(() => {
