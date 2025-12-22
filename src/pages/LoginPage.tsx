@@ -6,7 +6,7 @@ import { Mail, Lock, Church, MessageSquare, Calendar, Users, Bot, Bed } from 'lu
 import { supabase } from '../lib/supabase';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Por favor, insira um email válido.' }),
+  email: z.string().min(1, { message: 'Email é obrigatório.' }).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Por favor, insira um email válido.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 

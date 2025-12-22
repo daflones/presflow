@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 const registerSchema = z.object({
   churchName: z.string().min(3, { message: 'O nome da igreja deve ter pelo menos 3 caracteres.' }),
   userName: z.string().min(3, { message: 'Seu nome deve ter pelo menos 3 caracteres.' }),
-  email: z.string().email({ message: 'Por favor, insira um email válido.' }),
+  email: z.string().min(1, { message: 'Email é obrigatório.' }).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Por favor, insira um email válido.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 
