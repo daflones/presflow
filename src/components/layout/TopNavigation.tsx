@@ -44,6 +44,11 @@ export function TopNavigation() {
           {/* Navigation */}
           <nav className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
             {navigationItems.map((item) => {
+              // Ocultar "Agente IA" para usuários que não são managers
+              if (item.name === 'Agente IA' && !isManager) {
+                return null;
+              }
+              
               const isActive = location.pathname === item.href;
               return (
                 <Link
