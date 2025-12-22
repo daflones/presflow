@@ -325,27 +325,53 @@ class WhatsAppService {
     localStorage.setItem('whatsapp_instance', JSON.stringify(instances))
   }
 
-  // Buscar dados da instância do localStorage
+  // Buscar dados da instância do localStorage ou banco de dados
   async getInstanceFromProfile(): Promise<{
     instanceName: string | null
     status: string | null
     instanceId: string | null
     connectedAt: string | null
   } | null> {
+    // Primeiro tentar localStorage
     const existingData = localStorage.getItem('whatsapp_instance')
-    if (!existingData) return null
-    
-    const instances = JSON.parse(existingData)
-    if (instances.length === 0) return null
-    
-    // Retornar primeira instância (simplificado para este caso)
-    const instance = instances[0]
-    return {
-      instanceName: instance.instanceName,
-      status: instance.status,
-      instanceId: instance.instanceId,
-      connectedAt: instance.connectedAt || null
+    if (existingData) {
+      const instances = JSON.parse(existingData)
+      if (instances.length > 0) {
+        const instance = instances[0]
+        return {
+          instanceName: instance.instanceName,
+          status: instance.status,
+          instanceId: instance.instanceId,
+          connectedAt: instance.connectedAt || null
+        }
+      }
     }
+    
+    // Se não encontrou no localStorage, buscar no banco de dados
+    try {
+      const { whatsappDbService } = await import('../supabase')
+      const dbInstance = await whatsappDbService.getInstance()
+      
+      if (dbInstance) {
+        // Salvar no localStorage para próximas consultas
+        await this.saveInstanceToProfile({
+          instanceName: dbInstance.instance_name,
+          instanceId: dbInstance.instance_id,
+          status: dbInstance.status
+        })
+        
+        return {
+          instanceName: dbInstance.instance_name,
+          status: dbInstance.status,
+          instanceId: dbInstance.instance_id,
+          connectedAt: dbInstance.connected_at || null
+        }
+      }
+    } catch (error) {
+      console.error('[WhatsApp] Erro ao buscar instância do banco:', error)
+    }
+    
+    return null
   }
 
   // Limpar dados da instância do localStorage
