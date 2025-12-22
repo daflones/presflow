@@ -29,6 +29,8 @@ export function AdminIgrejas() {
     email: '',
     phone: '',
     address: '',
+    userName: '',
+    userPassword: '',
     owner_id: ''
   });
 
@@ -67,28 +69,77 @@ export function AdminIgrejas() {
     church.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Função para gerar slug a partir do nome
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+      .replace(/\s+/g, '-') // Substitui espaços por hífens
+      .replace(/-+/g, '-') // Remove hífens duplicados
+      .trim();
+  };
+
   async function handleCreateChurch(e: React.FormEvent) {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      toast.error('Nome da igreja é obrigatório');
+    if (!formData.name.trim() || !formData.email.trim() || !formData.userName.trim() || !formData.userPassword.trim()) {
+      toast.error('Nome da igreja, email, nome do usuário e senha são obrigatórios');
       return;
     }
 
     setIsCreating(true);
     try {
-      // Gerar UUID aleatório para o proprietário
-      const randomOwnerId = crypto.randomUUID();
+      // 1. Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email.trim(),
+        password: formData.userPassword.trim(),
+        options: {
+          data: {
+            full_name: formData.userName.trim(),
+            church_name: formData.name.trim(),
+          },
+        },
+      });
+
+      if (authError) {
+        throw new Error('Erro ao criar usuário: ' + authError.message);
+      }
+
+      if (!authData.user) {
+        throw new Error('Erro ao criar usuário');
+      }
+
+      // 2. Gerar slug a partir do nome
+      const slug = generateSlug(formData.name.trim());
       
+      // 3. Criar igreja na tabela churches com o ID do usuário criado
       await adminService.createChurch({
         name: formData.name.trim(),
-        email: formData.email.trim() || undefined,
+        slug: slug,
+        email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
         address: formData.address.trim() || undefined,
-        owner_id: randomOwnerId
+        owner_id: authData.user.id,
+        timezone: 'America/Sao_Paulo',
+        language: 'pt-BR',
+        plan: 'free',
+        is_active: true
       });
-      toast.success('Igreja cadastrada com sucesso!');
+
+      // 4. Fazer logout do usuário criado
+      await supabase.auth.signOut();
+      
+      toast.success('Igreja e usuário criados com sucesso!');
       setShowCreateForm(false);
-      setFormData({ name: '', email: '', phone: '', address: '' });
+      setFormData({ 
+        name: '', 
+        email: '', 
+        phone: '', 
+        address: '', 
+        userName: '', 
+        userPassword: '' 
+      });
       loadChurches();
     } catch (error: any) {
       toast.error('Erro ao cadastrar igreja: ' + error.message);
@@ -283,12 +334,35 @@ export function AdminIgrejas() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Email *</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Nome do Usuário *</label>
+                <input
+                  type="text"
+                  value={formData.userName}
+                  onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  placeholder="Nome completo do administrador"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Senha do Usuário *</label>
+                <input
+                  type="password"
+                  value={formData.userPassword}
+                  onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  placeholder="Mínimo 6 caracteres"
+                  required
                 />
               </div>
               <div>
