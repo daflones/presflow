@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Home, Settings, Plus, Pencil, Trash2, X, Check, Bed, Users, Image, Calendar, DollarSign, FileText, Bot } from 'lucide-react';
+import { ImageUploader } from '../../components/ui/ImageUploader';
 import { hostingConfigService, accommodationsService } from '../../services/supabase/hostingService';
 import type { HostingConfig, ChurchAccommodation, BlockedDatePeriod } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
@@ -43,7 +44,7 @@ export function AdminHospedagem() {
     descricao: '', possui_banheiro: false, possui_banheiro_privativo: false, possui_roupa_cama: true, possui_toalhas: false,
     possui_ar_condicionado: false, possui_ventilador: false, possui_tv: false, possui_wifi: true, possui_frigobar: false,
     comodidades_extras: [] as string[], valor_noite_override: undefined as number | undefined,
-    fotos: [] as { url: string; descricao?: string }[], ativo: true, em_manutencao: false,
+    fotos: [] as { url: string; descricao: string }[], ativo: true, em_manutencao: false,
   });
 
   useEffect(() => { loadData(); }, [searchParams.get('church')]);
@@ -79,7 +80,7 @@ export function AdminHospedagem() {
 
   function openNewAcc() { setSelectedAcc(null); setAccForm({ nome: '', codigo: '', tipo: 'individual', capacidade_maxima: 1, quantidade_disponivel: 1, descricao: '', possui_banheiro: false, possui_banheiro_privativo: false, possui_roupa_cama: true, possui_toalhas: false, possui_ar_condicionado: false, possui_ventilador: false, possui_tv: false, possui_wifi: true, possui_frigobar: false, comodidades_extras: [], valor_noite_override: undefined, fotos: [], ativo: true, em_manutencao: false }); setIsModalOpen(true); }
 
-  function openEditAcc(a: ChurchAccommodation) { setSelectedAcc(a); setAccForm({ nome: a.nome, codigo: a.codigo || '', tipo: a.tipo, capacidade_maxima: a.capacidade_maxima, quantidade_disponivel: a.quantidade_disponivel, descricao: a.descricao || '', possui_banheiro: a.possui_banheiro, possui_banheiro_privativo: a.possui_banheiro_privativo, possui_roupa_cama: a.possui_roupa_cama, possui_toalhas: a.possui_toalhas, possui_ar_condicionado: a.possui_ar_condicionado, possui_ventilador: a.possui_ventilador, possui_tv: a.possui_tv, possui_wifi: a.possui_wifi, possui_frigobar: a.possui_frigobar, comodidades_extras: a.comodidades_extras || [], valor_noite_override: a.valor_noite_override, fotos: a.fotos || [], ativo: a.ativo, em_manutencao: a.em_manutencao }); setIsModalOpen(true); }
+  function openEditAcc(a: ChurchAccommodation) { setSelectedAcc(a); setAccForm({ nome: a.nome, codigo: a.codigo || '', tipo: a.tipo, capacidade_maxima: a.capacidade_maxima, quantidade_disponivel: a.quantidade_disponivel, descricao: a.descricao || '', possui_banheiro: a.possui_banheiro, possui_banheiro_privativo: a.possui_banheiro_privativo, possui_roupa_cama: a.possui_roupa_cama, possui_toalhas: a.possui_toalhas, possui_ar_condicionado: a.possui_ar_condicionado, possui_ventilador: a.possui_ventilador, possui_tv: a.possui_tv, possui_wifi: a.possui_wifi, possui_frigobar: a.possui_frigobar, comodidades_extras: a.comodidades_extras || [], valor_noite_override: a.valor_noite_override, fotos: (a.fotos || []).map(f => ({ url: f.url, descricao: f.descricao || '' })), ativo: a.ativo, em_manutencao: a.em_manutencao }); setIsModalOpen(true); }
 
   async function handleSaveAcc() {
     if (!churchId || !accForm.nome) return;
@@ -170,11 +171,17 @@ export function AdminHospedagem() {
               <div><label className="block text-sm text-gray-300 mb-1">Informações Gerais</label><textarea value={form.informacoes_gerais} onChange={e => setForm({ ...form, informacoes_gerais: e.target.value })} rows={3} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm" /></div>
             </>)}
             {configTab === 'imagens' && (<>
-              <p className="text-xs text-gray-500">Imagens dos espaços que a IA pode enviar</p>
-              <div className="space-y-2">
-                {form.imagens.map((img, i) => (<div key={i} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded-lg"><Image className="h-4 w-4 text-gray-400" /><input type="url" value={img.url} onChange={e => { const n = [...form.imagens]; n[i] = { ...n[i], url: e.target.value }; setForm({ ...form, imagens: n }); }} placeholder="URL" className="flex-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm" /><input type="text" value={img.descricao} onChange={e => { const n = [...form.imagens]; n[i] = { ...n[i], descricao: e.target.value }; setForm({ ...form, imagens: n }); }} placeholder="Descrição" className="w-32 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm" /><button onClick={() => setForm({ ...form, imagens: form.imagens.filter((_, j) => j !== i) })} className="p-1 text-red-400"><Trash2 className="h-4 w-4" /></button></div>))}
-                <button onClick={() => setForm({ ...form, imagens: [...form.imagens, { url: '', descricao: '' }] })} className="flex items-center gap-2 px-3 py-2 text-sm text-purple-400 border border-dashed border-gray-600 rounded-lg w-full justify-center"><Plus className="h-4 w-4" />Adicionar Imagem</button>
-              </div>
+              <p className="text-xs text-gray-500 mb-4">Imagens dos espaços que a IA pode enviar aos usuários</p>
+              {churchId && (
+                <ImageUploader
+                  images={form.imagens}
+                  onChange={(imgs) => setForm({ ...form, imagens: imgs })}
+                  churchId={churchId}
+                  category="hospedagem"
+                  maxImages={20}
+                  label="Fotos da Hospedagem"
+                />
+              )}
             </>)}
           </div>
           <div className="flex justify-end p-4 border-t border-gray-700"><button onClick={handleSaveConfig} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg">{isSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check className="h-4 w-4" />}Salvar</button></div>
@@ -203,7 +210,16 @@ export function AdminHospedagem() {
           <div><label className="block text-sm text-gray-300 mb-2">Comodidades</label><div className="grid grid-cols-3 gap-2">{[{ k: 'possui_banheiro', l: 'Banheiro' }, { k: 'possui_banheiro_privativo', l: 'Banheiro Privativo' }, { k: 'possui_roupa_cama', l: 'Roupa de Cama' }, { k: 'possui_toalhas', l: 'Toalhas' }, { k: 'possui_ar_condicionado', l: 'Ar Condicionado' }, { k: 'possui_ventilador', l: 'Ventilador' }, { k: 'possui_tv', l: 'TV' }, { k: 'possui_wifi', l: 'Wi-Fi' }, { k: 'possui_frigobar', l: 'Frigobar' }].map(c => (<label key={c.k} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded cursor-pointer"><input type="checkbox" checked={(accForm as any)[c.k]} onChange={e => setAccForm({ ...accForm, [c.k]: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-300">{c.l}</span></label>))}</div></div>
           <div><label className="block text-sm text-gray-300 mb-1">Valor/Noite Override (R$)</label><input type="number" step="0.01" value={accForm.valor_noite_override || ''} onChange={e => setAccForm({ ...accForm, valor_noite_override: e.target.value ? parseFloat(e.target.value) : undefined })} placeholder="Deixe vazio para usar valor padrão" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white" /></div>
           <div className="flex gap-4"><label className="flex items-center gap-2"><input type="checkbox" checked={accForm.ativo} onChange={e => setAccForm({ ...accForm, ativo: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-300">Ativo</span></label><label className="flex items-center gap-2"><input type="checkbox" checked={accForm.em_manutencao} onChange={e => setAccForm({ ...accForm, em_manutencao: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-gray-300">Em Manutenção</span></label></div>
-          <div><label className="block text-sm text-gray-300 mb-2">Fotos</label><div className="space-y-2">{accForm.fotos.map((f, i) => (<div key={i} className="flex items-center gap-2"><Image className="h-4 w-4 text-gray-400" /><input type="url" value={f.url} onChange={e => { const n = [...accForm.fotos]; n[i] = { ...n[i], url: e.target.value }; setAccForm({ ...accForm, fotos: n }); }} placeholder="URL" className="flex-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm" /><button onClick={() => setAccForm({ ...accForm, fotos: accForm.fotos.filter((_, j) => j !== i) })} className="p-1 text-red-400"><Trash2 className="h-4 w-4" /></button></div>))}<button onClick={() => setAccForm({ ...accForm, fotos: [...accForm.fotos, { url: '' }] })} className="flex items-center gap-2 px-3 py-2 text-sm text-purple-400 border border-dashed border-gray-600 rounded-lg w-full justify-center"><Plus className="h-4 w-4" />Adicionar Foto</button></div></div>
+          {churchId && (
+            <ImageUploader
+              images={accForm.fotos}
+              onChange={(imgs) => setAccForm({ ...accForm, fotos: imgs })}
+              churchId={churchId}
+              category="acomodacoes"
+              maxImages={10}
+              label="Fotos da Acomodação"
+            />
+          )}
         </div>
         <div className="flex justify-end gap-3 p-4 border-t border-gray-700"><button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-400">Cancelar</button><button onClick={handleSaveAcc} disabled={isSaving || !accForm.nome} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg">{isSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check className="h-4 w-4" />}Salvar</button></div>
       </div></div>)}

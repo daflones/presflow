@@ -3,13 +3,29 @@
 -- Execute este script no SQL Editor do Supabase
 -- ============================================
 
--- As colunas de imagens já existem no schema anterior como JSONB
--- Formato: [{"url": "https://...", "descricao": "..."}]
--- 
--- Tabelas que já possuem campo de imagens:
--- - church_services.imagens
--- - church_hosting_config.imagens  
--- - church_accommodations.fotos
+-- ============================================
+-- CRIAR BUCKETS NO SUPABASE STORAGE
+-- ============================================
+
+-- Bucket para imagens gerais da igreja
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('church-images', 'church-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Bucket para imagens de serviços (batismos, casamentos, etc.)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('services-images', 'services-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Bucket para imagens de hospedagem e acomodações
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('hosting-images', 'hosting-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Bucket para imagens dos espaços
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('spaces-images', 'spaces-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- ============================================
 -- ADICIONAR COLUNA DE IMAGENS NA TABELA ai_configs
@@ -62,37 +78,47 @@ COMMENT ON COLUMN public.ai_configs.imagens_igreja IS 'Fotos gerais da igreja (f
 --
 -- ============================================
 
--- Políticas RLS para os buckets (executar após criar os buckets)
--- Substitua 'BUCKET_NAME' pelo nome real do bucket
+-- ============================================
+-- POLÍTICAS RLS PARA OS BUCKETS
+-- ============================================
+-- As políticas já existem, então não precisa executar novamente
+-- Se precisar recriar, execute os DROP primeiro e depois os CREATE
 
--- Política para permitir upload por usuários autenticados
-CREATE POLICY "Authenticated users can upload images"
+-- Para verificar as políticas existentes:
+-- SELECT * FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects';
+
+-- Se as políticas não existirem, execute:
+/*
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public reads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated updates" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated deletes" ON storage.objects;
+
+CREATE POLICY "Allow authenticated uploads"
 ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id IN ('church-images', 'services-images', 'hosting-images', 'spaces-images')
 );
 
--- Política para permitir leitura pública
-CREATE POLICY "Public can view images"
+CREATE POLICY "Allow public reads"
 ON storage.objects FOR SELECT
 TO public
 USING (
   bucket_id IN ('church-images', 'services-images', 'hosting-images', 'spaces-images')
 );
 
--- Política para permitir atualização por usuários autenticados
-CREATE POLICY "Authenticated users can update their images"
+CREATE POLICY "Allow authenticated updates"
 ON storage.objects FOR UPDATE
 TO authenticated
 USING (
   bucket_id IN ('church-images', 'services-images', 'hosting-images', 'spaces-images')
 );
 
--- Política para permitir deleção por usuários autenticados
-CREATE POLICY "Authenticated users can delete their images"
+CREATE POLICY "Allow authenticated deletes"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (
   bucket_id IN ('church-images', 'services-images', 'hosting-images', 'spaces-images')
 );
+*/

@@ -4,6 +4,7 @@ import {
   Heart, Droplets, Church, Camera, Map, Sunrise, Users, BookOpen, GripVertical,
   FileText, DollarSign, Calendar, Bot, Image
 } from 'lucide-react';
+import { ImageUploader } from '../../components/ui/ImageUploader';
 import { churchServicesService } from '../../services/supabase/churchServices';
 import type { ChurchService, ServiceEtapa, ServiceDocumento } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
@@ -973,57 +974,18 @@ export function AdminServicos() {
               {activeTab === 'imagens' && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Imagens do Serviço</h3>
-                  <p className="text-xs text-gray-500">Adicione imagens que a IA pode enviar aos clientes (fotos de cerimônias, locais, etc.)</p>
+                  <p className="text-xs text-gray-500 mb-4">Adicione imagens que a IA pode enviar aos clientes (fotos de cerimônias, locais, etc.)</p>
                   
-                  <div className="space-y-2">
-                    {form.imagens.map((img, index) => (
-                      <div key={index} className="flex items-center gap-2 p-3 bg-gray-700/50 rounded-lg">
-                        <Image className="h-5 w-5 text-gray-400" />
-                        <input
-                          type="url"
-                          value={img.url}
-                          onChange={(e) => {
-                            const newImgs = [...form.imagens];
-                            newImgs[index] = { ...newImgs[index], url: e.target.value };
-                            setForm({ ...form, imagens: newImgs });
-                          }}
-                          placeholder="URL da imagem"
-                          className="flex-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm"
-                        />
-                        <input
-                          type="text"
-                          value={img.descricao}
-                          onChange={(e) => {
-                            const newImgs = [...form.imagens];
-                            newImgs[index] = { ...newImgs[index], descricao: e.target.value };
-                            setForm({ ...form, imagens: newImgs });
-                          }}
-                          placeholder="Descrição"
-                          className="w-40 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm"
-                        />
-                        <button
-                          onClick={() => {
-                            setForm({ ...form, imagens: form.imagens.filter((_, i) => i !== index) });
-                          }}
-                          className="p-1 text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => {
-                        setForm({
-                          ...form,
-                          imagens: [...form.imagens, { url: '', descricao: '' }]
-                        });
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-purple-400 hover:text-purple-300 border border-dashed border-gray-600 rounded-lg hover:border-purple-500 w-full justify-center"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Adicionar Imagem
-                    </button>
-                  </div>
+                  {churchId && (
+                    <ImageUploader
+                      images={form.imagens}
+                      onChange={(imgs) => setForm({ ...form, imagens: imgs })}
+                      churchId={churchId}
+                      category="servicos"
+                      maxImages={20}
+                      label="Fotos do Serviço"
+                    />
+                  )}
                 </div>
               )}
             </div>
