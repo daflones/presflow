@@ -42,16 +42,23 @@ export function AdminIgrejas() {
       const data = await adminService.listChurches();
       setChurches(data);
       
+      // Buscar informações de role da tabela profiles ao invés de auth.admin
       const ownerIds = [...new Set(data.map(c => c.owner_id).filter(Boolean))];
       const ownersInfo: Record<string, { isManager: boolean; email: string }> = {};
       
-      for (const ownerId of ownerIds) {
-        const { data: userData, error } = await supabase.auth.admin.getUserById(ownerId);
-        if (!error && userData?.user) {
-          ownersInfo[ownerId] = {
-            isManager: userData.user.user_metadata?.role === 'manager' || userData.user.app_metadata?.role === 'manager',
-            email: userData.user.email || ''
-          };
+      if (ownerIds.length > 0) {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, role, email')
+          .in('id', ownerIds);
+        
+        if (!error && profiles) {
+          profiles.forEach(profile => {
+            ownersInfo[profile.id] = {
+              isManager: profile.role === 'manager',
+              email: profile.email || ''
+            };
+          });
         }
       }
       
@@ -98,9 +105,11 @@ export function AdminIgrejas() {
   async function toggleManagerRole(church: ChurchType) {
     if (!church.owner_id) {
       toast.error('Igreja sem proprietário definido');
+      // Atualizar role na tabela profiles
       return;
-    }
-
+        fro('fils')
+    }.pe()
+   .eq('id',church.owner_id
     const currentIsManager = churchOwners[church.owner_id]?.isManager || false;
     const newRole = currentIsManager ? null : 'manager';
 
@@ -216,7 +225,7 @@ export function AdminIgrejas() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-300">{formatDate(church.created_at)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center juconfst-ia?chuich=d gap-1">
                       <button
                         onClick={() => setSelectedChurch(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-white"
