@@ -30,6 +30,21 @@ export const adminService = {
     return data;
   },
 
+  async createAIConfig(input: Omit<AIConfig, 'id' | 'created_at' | 'updated_at'>): Promise<AIConfig | null> {
+    const { data, error } = await supabase
+      .from('ai_configs')
+      .insert(input)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[admin.createAIConfig] Erro:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
   async createChurch(input: {
     name: string;
     slug: string;

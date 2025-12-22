@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Home, Settings, Plus, Pencil, Trash2, X, Check, Bed, Users, Image, Calendar, DollarSign, FileText, Bot } from 'lucide-react';
 import { ImageUploader } from '../../components/ui/ImageUploader';
 import { hostingConfigService, accommodationsService } from '../../services/supabase/hostingService';
-import type { HostingConfig, ChurchAccommodation, BlockedDatePeriod } from '../../types/database';
+import { adminService } from '../../services/supabase/admin';
+import type { HostingConfig, ChurchAccommodation, BlockedDatePeriod, Church } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import "react";
 
 const TIPO_ACOMODACAO: Record<string, string> = { individual: 'Individual', duplo: 'Duplo', triplo: 'Triplo', quadruplo: 'Quádruplo', coletivo: 'Coletivo', dormitorio: 'Dormitório', suite: 'Suíte', apartamento: 'Apartamento' };
 const PUBLICO_OPTIONS = ['romeiros', 'retiros', 'clero', 'turistas', 'eventos', 'grupos', 'familias'];
@@ -14,6 +15,7 @@ export function AdminHospedagem() {
   const [searchParams] = useSearchParams();
   const [churchId, setChurchId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [churches, setChurches] = useState<Church[]>([]);
   const [activeTab, setActiveTab] = useState<'config' | 'acomodacoes'>('config');
   const [, setConfig] = useState<HostingConfig | null>(null);
   const [accommodations, setAccommodations] = useState<ChurchAccommodation[]>([]);
@@ -49,22 +51,53 @@ export function AdminHospedagem() {
 
   useEffect(() => { loadData(); }, [searchParams.get('church')]);
 
+  async function loadChurchData(churchId: string) {
+    try {
+      const cfg = await hostingConfigService.getByChurch(churchId);
+      if (cfg) { 
+        setConfig(cfg); 
+        setForm({ ...form, ...cfg, imagens: (cfg as any).imagens || [] }); 
+      } else {
+        // Reset form para valores padrão
+        setForm({
+          hospedagem_ativa: false, descricao: '', publico_permitido: ['romeiros', 'retiros'], idade_minima: 0,
+          permite_criancas: true, permite_animais: false, acessibilidade: '',
+          dias_funcionamento: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+          horario_checkin: '14:00', horario_checkout: '12:00', estadia_minima: 1, estadia_maxima: 30,
+          permite_estender_estadia: true, datas_bloqueadas: [], bloqueio_por_evento: true,
+          valor_por_noite: undefined, valor_por_pessoa: false, taxa_limpeza: undefined,
+          exige_sinal: false, valor_sinal: undefined, percentual_sinal: undefined,
+          prazo_pagamento_sinal: undefined, politica_cancelamento: '',
+          formas_pagamento: ['pix', 'dinheiro', 'transferencia'], dados_obrigatorios: ['nome', 'cpf', 'telefone', 'email'],
+          exige_documento: true, tipos_documento: ['rg', 'cnh'], ficha_hospede_link: '', envio_documentos_por: ['upload', 'email'],
+          ia_nivel_automacao: 'informar', usa_agendamento_ia: false,
+          precisa_confirmacao_humana: true, mensagem_confirmacao_reserva: '', mensagem_indisponibilidade: '',
+          regras_hospedagem: '', termos_responsabilidade: '', orientacoes_hospede: '', politica_silencio: '', informacoes_gerais: '',
+          imagens: [],
+        });
+        setConfig(null);
+      }
+      setAccommodations(await accommodationsService.listByChurch(churchId));
+    } catch (e) { 
+      console.error('Erro ao carregar dados da igreja:', e); 
+    }
+  }
+
   async function loadData() {
     setIsLoading(true);
     try {
+      // Carregar lista de igrejas
+      const churchesData = await adminService.listChurches();
+      setChurches(churchesData);
+
       let cId = searchParams.get('church');
-      if (!cId) {
-        const { data: u } = await supabase.auth.getUser();
-        if (u.user) {
-          const { data: c } = await supabase.from('churches').select('id').eq('owner_id', u.user.id).single();
-          if (c) cId = c.id;
-        }
+      if (!cId && churchesData.length > 0) {
+        cId = churchesData[0].id;
       }
+      
       if (cId) {
         setChurchId(cId);
-        const cfg = await hostingConfigService.getByChurch(cId);
-        if (cfg) { setConfig(cfg); setForm({ ...form, ...cfg, imagens: (cfg as any).imagens || [] }); }
-        setAccommodations(await accommodationsService.listByChurch(cId));
+        await loadChurchData(cId);
       }
     } catch (e) { console.error(e); }
     setIsLoading(false);
@@ -102,6 +135,33 @@ export function AdminHospedagem() {
       <div className="flex items-center justify-between mb-6">
         <div><h1 className="text-2xl font-bold text-white">Hospedagem</h1><p className="text-gray-400 text-sm">Configure hospedagem e acomodações</p></div>
         <span className={`px-3 py-1 rounded-full text-sm ${form.hospedagem_ativa ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>{form.hospedagem_ativa ? 'Ativa' : 'Inativa'}</span>
+      </div>
+
+      {/* Church Selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">Selecione a Igreja</label>
+        <select
+          value={churchId || ''}
+          onChange={(e) => {
+            const newChurchId = e.target.value;
+            setChurchId(newChurchId);
+            if (newChurchId) {
+              // Carregar dados da nova igreja selecionada
+              loadChurchData(newChurchId);
+            } else {
+              setConfig(null);
+              setAccommodations([]);
+            }
+          }}
+          className="w-full md:w-64 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+        >
+          <option value="">Selecione uma igreja...</option>
+          {churches.map((church) => (
+            <option key={church.id} value={church.id}>
+              {church.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex gap-2 mb-6">

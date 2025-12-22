@@ -89,6 +89,7 @@ export type AIConfig = {
   projetos_sociais_comunidade?: string;
   regras_especificas?: string;
   hospedagem_disponivel: boolean;
+  imagens_acomodacoes?: string; // Array de URLs de imagens das acomodações
   
   // Identidade do Agente
   agent_gender: 'feminino' | 'masculino' | 'neutro';

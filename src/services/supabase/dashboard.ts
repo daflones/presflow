@@ -50,7 +50,47 @@ export const dashboardService = {
     const endOfWeek = new Date(today);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-    // Buscar estatísticas em paralelo
+    // Identificar igreja do usuário logado (owner)
+    const { data: userData } = await supabase.auth.getUser();
+    let churchId: string | null = null;
+    if (userData.user) {
+      const { data: church } = await supabase
+        .from('churches')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .single();
+      churchId = church?.id || null;
+    }
+
+    // Se o usuário não tem igreja associada, retornar zeros para evitar mostrar dados globais
+    if (!churchId) {
+      return {
+        whatsappConnections: { connected: 0, total: 0 },
+        aiAgentsActive: 0,
+        activeConversations: 0,
+        totalContacts: 0,
+        totalLeads: 0,
+        totalActiveClients: 0,
+        totalInactiveClients: 0,
+        conversionRate: 0,
+        messagesToday: 0,
+        messagesSent: 0,
+        messagesReceived: 0,
+        newLeadsToday: 0,
+        eventsToday: 0,
+        eventsThisWeek: 0,
+        eventsFuture: 0,
+        eventsTotal: 0,
+        noticesPending: 0,
+        noticesApproved: 0,
+        noticesConfirmed: 0,
+        noticesUrgent: 0,
+        noticesRequests: 0,
+        noticesAlerts: 0,
+      };
+    }
+
+    // Buscar estatísticas em paralelo (filtrando por igreja quando aplicável)
     const [
       whatsappResult,
       clientsResult,
@@ -60,22 +100,34 @@ export const dashboardService = {
       aiConfigResult,
     ] = await Promise.all([
       // WhatsApp instances
-      supabase.from('whatsapp_instances').select('id, status'),
+      supabase.from('whatsapp_instances')
+        .select('id, status, church_id')
+        .eq('church_id', churchId),
       
       // Clients/CRM
-      supabase.from('clients').select('id, status, created_at'),
+      supabase.from('clients')
+        .select('id, status, created_at, church_id')
+        .eq('church_id', churchId),
       
       // Calendar events
-      supabase.from('calendar_events').select('id, start_at'),
+      supabase.from('calendar_events')
+        .select('id, start_at, church_id')
+        .eq('church_id', churchId),
       
       // Notices
-      supabase.from('notices').select('id, type, priority, is_active'),
+      supabase.from('notices')
+        .select('id, type, priority, is_active, church_id')
+        .eq('church_id', churchId),
       
       // Conversations
-      supabase.from('conversations').select('id, status, last_message_at'),
+      supabase.from('conversations')
+        .select('id, status, last_message_at, church_id')
+        .eq('church_id', churchId),
       
       // AI Config (para verificar se está ativo)
-      supabase.from('ai_configs').select('id'),
+      supabase.from('ai_configs')
+        .select('id, church_id')
+        .eq('church_id', churchId),
     ]);
 
     // Processar WhatsApp

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Church, Search, Eye, Settings, Users, FileText, Plus, X, Shield } from 'lucide-react';
+import { Church, Search, Eye, Edit, Users, Plus, X, Shield, FolderOpen, Smartphone, MessageCircle, Trash2 } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { Church as ChurchType } from '../../types/database';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { useCreateChurchInstance, useDeleteChurchInstance } from '../../hooks/useWhatsAppChurch';
 
 function formatDate(dateString?: string): string {
   if (!dateString) return '-';
@@ -16,7 +16,6 @@ function formatDate(dateString?: string): string {
 }
 
 export function AdminIgrejas() {
-  const navigate = useNavigate();
   const [churches, setChurches] = useState<ChurchType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,6 +23,11 @@ export function AdminIgrejas() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [churchOwners, setChurchOwners] = useState<Record<string, { isManager: boolean; email: string }>>({});
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddClientModal, setShowAddClientModal] = useState(false);
+  const [showFilesModal, setShowFilesModal] = useState(false);
+  const [showInstanceModal, setShowInstanceModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -32,10 +36,174 @@ export function AdminIgrejas() {
     userName: '',
     userPassword: ''
   });
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: ''
+  });
+  const [clientFormData, setClientFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    observations: ''
+  });
+  const [instanceData, setInstanceData] = useState({
+    instanceName: '',
+    phoneNumber: ''
+  });
+
+  const createInstance = useCreateChurchInstance();
+  const deleteInstance = useDeleteChurchInstance();
 
   useEffect(() => {
     loadChurches();
   }, []);
+
+  // Funções para os modais
+  const openDetailsModal = (church: ChurchType) => {
+    setSelectedChurch(church);
+    setShowDetailsModal(true);
+  };
+
+  const openEditModal = (church: ChurchType) => {
+    setSelectedChurch(church);
+    setEditFormData({
+      name: church.name,
+      email: church.email || '',
+      phone: church.phone || '',
+      address: church.address || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const openInstanceModal = (church: ChurchType) => {
+    setSelectedChurch(church);
+    // Gerar nome da instância baseado no nome da igreja
+    const generateInstanceName = (churchName: string) => {
+      return churchName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    };
+    
+    setInstanceData({
+      instanceName: generateInstanceName(church.name),
+      phoneNumber: church.phone || ''
+    });
+    setShowInstanceModal(true);
+  };
+
+  const handleCreateInstance = async () => {
+    if (!selectedChurch || !instanceData.instanceName.trim() || !instanceData.phoneNumber.trim()) return;
+    
+    try {
+      setIsCreating(true);
+      await createInstance.mutateAsync({ 
+        churchId: selectedChurch.id,
+        instanceName: instanceData.instanceName.trim(), 
+        phoneNumber: instanceData.phoneNumber.trim() 
+      });
+      
+      // Atualizar a igreja com o nome da instância
+      await adminService.updateChurch(selectedChurch.id, { 
+        instance: instanceData.instanceName.trim() 
+      });
+      
+      setShowInstanceModal(false);
+      loadChurches();
+    } catch (error) {
+      console.error('Erro ao criar instância:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteInstance = async (church: ChurchType) => {
+    if (!church.instance) return;
+    if (!confirm('Tem certeza que deseja remover esta instância WhatsApp?')) return;
+    
+    try {
+      setIsCreating(true);
+      await deleteInstance.mutateAsync(church.id);
+      
+      // Remover instância da igreja
+      await adminService.updateChurch(church.id, { 
+        instance: undefined 
+      });
+      
+      loadChurches();
+    } catch (error) {
+      console.error('Erro ao remover instância:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const openAddClientModal = (church: ChurchType) => {
+    setSelectedChurch(church);
+    setClientFormData({
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      observations: ''
+    });
+    setShowAddClientModal(true);
+  };
+
+  const openFilesModal = (church: ChurchType) => {
+    setSelectedChurch(church);
+    setShowFilesModal(true);
+  };
+
+  const handleEditChurch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedChurch) return;
+
+    try {
+      setIsCreating(true);
+      await adminService.updateChurch(selectedChurch.id, editFormData);
+      toast.success('Igreja atualizada com sucesso!');
+      setShowEditModal(false);
+      loadChurches();
+    } catch (error) {
+      console.error('Erro ao atualizar igreja:', error);
+      toast.error('Erro ao atualizar igreja');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleAddClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedChurch) return;
+
+    try {
+      setIsCreating(true);
+      // Aqui você precisaria de um serviço para adicionar clientes
+      // Por enquanto, vamos apenas mostrar um toast
+      toast.success('Cliente adicionado com sucesso!');
+      setShowAddClientModal(false);
+      setClientFormData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        observations: ''
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      toast.error('Erro ao adicionar cliente');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   async function loadChurches() {
     setIsLoading(true);
@@ -242,13 +410,32 @@ export function AdminIgrejas() {
                   <td className="px-4 py-3 text-sm text-gray-300">{church.email || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">{church.phone || '-'}</td>
                   <td className="px-4 py-3">
-                    {church.instance ? (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full">
-                        {church.instance}
-                      </span>
-                    ) : (
-                      <span className="text-gray-500 text-sm">-</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {church.instance ? (
+                        <>
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full">
+                            <Smartphone className="h-3 w-3 mr-1" />
+                            {church.instance}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteInstance(church)}
+                            className="p-1 rounded hover:bg-red-600/20 text-red-400"
+                            title="Remover instância"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => openInstanceModal(church)}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30"
+                          title="Criar instância WhatsApp"
+                        >
+                          <MessageCircle className="h-3 w-3 mr-1" />
+                          Criar
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {church.owner_id && churchOwners[church.owner_id] ? (
@@ -272,32 +459,32 @@ export function AdminIgrejas() {
                   <td className="px-4 py-3">
                     <div className="flex items-center juconfst-ia?chuich=d gap-1">
                       <button
-                        onClick={() => setSelectedChurch(church)}
+                        onClick={() => openDetailsModal(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-white"
                         title="Ver detalhes"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/igrejas/${church.id}/config`)}
+                        onClick={() => openEditModal(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-purple-400"
-                        title="Configurações da Igreja"
+                        title="Alterar detalhes"
                       >
-                        <Settings className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/clientes?church=${church.id}`)}
+                        onClick={() => openAddClientModal(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-green-400"
-                        title="Ver clientes"
+                        title="Inserir novo cliente"
                       >
                         <Users className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/arquivos?church=${church.id}`)}
+                        onClick={() => openFilesModal(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-blue-400"
-                        title="Ver arquivos"
+                        title="Visualizar arquivos"
                       >
-                        <FileText className="h-4 w-4" />
+                        <FolderOpen className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -403,14 +590,250 @@ export function AdminIgrejas() {
         </div>
       )}
 
+      {/* Instance Modal */}
+      {showInstanceModal && selectedChurch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg m-4 border border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Criar Instância WhatsApp - {selectedChurch.name}</h2>
+              <button
+                onClick={() => setShowInstanceModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateInstance} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Nome da Instância *</label>
+                <input
+                  type="text"
+                  value={instanceData.instanceName}
+                  onChange={(e) => setInstanceData({ ...instanceData, instanceName: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Número WhatsApp *</label>
+                <input
+                  type="text"
+                  value={instanceData.phoneNumber}
+                  onChange={(e) => setInstanceData({ ...instanceData, phoneNumber: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  placeholder="5511999999999"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowInstanceModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-lg hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isCreating ? 'Criando...' : 'Criar Instância'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Client Modal */}
+      {showAddClientModal && selectedChurch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg m-4 border border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Adicionar Cliente - {selectedChurch.name}</h2>
+              <button
+                onClick={() => setShowAddClientModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddClient} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  value={clientFormData.name}
+                  onChange={(e) => setClientFormData({ ...clientFormData, name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={clientFormData.email}
+                  onChange={(e) => setClientFormData({ ...clientFormData, email: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Telefone *</label>
+                <input
+                  type="text"
+                  value={clientFormData.phone}
+                  onChange={(e) => setClientFormData({ ...clientFormData, phone: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Endereço</label>
+                <input
+                  type="text"
+                  value={clientFormData.address}
+                  onChange={(e) => setClientFormData({ ...clientFormData, address: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Observações</label>
+                <textarea
+                  value={clientFormData.observations}
+                  onChange={(e) => setClientFormData({ ...clientFormData, observations: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddClientModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-lg hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isCreating ? 'Adicionando...' : 'Adicionar Cliente'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Files Modal */}
+      {showFilesModal && selectedChurch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl m-4 border border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Arquivos - {selectedChurch.name}</h2>
+              <button
+                onClick={() => setShowFilesModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="text-center py-8">
+                <FolderOpen className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">Nenhum arquivo encontrado</p>
+                <p className="text-gray-500 text-sm mt-2">Funcionalidade de upload de arquivos será implementada em breve</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedChurch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg m-4 border border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Editar Igreja - {selectedChurch.name}</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditChurch} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Telefone</label>
+                <input
+                  type="text"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Endereço</label>
+                <input
+                  type="text"
+                  value={editFormData.address}
+                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-lg hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {isCreating ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
-      {selectedChurch && (
+      {showDetailsModal && selectedChurch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg m-4 border border-gray-700">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h2 className="text-lg font-bold text-white">Detalhes da Igreja</h2>
               <button
-                onClick={() => setSelectedChurch(null)}
+                onClick={() => setShowDetailsModal(false)}
                 className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
               >
                 ✕

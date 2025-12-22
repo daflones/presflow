@@ -42,7 +42,61 @@ const QUALIFICATION_LABELS: Record<string, string> = {
   motivacao: 'Motivação',
   expectativa: 'Expectativa',
   tipo_evento: 'Tipo de Evento',
+  business_hours: 'Horário de Funcionamento',
 };
+
+const createDefaultEditForm = () => ({
+  agent_name: '',
+  informacoes_adicionais: '',
+  perguntas_frequentes: '',
+  principais_eventos: '',
+  menu_principal: '',
+  localizacao_igreja: '',
+  informacao_historica: '',
+  documentacao_necessaria: '',
+  tone_of_voice: 'amigavel' as 'amigavel' | 'formal' | 'profissional',
+  text_size: 'curto' as 'curto' | 'medio' | 'longo',
+  use_emojis: false,
+  send_documents: false,
+  auto_scheduling: false,
+  outside_hours_message: '',
+  google_maps_link: '',
+  espacos_disponiveis: '',
+  info_casamento: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+  exige_sinal: false,
+  regras_sinal: '',
+  info_batizados: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+  cursos: '',
+  sessao_fotos: '',
+  regras_hospedagem: '',
+  link_visitacao: '',
+  guia_turistico: '',
+  projetos_sociais_empresas: '',
+  projetos_sociais_comunidade: '',
+  regras_especificas: '',
+  hospedagem_disponivel: false,
+  imagens_acomodacoes: '',
+  agent_gender: 'feminino' as 'feminino' | 'masculino' | 'neutro',
+  greeting_message: '',
+  error_message: '',
+  phone_landline: '',
+  phone_whatsapp: '',
+  email_main: '',
+  email_secretary: '',
+  email_documents: '',
+  contact_general: '',
+  allow_scheduling_lent: true,
+  allow_scheduling_jubilee: true,
+  blocked_dates: [] as BlockedDatePeriod[],
+  max_simultaneous_events: 1,
+  donation_text: '',
+  prayer_text: '',
+  confirmation_text: '',
+  unavailability_text: '',
+  post_scheduling_text: '',
+  qualification_fields: DEFAULT_QUALIFICATION_FIELDS,
+  business_hours: DEFAULT_BUSINESS_HOURS,
+});
 
 export function AdminConfigIA() {
   const [searchParams] = useSearchParams();
@@ -55,68 +109,15 @@ export function AdminConfigIA() {
   const [filterChurch, setFilterChurch] = useState(churchIdParam || '');
   
   // Edit modal
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<AIConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'hospedagem' | 'visitacao' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('general');
   
-  const [editForm, setEditForm] = useState({
-    agent_name: '',
-    informacoes_adicionais: '',
-    perguntas_frequentes: '',
-    principais_eventos: '',
-    menu_principal: '',
-    localizacao_igreja: '',
-    informacao_historica: '',
-    documentacao_necessaria: '',
-    tone_of_voice: 'amigavel' as 'amigavel' | 'formal' | 'profissional',
-    text_size: 'curto' as 'curto' | 'medio' | 'longo',
-    use_emojis: false,
-    send_documents: false,
-    auto_scheduling: false,
-    outside_hours_message: '',
-    // Campos de serviços
-    google_maps_link: '',
-    espacos_disponiveis: '',
-    info_casamento: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
-    exige_sinal: false,
-    regras_sinal: '',
-    info_batizados: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
-    cursos: '',
-    sessao_fotos: '',
-    regras_hospedagem: '',
-    link_visitacao: '',
-    guia_turistico: '',
-    projetos_sociais_empresas: '',
-    projetos_sociais_comunidade: '',
-    regras_especificas: '',
-    hospedagem_disponivel: false,
-    // Identidade do Agente
-    agent_gender: 'feminino' as 'feminino' | 'masculino' | 'neutro',
-    greeting_message: '',
-    error_message: '',
-    // Contatos da Igreja
-    phone_landline: '',
-    phone_whatsapp: '',
-    email_main: '',
-    email_secretary: '',
-    email_documents: '',
-    contact_general: '',
-    // Regras de Agendamento
-    allow_scheduling_lent: true,
-    allow_scheduling_jubilee: true,
-    blocked_dates: [] as BlockedDatePeriod[],
-    max_simultaneous_events: 1,
-    // Mensagens Personalizadas
-    donation_text: '',
-    prayer_text: '',
-    confirmation_text: '',
-    unavailability_text: '',
-    post_scheduling_text: '',
-    // Campos existentes
-    qualification_fields: DEFAULT_QUALIFICATION_FIELDS,
-    business_hours: DEFAULT_BUSINESS_HOURS,
-  });
+  const [modalMode, setModalMode] = useState<'edit' | 'create'>('edit');
+  const [creatingChurchId, setCreatingChurchId] = useState<string | null>(null);
+  const [pendingChurchId, setPendingChurchId] = useState('');
+  const [editForm, setEditForm] = useState(createDefaultEditForm);
 
   useEffect(() => {
     loadData();
@@ -178,6 +179,7 @@ export function AdminConfigIA() {
       projetos_sociais_comunidade: config.projetos_sociais_comunidade || '',
       regras_especificas: config.regras_especificas || '',
       hospedagem_disponivel: config.hospedagem_disponivel || false,
+      imagens_acomodacoes: config.imagens_acomodacoes || '',
       // Identidade do Agente
       agent_gender: config.agent_gender || 'feminino',
       greeting_message: config.greeting_message || '',
@@ -204,21 +206,49 @@ export function AdminConfigIA() {
       qualification_fields: config.qualification_fields || DEFAULT_QUALIFICATION_FIELDS,
       business_hours: config.business_hours || DEFAULT_BUSINESS_HOURS,
     });
-    setIsEditModalOpen(true);
+    setIsModalOpen(true);
+    setModalMode('edit');
+    setCreatingChurchId(null);
+    setPendingChurchId('');
   }
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedConfig(null);
+    setModalMode('edit');
+    setCreatingChurchId(null);
+    setPendingChurchId('');
+  }
+
+  const openCreateModal = (churchId: string) => {
+    setModalMode('create');
+    setCreatingChurchId(churchId);
+    setSelectedConfig(null);
+    setEditForm(createDefaultEditForm());
+    setActiveTab('general');
+    setIsModalOpen(true);
+  };
+
   async function handleSave() {
-    if (!selectedConfig) return;
-    
     setIsSaving(true);
     try {
-      const result = await adminService.updateAIConfig(selectedConfig.id, editForm);
-      if (result) {
-        alert('Configurações salvas com sucesso!');
-        setIsEditModalOpen(false);
+      if (modalMode === 'edit' && selectedConfig) {
+        const result = await adminService.updateAIConfig(selectedConfig.id, editForm);
+        if (result) {
+          alert('Configurações salvas com sucesso!');
+          closeModal();
+          loadData();
+        } else {
+          alert('Erro ao salvar configuração. Tente novamente.');
+        }
+      } else if (modalMode === 'create' && creatingChurchId) {
+        await adminService.createAIConfig({
+          church_id: creatingChurchId,
+          ...editForm,
+        });
+        alert('Configuração criada com sucesso!');
+        closeModal();
         loadData();
-      } else {
-        alert('Erro ao salvar configuração. Tente novamente.');
       }
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -227,6 +257,9 @@ export function AdminConfigIA() {
       setIsSaving(false);
     }
   }
+
+  const churchesWithConfig = new Set(configs.map(config => config.church_id));
+  const churchesWithoutConfig = churches.filter(church => !churchesWithConfig.has(church.id));
 
   const filteredConfigs = configs.filter(config => {
     const matchesSearch = config.agent_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -266,6 +299,28 @@ export function AdminConfigIA() {
           ))}
         </select>
       </div>
+      {churchesWithoutConfig.length > 0 && (
+        <div className="flex flex-col md:flex-row gap-3 items-center text-sm text-gray-300">
+          <span className="text-gray-400">Igrejas sem configuração</span>
+          <select
+            value={pendingChurchId}
+            onChange={(e) => setPendingChurchId(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+          >
+            <option value="">Selecione uma igreja</option>
+            {churchesWithoutConfig.map(church => (
+              <option key={church.id} value={church.id}>{church.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => pendingChurchId && openCreateModal(pendingChurchId)}
+            disabled={!pendingChurchId}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Criar configuração
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
@@ -349,14 +404,18 @@ export function AdminConfigIA() {
       </div>
 
       {/* Edit Modal */}
-      {isEditModalOpen && selectedConfig && (
+      {isModalOpen && (modalMode === 'edit' ? !!selectedConfig : true) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl h-[90vh] border border-gray-700 flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 shrink-0">
-              <h2 className="text-lg font-bold text-white">Editar Configuração de IA</h2>
+              <h2 className="text-lg font-bold text-white">
+                {modalMode === 'edit'
+                  ? 'Editar Configuração de IA'
+                  : `Criar Configuração de IA${creatingChurchId ? ` - ${churches.find(c => c.id === creatingChurchId)?.name || ''}` : ''}`.trim()}
+              </h2>
               <button
-                onClick={() => setIsEditModalOpen(false)}
+                onClick={closeModal}
                 className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
               >
                 <X className="h-5 w-5" />
@@ -1248,6 +1307,18 @@ export function AdminConfigIA() {
                             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                           />
                         </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Imagens das Acomodações</label>
+                          <p className="text-xs text-gray-500 mb-2">Adicione URLs de imagens das acomodações (separadas por vírgula)</p>
+                          <textarea
+                            value={editForm.imagens_acomodacoes}
+                            onChange={(e) => setEditForm({ ...editForm, imagens_acomodacoes: e.target.value })}
+                            rows={3}
+                            placeholder="https://exemplo.com/imagem1.jpg, https://exemplo.com/imagem2.jpg"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                          />
+                        </div>
                       </div>
                     </>
                   )}
@@ -1491,7 +1562,7 @@ export function AdminConfigIA() {
             {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700 shrink-0">
               <button
-                onClick={() => setIsEditModalOpen(false)}
+                onClick={closeModal}
                 className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg"
               >
                 Cancelar

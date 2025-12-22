@@ -1,13 +1,16 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Shield, Church, Bot, Users, FileText, LogOut, Home } from 'lucide-react';
+import { Shield, Church, Bot, Users, FileText, LogOut, Home, Bed, Calendar, MapPin } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect } from 'react';
 
 const adminNavItems = [
   { name: 'Dashboard', href: '/admin', icon: Home },
   { name: 'Igrejas', href: '/admin/igrejas', icon: Church },
-  { name: 'Calendário', href: '/admin/calendario', icon: Church },
+  { name: 'Calendário', href: '/admin/calendario', icon: Calendar },
   { name: 'Configurações IA', href: '/admin/config-ia', icon: Bot },
+  { name: 'Serviços', href: '/admin/servicos', icon: MapPin },
+  { name: 'Hospedagem', href: '/admin/hospedagem', icon: Bed },
+  { name: 'Visitação', href: '/admin/visitacao', icon: Calendar },
   { name: 'Clientes', href: '/admin/clientes', icon: Users },
   { name: 'Arquivos IA', href: '/admin/arquivos', icon: FileText },
 ];

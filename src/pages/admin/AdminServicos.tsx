@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import { 
   Settings, Search, Plus, Pencil, Trash2, X, Check,
-  Heart, Droplets, Church, Camera, Map, Sunrise, Users, BookOpen, GripVertical,
+  Heart, Droplets, ChurchIcon, Camera, Map, Sunrise, Users, BookOpen, GripVertical,
   FileText, DollarSign, Calendar, Bot, Image
 } from 'lucide-react';
 import { ImageUploader } from '../../components/ui/ImageUploader';
 import { churchServicesService } from '../../services/supabase/churchServices';
-import type { ChurchService, ServiceEtapa, ServiceDocumento } from '../../types/database';
+import { adminService } from '../../services/supabase/admin';
+import type { ChurchService, ServiceEtapa, ServiceDocumento, Church as ChurchType } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import "react";
 
 const ICON_MAP: Record<string, any> = {
   heart: Heart,
   droplets: Droplets,
-  church: Church,
+  church: ChurchIcon,
   camera: Camera,
   map: Map,
   sunrise: Sunrise,
@@ -47,6 +48,7 @@ export function AdminServicos() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [churchId, setChurchId] = useState<string | null>(null);
+  const [churches, setChurches] = useState<ChurchType[]>([]);
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -93,26 +95,21 @@ export function AdminServicos() {
   });
 
   useEffect(() => {
-    loadChurchAndServices();
+    loadChurchesAndServices();
   }, [churchIdParam]);
 
-  async function loadChurchAndServices() {
+  async function loadChurchesAndServices() {
     setIsLoading(true);
     try {
+      // Carregar lista de igrejas
+      const churchesData = await adminService.listChurches();
+      setChurches(churchesData);
+
       let cId = churchIdParam;
       
-      if (!cId) {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData.user) {
-          const { data: church } = await supabase
-            .from('churches')
-            .select('id')
-            .eq('owner_id', userData.user.id)
-            .single();
-          if (church) {
-            cId = church.id;
-          }
-        }
+      if (!cId && churchesData.length > 0) {
+        // Se não tiver parâmetro, usa a primeira igreja
+        cId = churchesData[0].id;
       }
 
       if (cId) {
@@ -224,7 +221,7 @@ export function AdminServicos() {
           ...form,
         } as any);
       }
-      await loadChurchAndServices();
+      await loadChurchesAndServices();
       setIsModalOpen(false);
     } catch (error) {
       console.error('Erro ao salvar serviço:', error);
@@ -239,7 +236,7 @@ export function AdminServicos() {
 
     try {
       await churchServicesService.delete(id);
-      await loadChurchAndServices();
+      await loadChurchesAndServices();
     } catch (error) {
       console.error('Erro ao excluir serviço:', error);
       alert('Erro ao excluir serviço');
@@ -249,7 +246,7 @@ export function AdminServicos() {
   async function handleToggleActive(service: ChurchService) {
     try {
       await churchServicesService.toggleActive(service.id, !service.ativo);
-      await loadChurchAndServices();
+      await loadChurchesAndServices();
     } catch (error) {
       console.error('Erro ao alterar status:', error);
     }
@@ -286,6 +283,31 @@ export function AdminServicos() {
         </button>
       </div>
 
+      {/* Church Selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">Selecione a Igreja</label>
+        <select
+          value={churchId || ''}
+          onChange={(e) => {
+            const newChurchId = e.target.value;
+            setChurchId(newChurchId);
+            if (newChurchId) {
+              churchServicesService.listByChurch(newChurchId).then(setServices);
+            } else {
+              setServices([]);
+            }
+          }}
+          className="w-full md:w-64 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+        >
+          <option value="">Selecione uma igreja...</option>
+          {churches.map((church) => (
+            <option key={church.id} value={church.id}>
+              {church.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Search */}
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -305,7 +327,7 @@ export function AdminServicos() {
         </div>
       ) : filteredServices.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
-          <Church className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <ChurchIcon className="h-12 w-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">Nenhum serviço cadastrado</p>
           <button
             onClick={openNewService}
@@ -317,7 +339,7 @@ export function AdminServicos() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredServices.map((service) => {
-            const ServiceIcon = ICON_MAP[service.icone || 'church'] || Church;
+            const ServiceIcon = ICON_MAP[service.icone || 'church'] || ChurchIcon;
             return (
               <div
                 key={service.id}

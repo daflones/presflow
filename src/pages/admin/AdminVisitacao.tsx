@@ -16,9 +16,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useAuth } from '../../contexts/AuthContext';
 import { visitationConfigService } from '../../services/supabase';
-import type { VisitationFormConfig, VisitationFieldsConfig, CustomField } from '../../types/database';
+import { adminService } from '../../services/supabase/admin';
+import type { VisitationFormConfig, VisitationFieldsConfig, CustomField, Church } from '../../types/database';
 
 const defaultFieldsConfig: VisitationFieldsConfig = {
   nome: { ativo: true, obrigatorio: true, label: 'Nome completo' },
@@ -41,10 +41,11 @@ const defaultFieldsConfig: VisitationFieldsConfig = {
 };
 
 export function AdminVisitacao() {
-  const { church } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [churches, setChurches] = useState<Church[]>([]);
+  const [selectedChurchId, setSelectedChurchId] = useState<string | null>(null);
   const [config, setConfig] = useState<Partial<VisitationFormConfig>>({
     titulo: 'Formulário de Visitação',
     descricao: '',
@@ -60,22 +61,43 @@ export function AdminVisitacao() {
   });
 
   useEffect(() => {
-    loadConfig();
-  }, [church?.id]);
+    loadChurchesAndConfig();
+  }, []);
 
-  const loadConfig = async () => {
-    if (!church?.id) return;
-    
+  async function loadChurchConfig(churchId: string) {
     try {
-      setIsLoading(true);
-      const existingConfig = await visitationConfigService.getByChurch(church.id);
+      const existingConfig = await visitationConfigService.getByChurch(churchId);
       
       if (existingConfig) {
         setConfig(existingConfig);
       } else {
         // Gerar slug baseado no nome da igreja
-        const slug = generateSlug(church.name);
+        const church = churches.find(c => c.id === churchId);
+        const slug = generateSlug(church?.name || '');
         setConfig(prev => ({ ...prev, slug }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configuração da igreja:', error);
+    }
+  }
+
+  const loadChurchesAndConfig = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Carregar lista de igrejas
+      const churchesData = await adminService.listChurches();
+      setChurches(churchesData);
+      
+      // Se não tiver igreja selecionada, usa a primeira
+      if (!selectedChurchId && churchesData.length > 0) {
+        setSelectedChurchId(churchesData[0].id);
+      }
+      
+      // Carregar configuração da igreja selecionada
+      if (selectedChurchId || churchesData.length > 0) {
+        const churchId = selectedChurchId || churchesData[0].id;
+        await loadChurchConfig(churchId);
       }
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
@@ -96,12 +118,12 @@ export function AdminVisitacao() {
   };
 
   const handleSave = async () => {
-    if (!church?.id) return;
+    if (!selectedChurchId) return;
 
     try {
       setIsSaving(true);
-      await visitationConfigService.upsert(church.id, config as VisitationFormConfig);
-      await loadConfig();
+      await visitationConfigService.upsert(selectedChurchId, config as VisitationFormConfig);
+      await loadChurchesAndConfig();
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
     } finally {
@@ -199,6 +221,44 @@ export function AdminVisitacao() {
             Salvar
           </Button>
         </div>
+      </div>
+
+      {/* Church Selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">Selecione a Igreja</label>
+        <select
+          value={selectedChurchId || ''}
+          onChange={(e) => {
+            const newChurchId = e.target.value;
+            setSelectedChurchId(newChurchId);
+            if (newChurchId) {
+              loadChurchConfig(newChurchId);
+            } else {
+              // Reset config para valores padrão
+              setConfig({
+                titulo: 'Formulário de Visitação',
+                descricao: '',
+                ativo: true,
+                cor_primaria: '#8B5CF6',
+                mensagem_boas_vindas: 'Seja bem-vindo! Preencha o formulário abaixo para que possamos conhecê-lo melhor.',
+                mensagem_agradecimento: 'Obrigado por preencher o formulário! Em breve entraremos em contato.',
+                campos_config: defaultFieldsConfig,
+                campos_personalizados: [],
+                opcoes_como_conheceu: ['Indicação de amigo/familiar', 'Redes sociais', 'Passou em frente', 'Evento', 'Busca na internet', 'Outro'],
+                opcoes_motivo_visita: ['Primeira visita', 'Conhecer a igreja', 'Buscar orientação espiritual', 'Participar de evento', 'Acompanhar familiar/amigo', 'Outro'],
+                slug: '',
+              });
+            }
+          }}
+          className="w-full md:w-64 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+        >
+          <option value="">Selecione uma igreja...</option>
+          {churches.map((church) => (
+            <option key={church.id} value={church.id}>
+              {church.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Link do Formulário */}
