@@ -309,17 +309,6 @@ export function AdminIgrejas() {
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">ID do Proprietário (User ID) *</label>
-                <input
-                  type="text"
-                  value={formData.owner_id}
-                  onChange={(e) => setFormData({ ...formData, owner_id: e.target.value })}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
-                  placeholder="UUID do usuário proprietário"
-                  required
-                />
-              </div>
               <div className="flex justify-end gap-2 pt-4">
                 <button
                   type="button"
