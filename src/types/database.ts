@@ -22,6 +22,7 @@ export type Church = {
   plan: 'free' | 'starter' | 'pro' | 'enterprise';
   plan_expires_at?: string;
   instance?: string; // Nome da instância WhatsApp conectada
+  role?: string; // Role do proprietário da igreja (manager, etc)
   created_at: string;
   updated_at: string;
   is_active: boolean;

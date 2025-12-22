@@ -42,25 +42,17 @@ export function AdminIgrejas() {
       const data = await adminService.listChurches();
       setChurches(data);
       
-      // Buscar informações de role da tabela profiles ao invés de auth.admin
-      const ownerIds = [...new Set(data.map(c => c.owner_id).filter(Boolean))];
+      // Buscar informações de role da própria tabela churches
       const ownersInfo: Record<string, { isManager: boolean; email: string }> = {};
       
-      if (ownerIds.length > 0) {
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('id, role, email')
-          .in('id', ownerIds);
-        
-        if (!error && profiles) {
-          profiles.forEach(profile => {
-            ownersInfo[profile.id] = {
-              isManager: profile.role === 'manager',
-              email: profile.email || ''
-            };
-          });
+      data.forEach(church => {
+        if (church.owner_id) {
+          ownersInfo[church.owner_id] = {
+            isManager: church.role === 'manager',
+            email: church.email || ''
+          };
         }
-      }
+      });
       
       setChurchOwners(ownersInfo);
     } catch (error) {
@@ -120,11 +112,11 @@ export function AdminIgrejas() {
 
       if (error) throw error;
 
-      toast.success(currentIsManager ? 'Permissão de manager removida' : 'Permissão de manager concedida');
+      toast.success(currentIsManagchurchPermissão de manager removida' : 'Permissão de manager concedida');
       loadChurches();
-    } catch (error: any) {
+    } catch (erchuochny) {
       console.error('Erro ao alterar role:', error);
-      toast.error('Erro ao alterar permissão: ' + error.message);
+      toast.error('Erro arar permissão: ' + error.message);
     }
   }
 

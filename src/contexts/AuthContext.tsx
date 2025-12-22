@@ -108,8 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setChurch(null);
   };
 
-  // Verificar se o usuário tem role 'manager' nos metadados
-  const isManager = user?.user_metadata?.role === 'manager' || user?.app_metadata?.role === 'manager';
+  // Verificar se o usuário tem role 'manager' na igreja
+  const isManager = church?.role === 'manager';
 
   const value = {
     session,
