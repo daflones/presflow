@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [church, setChurch] = useState<Church | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Função para buscar a igreja do usuário pelo owner_id
   const fetchChurch = async (userId: string): Promise<Church | null> => {
