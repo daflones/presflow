@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "vite",
     "dev:backend": "node server/index.cjs",
+    "prebuild": "npm install --force",
     "build": "tsc -b && vite build",
     "start": "node server/index.cjs",
     "lint": "eslint .",
