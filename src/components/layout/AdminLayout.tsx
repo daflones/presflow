@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Shield, Church, Bot, Users, FileText, LogOut, Home, Briefcase, Bed, ClipboardList } from 'lucide-react';
+import { Shield, Church, Bot, Users, FileText, LogOut, Home } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect } from 'react';
 

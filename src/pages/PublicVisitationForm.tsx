@@ -440,7 +440,7 @@ export function PublicVisitationForm() {
             Seus dados estão seguros e serão tratados com confidencialidade
           </p>
           <p className="text-gray-400 text-xs">
-            Powered by <span className="font-semibold">PrestFlow</span>
+            Powered by <span className="font-semibold">LogiKon</span>
           </p>
         </div>
       </div>

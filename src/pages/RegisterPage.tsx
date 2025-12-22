@@ -78,8 +78,8 @@ export function RegisterPage() {
               <div className="bg-white/20 backdrop-blur-sm rounded-full p-5 mb-4 inline-block">
                 <Church className="h-12 w-12" />
               </div>
-              <h1 className="text-3xl font-bold mb-2">PrestFlow</h1>
-              <p className="text-purple-200">Sistema de Gestão para Igrejas</p>
+              <h1 className="text-3xl font-bold mb-2">Cadastre sua Igreja no LogiKon</h1>
+              <p className="text-gray-400">Preencha os dados para começar</p>
             </div>
             
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
@@ -110,7 +110,7 @@ export function RegisterPage() {
             <div className="bg-purple-600 rounded-full p-3 inline-block mb-3">
               <Church className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-white">PrestFlow</h1>
+            <h1 className="text-xl font-bold text-white">LogiKon</h1>
           </div>
           
           <div className="text-center mb-6">

@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -11,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg}'],
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB limit
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, 
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
@@ -22,7 +21,7 @@ export default defineConfig({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxAgeSeconds: 60 * 60 * 24 * 365 
               }
             }
           }
@@ -30,8 +29,8 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'vite.svg'],
       manifest: {
-        name: 'PrestFlow - Gestão para Igrejas',
-        short_name: 'PrestFlow',
+        name: 'LogiKon - Gestão para Igrejas',
+        short_name: 'LogiKon',
         description: 'Plataforma de gestão para igrejas com automação inteligente.',
         theme_color: '#D4AF37',
         background_color: '#ffffff',

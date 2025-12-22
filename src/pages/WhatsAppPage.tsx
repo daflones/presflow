@@ -55,7 +55,7 @@ export default function WhatsAppPage() {
   // Gerar nome padrão para instância
   useEffect(() => {
     if (!instanceName) {
-      const generatedName = generateInstanceName('igreja-prestflow')
+      const generatedName = generateInstanceName('igreja-logikon')
       setInstanceName(generatedName)
     }
   }, [instanceName])

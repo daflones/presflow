@@ -88,7 +88,7 @@ export function LoginPage() {
             <div className="bg-purple-600 rounded-full p-4 inline-block mb-4">
               <Church className="h-10 w-10 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">PrestFlow</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Acesse o LogiKon</h1>
             <p className="text-gray-400 text-sm">Sistema de Gestão para Igrejas</p>
           </div>
           
@@ -138,7 +138,7 @@ export function LoginPage() {
           
           <div className="mt-8 pt-6 border-t border-gray-700">
             <p className="text-xs text-center text-gray-500">
-              © 2024 PrestFlow. Todos os direitos reservados.
+              © 2024 LogiKon. Todos os direitos reservados.
             </p>
           </div>
         </div>

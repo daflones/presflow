@@ -352,18 +352,18 @@ class WhatsAppService {
       const { whatsappDbService } = await import('../supabase')
       const dbInstance = await whatsappDbService.getInstance()
       
-      if (dbInstance) {
+      if (dbInstance && dbInstance.instance_name) {
         // Salvar no localStorage para próximas consultas
         await this.saveInstanceToProfile({
           instanceName: dbInstance.instance_name,
-          instanceId: dbInstance.instance_id,
-          status: dbInstance.status
+          instanceId: '', // Não temos instance_id no banco
+          status: 'open' // Assumir conectado se está no banco
         })
         
         return {
           instanceName: dbInstance.instance_name,
-          status: dbInstance.status,
-          instanceId: dbInstance.instance_id,
+          status: 'open',
+          instanceId: '',
           connectedAt: dbInstance.connected_at || null
         }
       }
