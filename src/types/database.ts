@@ -41,6 +41,19 @@ export type InfoCerimonia = {
   valores: string;
 };
 
+// Tipo para períodos bloqueados
+export type BlockedDatePeriod = {
+  start: string;
+  end: string;
+  reason?: string;
+};
+
+// Tipo para itens de imagem (usado em várias entidades)
+export type ImagemItem = {
+  url: string;
+  descricao?: string;
+};
+
 export type AIConfig = {
   id: string;
   church_id: string;
@@ -49,7 +62,7 @@ export type AIConfig = {
   informacoes_adicionais?: string;
   perguntas_frequentes?: string;
   principais_eventos?: string;
-  menu_principal?: string;
+  menu_principal?: string; // TEXT no banco de dados (conteúdo do menu)
   localizacao_igreja?: string;
   informacao_historica?: string;
   documentacao_necessaria?: string;
@@ -59,7 +72,7 @@ export type AIConfig = {
   send_documents: boolean;
   auto_scheduling: boolean;
   
-  // Novos campos
+  // Campos de serviços
   google_maps_link?: string;
   espacos_disponiveis?: string;
   info_casamento?: InfoCerimonia;
@@ -75,6 +88,38 @@ export type AIConfig = {
   projetos_sociais_comunidade?: string;
   regras_especificas?: string;
   hospedagem_disponivel: boolean;
+  
+  // Identidade do Agente
+  agent_gender: 'feminino' | 'masculino' | 'neutro';
+  greeting_message?: string;
+  error_message?: string;
+  
+  // Contatos da Igreja
+  phone_landline?: string;
+  phone_whatsapp?: string;
+  email_main?: string;
+  email_secretary?: string;
+  email_documents?: string;
+  contact_general?: string;
+  
+  // Regras de Agendamento
+  allow_scheduling_lent: boolean;
+  allow_scheduling_jubilee: boolean;
+  blocked_dates: BlockedDatePeriod[];
+  max_simultaneous_events: number;
+  
+  // Mensagens Personalizadas
+  donation_text?: string;
+  prayer_text?: string;
+  confirmation_text?: string;
+  unavailability_text?: string;
+  post_scheduling_text?: string;
+  
+  // Imagens (armazenadas no Supabase Storage)
+  imagens_batismos?: ImagemItem[];
+  imagens_casamentos?: ImagemItem[];
+  imagens_espacos?: ImagemItem[];
+  imagens_igreja?: ImagemItem[];
   
   qualification_fields: {
     nome: boolean;
@@ -304,4 +349,313 @@ export type ArquivoIA = {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+};
+
+// ============================================
+// SERVIÇOS ESTRUTURADOS
+// ============================================
+
+export type ServiceEtapa = {
+  ordem: number;
+  titulo: string;
+  descricao?: string;
+  duracao_dias?: number;
+};
+
+export type ServiceDocumento = {
+  nome: string;
+  obrigatorio: boolean;
+  descricao?: string;
+};
+
+export type ServiceHorario = {
+  inicio: string;
+  fim: string;
+};
+
+export type ChurchService = {
+  id: string;
+  church_id: string;
+  
+  // Identificação
+  nome: string;
+  slug: string;
+  tipo: 'cerimonia' | 'sacramento' | 'evento' | 'servico' | 'outro';
+  ativo: boolean;
+  ordem: number;
+  
+  // Descrição
+  descricao_curta?: string;
+  descricao_completa?: string;
+  icone?: string;
+  
+  // Processo
+  etapas: ServiceEtapa[];
+  
+  // Disponibilidade
+  dias_permitidos: string[];
+  horarios_permitidos: ServiceHorario[];
+  
+  // Documentos
+  documentos_exigidos: ServiceDocumento[];
+  
+  // Valores
+  valor?: number;
+  valor_variavel: boolean;
+  valor_minimo?: number;
+  valor_maximo?: number;
+  forma_pagamento: string[];
+  exige_sinal: boolean;
+  valor_sinal?: number;
+  percentual_sinal?: number;
+  prazo_pagamento_sinal?: number;
+  
+  // Regras
+  regras?: string;
+  restricoes?: string;
+  prazo_minimo_agendamento: number;
+  prazo_maximo_agendamento: number;
+  duracao_media_minutos?: number;
+  capacidade_maxima?: number;
+  
+  // Automação IA
+  usa_agendamento: boolean;
+  usa_tool_verificar_agendamento: boolean;
+  usa_tool_realizar_agendamento: boolean;
+  precisa_confirmacao_humana: boolean;
+  
+  // Mensagens
+  mensagem_confirmacao?: string;
+  mensagem_indisponibilidade?: string;
+  mensagem_pos_agendamento?: string;
+  
+  created_at: string;
+  updated_at: string;
+};
+
+// ============================================
+// HOSPEDAGEM
+// ============================================
+
+export type HostingConfig = {
+  id: string;
+  church_id: string;
+  
+  // Status
+  hospedagem_ativa: boolean;
+  
+  // Descrição
+  descricao?: string;
+  publico_permitido: string[];
+  
+  // Restrições
+  idade_minima: number;
+  permite_criancas: boolean;
+  permite_animais: boolean;
+  acessibilidade?: string;
+  
+  // Funcionamento
+  dias_funcionamento: string[];
+  horario_checkin: string;
+  horario_checkout: string;
+  estadia_minima: number;
+  estadia_maxima: number;
+  permite_estender_estadia: boolean;
+  
+  // Bloqueios
+  datas_bloqueadas: BlockedDatePeriod[];
+  bloqueio_por_evento: boolean;
+  
+  // Valores
+  valor_por_noite?: number;
+  valor_por_pessoa: boolean;
+  taxa_limpeza?: number;
+  exige_sinal: boolean;
+  valor_sinal?: number;
+  percentual_sinal?: number;
+  prazo_pagamento_sinal?: number;
+  politica_cancelamento?: string;
+  formas_pagamento: string[];
+  
+  // Dados do Hóspede
+  dados_obrigatorios: string[];
+  exige_documento: boolean;
+  tipos_documento: string[];
+  ficha_hospede_link?: string;
+  envio_documentos_por: string[];
+  
+  // Automação IA
+  ia_nivel_automacao: 'informar' | 'coletar_dados' | 'pre_reservar' | 'confirmar_reserva';
+  usa_agendamento_ia: boolean;
+  precisa_confirmacao_humana: boolean;
+  
+  // Mensagens
+  mensagem_confirmacao_reserva?: string;
+  mensagem_indisponibilidade?: string;
+  
+  // Textos Institucionais
+  regras_hospedagem?: string;
+  termos_responsabilidade?: string;
+  orientacoes_hospede?: string;
+  politica_silencio?: string;
+  informacoes_gerais?: string;
+  
+  created_at: string;
+  updated_at: string;
+};
+
+export type AccommodationType = 'individual' | 'duplo' | 'triplo' | 'quadruplo' | 'coletivo' | 'dormitorio' | 'suite' | 'apartamento';
+
+export type AccommodationPhoto = {
+  url: string;
+  descricao?: string;
+};
+
+export type ChurchAccommodation = {
+  id: string;
+  church_id: string;
+  
+  // Identificação
+  nome: string;
+  codigo?: string;
+  tipo: AccommodationType;
+  
+  // Capacidade
+  capacidade_maxima: number;
+  quantidade_disponivel: number;
+  
+  // Descrição
+  descricao?: string;
+  
+  // Comodidades
+  possui_banheiro: boolean;
+  possui_banheiro_privativo: boolean;
+  possui_roupa_cama: boolean;
+  possui_toalhas: boolean;
+  possui_ar_condicionado: boolean;
+  possui_ventilador: boolean;
+  possui_tv: boolean;
+  possui_wifi: boolean;
+  possui_frigobar: boolean;
+  comodidades_extras: string[];
+  
+  // Valores
+  valor_noite_override?: number;
+  
+  // Fotos
+  fotos: AccommodationPhoto[];
+  
+  // Status
+  ativo: boolean;
+  em_manutencao: boolean;
+  
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReservationStatus = 'pendente' | 'confirmada' | 'checkin_realizado' | 'checkout_realizado' | 'cancelada' | 'no_show';
+export type PaymentStatus = 'pendente' | 'sinal_pago' | 'pago_total' | 'reembolsado';
+
+export type ReservationCompanion = {
+  nome: string;
+  cpf?: string;
+  parentesco?: string;
+};
+
+export type HostingReservation = {
+  id: string;
+  church_id: string;
+  accommodation_id?: string;
+  client_id?: string;
+  
+  // Datas
+  data_checkin: string;
+  data_checkout: string;
+  
+  // Hóspede Principal
+  hospede_nome: string;
+  hospede_cpf?: string;
+  hospede_rg?: string;
+  hospede_telefone?: string;
+  hospede_email?: string;
+  hospede_endereco?: string;
+  hospede_data_nascimento?: string;
+  
+  // Acompanhantes
+  quantidade_hospedes: number;
+  acompanhantes: ReservationCompanion[];
+  
+  // Valores
+  valor_total?: number;
+  valor_sinal_pago?: number;
+  valor_restante?: number;
+  
+  // Status
+  status: ReservationStatus;
+  pagamento_status: PaymentStatus;
+  forma_pagamento?: string;
+  
+  // Observações
+  observacoes?: string;
+  motivo_visita?: string;
+  
+  // Origem
+  origem: 'manual' | 'whatsapp' | 'site' | 'telefone';
+  atendido_por?: string;
+  
+  created_at: string;
+  updated_at: string;
+};
+
+export type AppointmentStatus = 'solicitado' | 'aguardando_documentos' | 'confirmado' | 'realizado' | 'cancelado';
+
+export type DocumentoEntregue = {
+  nome: string;
+  entregue: boolean;
+  data?: string;
+};
+
+export type ServiceAppointment = {
+  id: string;
+  church_id: string;
+  service_id: string;
+  client_id?: string;
+  
+  // Data e Hora
+  data_agendamento: string;
+  hora_inicio?: string;
+  hora_fim?: string;
+  
+  // Solicitante
+  solicitante_nome: string;
+  solicitante_telefone?: string;
+  solicitante_email?: string;
+  solicitante_cpf?: string;
+  
+  // Detalhes específicos do serviço
+  detalhes: Record<string, any>;
+  
+  // Documentos
+  documentos_entregues: DocumentoEntregue[];
+  documentos_pendentes: string[];
+  
+  // Valores
+  valor_total?: number;
+  valor_sinal_pago?: number;
+  valor_restante?: number;
+  
+  // Status
+  status: AppointmentStatus;
+  pagamento_status: PaymentStatus;
+  forma_pagamento?: string;
+  
+  // Observações
+  observacoes?: string;
+  
+  // Origem
+  origem: 'manual' | 'whatsapp' | 'site' | 'telefone';
+  atendido_por?: string;
+  
+  created_at: string;
+  updated_at: string;
 };

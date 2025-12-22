@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Settings2, Check } from 'lucide-react';
+import { Settings2, Check, Briefcase, Bed, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { aiConfigService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -335,6 +336,41 @@ export function AgentPage() {
           <Check className="h-4 w-4" />
           Salvar Alterações
         </button>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Link
+          to="/admin/servicos"
+          className="flex items-center justify-between p-4 rounded-xl border bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 hover:border-blue-400 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Gerenciar Serviços</h3>
+              <p className="text-sm text-gray-500">Casamentos, batizados, fotos e mais</p>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+        </Link>
+
+        <Link
+          to="/admin/hospedagem"
+          className="flex items-center justify-between p-4 rounded-xl border bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 hover:border-purple-400 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-600 text-white">
+              <Bed className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Gerenciar Hospedagem</h3>
+              <p className="text-sm text-gray-500">Acomodações, reservas e configurações</p>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
+        </Link>
       </div>
 
       <div className="space-y-6">

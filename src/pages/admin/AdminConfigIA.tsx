@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings, MapPin } from 'lucide-react';
+import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings, MapPin, Phone, MessageSquare, Calendar, Plus, Trash2 } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
-import type { AIConfig, Church as ChurchType } from '../../types/database';
+import type { AIConfig, Church as ChurchType, BlockedDatePeriod } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
 
 const DEFAULT_BUSINESS_HOURS = {
@@ -58,7 +58,7 @@ export function AdminConfigIA() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<AIConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'services' | 'qualification' | 'hours'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('general');
   
   const [editForm, setEditForm] = useState({
     agent_name: '',
@@ -75,7 +75,7 @@ export function AdminConfigIA() {
     send_documents: false,
     auto_scheduling: false,
     outside_hours_message: '',
-    // Novos campos
+    // Campos de serviços
     google_maps_link: '',
     espacos_disponiveis: '',
     info_casamento: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
@@ -91,6 +91,29 @@ export function AdminConfigIA() {
     projetos_sociais_comunidade: '',
     regras_especificas: '',
     hospedagem_disponivel: false,
+    // Identidade do Agente
+    agent_gender: 'feminino' as 'feminino' | 'masculino' | 'neutro',
+    greeting_message: '',
+    error_message: '',
+    // Contatos da Igreja
+    phone_landline: '',
+    phone_whatsapp: '',
+    email_main: '',
+    email_secretary: '',
+    email_documents: '',
+    contact_general: '',
+    // Regras de Agendamento
+    allow_scheduling_lent: true,
+    allow_scheduling_jubilee: true,
+    blocked_dates: [] as BlockedDatePeriod[],
+    max_simultaneous_events: 1,
+    // Mensagens Personalizadas
+    donation_text: '',
+    prayer_text: '',
+    confirmation_text: '',
+    unavailability_text: '',
+    post_scheduling_text: '',
+    // Campos existentes
     qualification_fields: DEFAULT_QUALIFICATION_FIELDS,
     business_hours: DEFAULT_BUSINESS_HOURS,
   });
@@ -139,7 +162,7 @@ export function AdminConfigIA() {
       send_documents: config.send_documents || false,
       auto_scheduling: config.auto_scheduling || false,
       outside_hours_message: config.outside_hours_message || '',
-      // Novos campos
+      // Campos de serviços
       google_maps_link: config.google_maps_link || '',
       espacos_disponiveis: config.espacos_disponiveis || '',
       info_casamento: config.info_casamento || { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
@@ -155,6 +178,29 @@ export function AdminConfigIA() {
       projetos_sociais_comunidade: config.projetos_sociais_comunidade || '',
       regras_especificas: config.regras_especificas || '',
       hospedagem_disponivel: config.hospedagem_disponivel || false,
+      // Identidade do Agente
+      agent_gender: config.agent_gender || 'feminino',
+      greeting_message: config.greeting_message || '',
+      error_message: config.error_message || '',
+      // Contatos da Igreja
+      phone_landline: config.phone_landline || '',
+      phone_whatsapp: config.phone_whatsapp || '',
+      email_main: config.email_main || '',
+      email_secretary: config.email_secretary || '',
+      email_documents: config.email_documents || '',
+      contact_general: config.contact_general || '',
+      // Regras de Agendamento
+      allow_scheduling_lent: config.allow_scheduling_lent ?? true,
+      allow_scheduling_jubilee: config.allow_scheduling_jubilee ?? true,
+      blocked_dates: config.blocked_dates || [],
+      max_simultaneous_events: config.max_simultaneous_events || 1,
+      // Mensagens Personalizadas
+      donation_text: config.donation_text || '',
+      prayer_text: config.prayer_text || '',
+      confirmation_text: config.confirmation_text || '',
+      unavailability_text: config.unavailability_text || '',
+      post_scheduling_text: config.post_scheduling_text || '',
+      // Campos existentes
       qualification_fields: config.qualification_fields || DEFAULT_QUALIFICATION_FIELDS,
       business_hours: config.business_hours || DEFAULT_BUSINESS_HOURS,
     });
@@ -317,10 +363,10 @@ export function AdminConfigIA() {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-700">
+            <div className="flex border-b border-gray-700 overflow-x-auto scrollbar-hide bg-gray-800/50 px-2">
               <button
                 onClick={() => setActiveTab('general')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === 'general'
                     ? 'border-purple-500 text-purple-400'
                     : 'border-transparent text-gray-400 hover:text-white'
@@ -330,8 +376,30 @@ export function AdminConfigIA() {
                 Geral
               </button>
               <button
+                onClick={() => setActiveTab('identity')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'identity'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                Identidade
+              </button>
+              <button
+                onClick={() => setActiveTab('contacts')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'contacts'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                <Phone className="h-4 w-4" />
+                Contatos
+              </button>
+              <button
                 onClick={() => setActiveTab('services')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === 'services'
                     ? 'border-purple-500 text-purple-400'
                     : 'border-transparent text-gray-400 hover:text-white'
@@ -341,8 +409,30 @@ export function AdminConfigIA() {
                 Serviços
               </button>
               <button
+                onClick={() => setActiveTab('scheduling')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'scheduling'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="h-4 w-4" />
+                Agendamento
+              </button>
+              <button
+                onClick={() => setActiveTab('messages')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'messages'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Mensagens
+              </button>
+              <button
                 onClick={() => setActiveTab('qualification')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === 'qualification'
                     ? 'border-purple-500 text-purple-400'
                     : 'border-transparent text-gray-400 hover:text-white'
@@ -353,7 +443,7 @@ export function AdminConfigIA() {
               </button>
               <button
                 onClick={() => setActiveTab('hours')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === 'hours'
                     ? 'border-purple-500 text-purple-400'
                     : 'border-transparent text-gray-400 hover:text-white'
@@ -539,6 +629,320 @@ export function AdminConfigIA() {
                           <p className="text-xs text-gray-500">Permite que a IA realize agendamentos automaticamente no calendário da igreja</p>
                         </div>
                       </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Identity */}
+              {activeTab === 'identity' && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Identidade do Agente</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Nome do Agente</label>
+                        <p className="text-xs text-gray-500 mb-2">Nome que a IA usará para se identificar</p>
+                        <input
+                          type="text"
+                          value={editForm.agent_name}
+                          onChange={(e) => setEditForm({ ...editForm, agent_name: e.target.value })}
+                          placeholder="Ex: Iara, Maria, Assistente..."
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Gênero / Persona</label>
+                        <p className="text-xs text-gray-500 mb-2">Define como a IA se refere a si mesma</p>
+                        <select
+                          value={editForm.agent_gender}
+                          onChange={(e) => setEditForm({ ...editForm, agent_gender: e.target.value as any })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="feminino">Feminino - "Eu sou a assistente..."</option>
+                          <option value="masculino">Masculino - "Eu sou o assistente..."</option>
+                          <option value="neutro">Neutro - "Sou assistente virtual..."</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Frase de Apresentação Inicial</label>
+                      <p className="text-xs text-gray-500 mb-2">Mensagem de boas-vindas que a IA enviará no início da conversa</p>
+                      <textarea
+                        value={editForm.greeting_message}
+                        onChange={(e) => setEditForm({ ...editForm, greeting_message: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Olá! Sou a Iara, assistente virtual da Paróquia. Como posso ajudá-lo hoje?"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Mensagem de Erro Padrão</label>
+                      <p className="text-xs text-gray-500 mb-2">Mensagem exibida quando ocorre um erro ou a IA não consegue processar</p>
+                      <textarea
+                        value={editForm.error_message}
+                        onChange={(e) => setEditForm({ ...editForm, error_message: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Desculpe, não consegui processar sua solicitação. Por favor, tente novamente ou entre em contato conosco."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Contacts */}
+              {activeTab === 'contacts' && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Telefones</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Telefone Fixo</label>
+                        <p className="text-xs text-gray-500 mb-2">Número do telefone fixo da igreja</p>
+                        <input
+                          type="tel"
+                          value={editForm.phone_landline}
+                          onChange={(e) => setEditForm({ ...editForm, phone_landline: e.target.value })}
+                          placeholder="(11) 3333-4444"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp</label>
+                        <p className="text-xs text-gray-500 mb-2">Número de WhatsApp para contato</p>
+                        <input
+                          type="tel"
+                          value={editForm.phone_whatsapp}
+                          onChange={(e) => setEditForm({ ...editForm, phone_whatsapp: e.target.value })}
+                          placeholder="(11) 99999-8888"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">E-mails</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">E-mail Principal</label>
+                        <input
+                          type="email"
+                          value={editForm.email_main}
+                          onChange={(e) => setEditForm({ ...editForm, email_main: e.target.value })}
+                          placeholder="contato@paroquia.com.br"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">E-mail da Secretaria</label>
+                        <input
+                          type="email"
+                          value={editForm.email_secretary}
+                          onChange={(e) => setEditForm({ ...editForm, email_secretary: e.target.value })}
+                          placeholder="secretaria@paroquia.com.br"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">E-mail para Documentos</label>
+                        <input
+                          type="email"
+                          value={editForm.email_documents}
+                          onChange={(e) => setEditForm({ ...editForm, email_documents: e.target.value })}
+                          placeholder="documentos@paroquia.com.br"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Contato para Dúvidas Gerais</label>
+                      <p className="text-xs text-gray-500 mb-2">Informações adicionais de contato que a IA pode fornecer</p>
+                      <textarea
+                        value={editForm.contact_general}
+                        onChange={(e) => setEditForm({ ...editForm, contact_general: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Para dúvidas sobre casamentos, ligue para (11) 3333-4444 ramal 2. Para batizados, envie e-mail para batizados@paroquia.com.br"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Scheduling */}
+              {activeTab === 'scheduling' && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Regras de Agendamento</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-gray-700/50 rounded-lg">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editForm.allow_scheduling_lent}
+                            onChange={(e) => setEditForm({ ...editForm, allow_scheduling_lent: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                          />
+                          <div>
+                            <span className="text-sm text-gray-300">Permite agendamento na Quaresma?</span>
+                            <p className="text-xs text-gray-500">Habilita agendamentos durante o período quaresmal</p>
+                          </div>
+                        </label>
+                      </div>
+                      <div className="p-3 bg-gray-700/50 rounded-lg">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editForm.allow_scheduling_jubilee}
+                            onChange={(e) => setEditForm({ ...editForm, allow_scheduling_jubilee: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                          />
+                          <div>
+                            <span className="text-sm text-gray-300">Permite agendamento em Jubileu?</span>
+                            <p className="text-xs text-gray-500">Habilita agendamentos durante anos jubilares</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Limite de Eventos Simultâneos</label>
+                      <p className="text-xs text-gray-500 mb-2">Máximo de eventos que podem ocorrer no mesmo horário</p>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={editForm.max_simultaneous_events}
+                        onChange={(e) => setEditForm({ ...editForm, max_simultaneous_events: parseInt(e.target.value) || 1 })}
+                        className="w-32 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Datas Bloqueadas</h3>
+                    <p className="text-xs text-gray-500">Períodos em que não é permitido realizar agendamentos</p>
+                    <div className="space-y-2">
+                      {editForm.blocked_dates.map((period, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
+                          <input
+                            type="date"
+                            value={period.start}
+                            onChange={(e) => {
+                              const newDates = [...editForm.blocked_dates];
+                              newDates[index] = { ...newDates[index], start: e.target.value };
+                              setEditForm({ ...editForm, blocked_dates: newDates });
+                            }}
+                            className="bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm"
+                          />
+                          <span className="text-gray-400">até</span>
+                          <input
+                            type="date"
+                            value={period.end}
+                            onChange={(e) => {
+                              const newDates = [...editForm.blocked_dates];
+                              newDates[index] = { ...newDates[index], end: e.target.value };
+                              setEditForm({ ...editForm, blocked_dates: newDates });
+                            }}
+                            className="bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={period.reason || ''}
+                            onChange={(e) => {
+                              const newDates = [...editForm.blocked_dates];
+                              newDates[index] = { ...newDates[index], reason: e.target.value };
+                              setEditForm({ ...editForm, blocked_dates: newDates });
+                            }}
+                            placeholder="Motivo (opcional)"
+                            className="flex-1 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm"
+                          />
+                          <button
+                            onClick={() => {
+                              const newDates = editForm.blocked_dates.filter((_, i) => i !== index);
+                              setEditForm({ ...editForm, blocked_dates: newDates });
+                            }}
+                            className="p-1 text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setEditForm({
+                            ...editForm,
+                            blocked_dates: [...editForm.blocked_dates, { start: '', end: '', reason: '' }]
+                          });
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-purple-400 hover:text-purple-300 border border-dashed border-gray-600 rounded-lg hover:border-purple-500"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Adicionar Período Bloqueado
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Messages */}
+              {activeTab === 'messages' && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Mensagens Personalizadas</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Texto de Doação</label>
+                      <p className="text-xs text-gray-500 mb-2">Informações sobre como fazer doações para a igreja</p>
+                      <textarea
+                        value={editForm.donation_text}
+                        onChange={(e) => setEditForm({ ...editForm, donation_text: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Para contribuir com nossa paróquia, você pode fazer um PIX para: paroquia@email.com ou depositar na conta..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Texto de Oração (Modelos)</label>
+                      <p className="text-xs text-gray-500 mb-2">Modelos de orações que a IA pode compartilhar</p>
+                      <textarea
+                        value={editForm.prayer_text}
+                        onChange={(e) => setEditForm({ ...editForm, prayer_text: e.target.value })}
+                        rows={4}
+                        placeholder="Ex: Oração pela família: Senhor, abençoai nossa família... | Oração de agradecimento: Obrigado, Senhor, por todas as graças..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Texto de Confirmação</label>
+                      <p className="text-xs text-gray-500 mb-2">Mensagem enviada após agendamento bem-sucedido</p>
+                      <textarea
+                        value={editForm.confirmation_text}
+                        onChange={(e) => setEditForm({ ...editForm, confirmation_text: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Seu agendamento foi confirmado com sucesso! Em breve você receberá mais informações por e-mail."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Texto de Indisponibilidade</label>
+                      <p className="text-xs text-gray-500 mb-2">Mensagem quando não há horários disponíveis</p>
+                      <textarea
+                        value={editForm.unavailability_text}
+                        onChange={(e) => setEditForm({ ...editForm, unavailability_text: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Infelizmente não temos horários disponíveis para a data solicitada. Por favor, escolha outra data."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Texto Pós-Agendamento</label>
+                      <p className="text-xs text-gray-500 mb-2">Instruções enviadas após o agendamento ser realizado</p>
+                      <textarea
+                        value={editForm.post_scheduling_text}
+                        onChange={(e) => setEditForm({ ...editForm, post_scheduling_text: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Lembre-se de trazer os documentos necessários no dia marcado. Chegue com 15 minutos de antecedência."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
                     </div>
                   </div>
                 </div>

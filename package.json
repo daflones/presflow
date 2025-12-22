@@ -7,8 +7,11 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "vite",
     "dev:backend": "node server/index.cjs",
+    "dev:whatsapp": "node whatsapp-server.js",
+    "dev:all": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:whatsapp\"",
     "build": "npx tsc -b && npx vite build",
     "start": "node server/index.cjs",
+    "start:whatsapp": "node whatsapp-server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -78,6 +81,7 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "whatsapp-web.js": "^1.34.2",
+    "puppeteer": "^21.11.0",
     "ws": "^8.18.3",
     "zod": "^4.2.0",
     "zustand": "^5.0.9"

@@ -1,4 +1,4 @@
-import { Church, MessageSquare, Calendar, Users, Bot, Phone, Bell, FileText, Shield, Settings } from 'lucide-react';
+import { Church, MessageSquare, Calendar, Users, Bot, Phone, Bell, FileText, Shield, Settings, Smartphone } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,6 +11,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: Church },
   { name: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
+  { name: 'WhatsApp Web', href: '/whatsapp-web', icon: Smartphone },
   { name: 'Agente IA', href: '/agente-ia', icon: Bot },
   { name: 'Arquivos IA', href: '/arquivos-ia', icon: FileText },
   { name: 'Conversas', href: '/conversas', icon: Phone },

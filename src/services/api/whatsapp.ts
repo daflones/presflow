@@ -85,18 +85,22 @@ class WhatsAppService {
       integration: 'WHATSAPP-BAILEYS',
       webhook: {
         url: this.webhookUrl,
-        byEvents: true,
+        byEvents: false,
         base64: true,
         events: [
-          'CONNECTION_UPDATE',
-          'MESSAGES_UPSERT'
+          'MESSAGES_UPSERT',
+          'QRCODE_UPDATED',
+          'MESSAGES_UPDATE',
+          'SEND_MESSAGE'
         ]
       },
       websocket: {
         enabled: true,
         events: [
-          'CONNECTION_UPDATE',
-          'MESSAGES_UPSERT'
+          'MESSAGES_UPSERT',
+          'QRCODE_UPDATED',
+          'MESSAGES_UPDATE',
+          'SEND_MESSAGE'
         ]
       },
       rabbitmq: {

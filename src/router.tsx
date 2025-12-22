@@ -7,6 +7,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { DashboardPage } from './pages/DashboardPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import WhatsAppChatPage from './pages/WhatsAppChatPage';
+import WhatsAppWebPage from './pages/WhatsAppWebPage';
 import { AgentPage } from './pages/AgentPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { CalendarPage } from './pages/CalendarPage';
@@ -14,7 +15,7 @@ import { NoticesPage } from './pages/NoticesPage';
 import { UsersPage } from './pages/UsersPage';
 import { ArquivosIAPage } from './pages/ArquivosIAPage';
 import { PerfilIgrejaPage } from './pages/PerfilIgrejaPage';
-import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos } from './pages/admin';
+import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos, AdminServicos, AdminHospedagem } from './pages/admin';
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <DashboardPage /> },
           { path: '/whatsapp', element: <WhatsAppPage /> },
+          { path: '/whatsapp-web', element: <WhatsAppWebPage /> },
           { path: '/conversas', element: <WhatsAppChatPage /> },
           { path: '/agente-ia', element: <AgentPage /> },
           { path: '/arquivos-ia', element: <ArquivosIAPage /> },
@@ -52,6 +54,8 @@ export const router = createBrowserRouter([
           { index: true, element: <AdminDashboard /> },
           { path: 'igrejas', element: <AdminIgrejas /> },
           { path: 'config-ia', element: <AdminConfigIA /> },
+          { path: 'servicos', element: <AdminServicos /> },
+          { path: 'hospedagem', element: <AdminHospedagem /> },
           { path: 'clientes', element: <AdminClientes /> },
           { path: 'arquivos', element: <AdminArquivos /> },
         ],
