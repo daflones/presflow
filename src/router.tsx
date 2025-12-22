@@ -7,7 +7,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { DashboardPage } from './pages/DashboardPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import WhatsAppChatPage from './pages/WhatsAppChatPage';
-import WhatsAppWebPage from './pages/WhatsAppWebPage';
+// import WhatsAppWebPage from './pages/WhatsAppWebPage'; // Desabilitado temporariamente
 import { AgentPage } from './pages/AgentPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { CalendarPage } from './pages/CalendarPage';
@@ -41,7 +41,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <DashboardPage /> },
           { path: '/whatsapp', element: <WhatsAppPage /> },
-          { path: '/whatsapp-web', element: <WhatsAppWebPage /> },
+          // { path: '/whatsapp-web', element: <WhatsAppWebPage /> }, // Desabilitado temporariamente
           { path: '/conversas', element: <WhatsAppChatPage /> },
           { path: '/agente-ia', element: <AgentPage /> },
           { path: '/arquivos-ia', element: <ArquivosIAPage /> },
