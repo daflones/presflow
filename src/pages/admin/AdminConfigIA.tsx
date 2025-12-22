@@ -350,9 +350,10 @@ export function AdminConfigIA() {
 
       {/* Edit Modal */}
       {isEditModalOpen && selectedConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden m-4 border border-gray-700 flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl h-[90vh] border border-gray-700 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 shrink-0">
               <h2 className="text-lg font-bold text-white">Editar Configuração de IA</h2>
               <button
                 onClick={() => setIsEditModalOpen(false)}
@@ -362,99 +363,39 @@ export function AdminConfigIA() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-700 overflow-x-auto scrollbar-hide bg-gray-800/50 px-2">
-              <button
-                onClick={() => setActiveTab('general')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'general'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Settings className="h-4 w-4" />
-                Geral
-              </button>
-              <button
-                onClick={() => setActiveTab('identity')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'identity'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Bot className="h-4 w-4" />
-                Identidade
-              </button>
-              <button
-                onClick={() => setActiveTab('contacts')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'contacts'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Phone className="h-4 w-4" />
-                Contatos
-              </button>
-              <button
-                onClick={() => setActiveTab('services')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'services'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <MapPin className="h-4 w-4" />
-                Serviços
-              </button>
-              <button
-                onClick={() => setActiveTab('scheduling')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'scheduling'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Calendar className="h-4 w-4" />
-                Agendamento
-              </button>
-              <button
-                onClick={() => setActiveTab('messages')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'messages'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <MessageSquare className="h-4 w-4" />
-                Mensagens
-              </button>
-              <button
-                onClick={() => setActiveTab('qualification')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'qualification'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <FileText className="h-4 w-4" />
-                Qualificação
-              </button>
-              <button
-                onClick={() => setActiveTab('hours')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'hours'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-                Horários
-              </button>
-            </div>
+            {/* Body with Sidebar */}
+            <div className="flex flex-1 min-h-0">
+              {/* Sidebar Navigation */}
+              <div className="w-48 bg-gray-900/50 border-r border-gray-700 py-4 shrink-0">
+                <nav className="space-y-1 px-2">
+                  {[
+                    { id: 'general', label: 'Geral', icon: Settings },
+                    { id: 'identity', label: 'Identidade', icon: Bot },
+                    { id: 'contacts', label: 'Contatos', icon: Phone },
+                    { id: 'services', label: 'Serviços', icon: MapPin },
+                    { id: 'scheduling', label: 'Agendamento', icon: Calendar },
+                    { id: 'messages', label: 'Mensagens', icon: MessageSquare },
+                    { id: 'qualification', label: 'Qualificação', icon: FileText },
+                    { id: 'hours', label: 'Horários', icon: Clock },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        activeTab === tab.id
+                          ? 'bg-purple-600 text-white'
+                          : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                      }`}
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto p-6">
               {/* Tab: General */}
               {activeTab === 'general' && (
                 <div className="space-y-6">
@@ -1397,9 +1338,11 @@ export function AdminConfigIA() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-700">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700 shrink-0">
               <button
                 onClick={() => setIsEditModalOpen(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded-lg"
