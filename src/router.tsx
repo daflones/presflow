@@ -16,6 +16,7 @@ import { UsersPage } from './pages/UsersPage';
 import { ArquivosIAPage } from './pages/ArquivosIAPage';
 import { PerfilIgrejaPage } from './pages/PerfilIgrejaPage';
 import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos, AdminServicos, AdminHospedagem, AdminVisitacao } from './pages/admin';
+import { AdminCalendario } from './pages/admin/AdminCalendario';
 import { PublicVisitationForm } from './pages/PublicVisitationForm';
 
 export const router = createBrowserRouter([

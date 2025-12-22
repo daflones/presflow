@@ -110,7 +110,7 @@ export function RegisterPage() {
             <div className="bg-purple-600 rounded-full p-3 inline-block mb-3">
               <Church className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-white">LogiKon</h1>
+            <h1 className="text-xl font-bold text-white">PrestFlow</h1>
           </div>
           
           <div className="text-center mb-6">
@@ -185,7 +185,7 @@ export function RegisterPage() {
           
           <div className="mt-6 pt-4 border-t border-gray-700">
             <p className="text-xs text-center text-gray-500">
-              © 2024 PrestFlow. Todos os direitos reservados.
+              © 2024 LogiKon. Todos os direitos reservados.
             </p>
           </div>
         </div>

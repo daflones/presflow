@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Church, Search, Eye, Settings, Users, FileText, Plus, X } from 'lucide-react';
+import { Church, Search, Eye, Settings, Users, FileText, Plus, X, Shield } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { Church as ChurchType } from '../../types/database';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabase';
 
 function formatDate(dateString?: string): string {
   if (!dateString) return '-';
@@ -22,6 +23,7 @@ export function AdminIgrejas() {
   const [selectedChurch, setSelectedChurch] = useState<ChurchType | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [churchOwners, setChurchOwners] = useState<Record<string, { isManager: boolean; email: string }>>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -39,6 +41,21 @@ export function AdminIgrejas() {
     try {
       const data = await adminService.listChurches();
       setChurches(data);
+      
+      const ownerIds = [...new Set(data.map(c => c.owner_id).filter(Boolean))];
+      const ownersInfo: Record<string, { isManager: boolean; email: string }> = {};
+      
+      for (const ownerId of ownerIds) {
+        const { data: userData, error } = await supabase.auth.admin.getUserById(ownerId);
+        if (!error && userData?.user) {
+          ownersInfo[ownerId] = {
+            isManager: userData.user.user_metadata?.role === 'manager' || userData.user.app_metadata?.role === 'manager',
+            email: userData.user.email || ''
+          };
+        }
+      }
+      
+      setChurchOwners(ownersInfo);
     } catch (error) {
       console.error('Erro ao carregar igrejas:', error);
     } finally {
@@ -75,6 +92,30 @@ export function AdminIgrejas() {
       toast.error('Erro ao cadastrar igreja: ' + error.message);
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function toggleManagerRole(church: ChurchType) {
+    if (!church.owner_id) {
+      toast.error('Igreja sem proprietário definido');
+      return;
+    }
+
+    const currentIsManager = churchOwners[church.owner_id]?.isManager || false;
+    const newRole = currentIsManager ? null : 'manager';
+
+    try {
+      const { error } = await supabase.auth.admin.updateUserById(church.owner_id, {
+        user_metadata: { role: newRole }
+      });
+
+      if (error) throw error;
+
+      toast.success(currentIsManager ? 'Permissão de manager removida' : 'Permissão de manager concedida');
+      loadChurches();
+    } catch (error: any) {
+      console.error('Erro ao alterar role:', error);
+      toast.error('Erro ao alterar permissão: ' + error.message);
     }
   }
 
