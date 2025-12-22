@@ -155,6 +155,24 @@ export function AdminIgrejas() {
                       <span className="text-gray-500 text-sm">-</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    {church.owner_id && churchOwners[church.owner_id] ? (
+                      <button
+                        onClick={() => toggleManagerRole(church)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          churchOwners[church.owner_id].isManager
+                            ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        }`}
+                        title={churchOwners[church.owner_id].isManager ? 'Remover permissão de manager' : 'Conceder permissão de manager'}
+                      >
+                        <Shield className="h-3 w-3" />
+                        {churchOwners[church.owner_id].isManager ? 'Manager' : 'Usuário'}
+                      </button>
+                    ) : (
+                      <span className="text-gray-500 text-sm">-</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-300">{formatDate(church.created_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
