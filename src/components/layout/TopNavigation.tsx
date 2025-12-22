@@ -1,4 +1,4 @@
-import { Church, MessageSquare, Calendar, Users, Bot, Phone, Bell, FileText, Shield, Settings, LayoutDashboard } from 'lucide-react';
+import { Church, MessageSquare, Calendar, Users, Bot, Phone, Bell, FileText, Shield, Settings, LayoutDashboard, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -20,7 +20,7 @@ const navigationItems: NavigationItem[] = [
 
 export function TopNavigation() {
   const location = useLocation();
-  const { church, isManager } = useAuth();
+  const { church, isManager, signOut } = useAuth();
 
   return (
     <header className="bg-gray-900/80 backdrop-blur-xl border-b border-gray-700/50 shadow-lg">
@@ -101,6 +101,13 @@ export function TopNavigation() {
             >
               <Settings className="h-4 w-4" />
             </Link>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-2 p-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all text-red-400 hover:bg-red-500/20 hover:text-red-300"
+              title="Sair"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
