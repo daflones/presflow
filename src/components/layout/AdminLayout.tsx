@@ -7,9 +7,6 @@ const adminNavItems = [
   { name: 'Dashboard', href: '/admin', icon: Home },
   { name: 'Igrejas', href: '/admin/igrejas', icon: Church },
   { name: 'Configurações IA', href: '/admin/config-ia', icon: Bot },
-  { name: 'Serviços', href: '/admin/servicos', icon: Briefcase },
-  { name: 'Hospedagem', href: '/admin/hospedagem', icon: Bed },
-  { name: 'Visitação', href: '/admin/visitacao', icon: ClipboardList },
   { name: 'Clientes', href: '/admin/clientes', icon: Users },
   { name: 'Arquivos IA', href: '/admin/arquivos', icon: FileText },
 ];

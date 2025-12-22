@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Church, Search, Eye, Settings, Users, FileText } from 'lucide-react';
+import { Church, Search, Eye, Settings, Users, FileText, Plus, X } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { Church as ChurchType } from '../../types/database';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 function formatDate(dateString?: string): string {
   if (!dateString) return '-';
@@ -13,10 +15,20 @@ function formatDate(dateString?: string): string {
 }
 
 export function AdminIgrejas() {
+  const navigate = useNavigate();
   const [churches, setChurches] = useState<ChurchType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChurch, setSelectedChurch] = useState<ChurchType | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    owner_id: ''
+  });
 
   useEffect(() => {
     loadChurches();
@@ -39,12 +51,48 @@ export function AdminIgrejas() {
     church.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  async function handleCreateChurch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formData.name.trim() || !formData.owner_id.trim()) {
+      toast.error('Nome da igreja e ID do proprietário são obrigatórios');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await adminService.createChurch({
+        name: formData.name.trim(),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        address: formData.address.trim() || undefined,
+        owner_id: formData.owner_id.trim()
+      });
+      toast.success('Igreja cadastrada com sucesso!');
+      setShowCreateForm(false);
+      setFormData({ name: '', email: '', phone: '', address: '', owner_id: '' });
+      loadChurches();
+    } catch (error: any) {
+      toast.error('Erro ao cadastrar igreja: ' + error.message);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Igrejas</h1>
-        <p className="text-gray-400 mt-1">Gerencie todas as igrejas cadastradas no sistema</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Igrejas</h1>
+          <p className="text-gray-400 mt-1">Gerencie todas as igrejas cadastradas no sistema</p>
+        </div>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          Nova Igreja
+        </button>
       </div>
 
       {/* Search */}
@@ -117,27 +165,27 @@ export function AdminIgrejas() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <a
-                        href={`/admin/config-ia?church=${church.id}`}
+                      <button
+                        onClick={() => navigate(`/admin/igrejas/${church.id}/config`)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-purple-400"
-                        title="Configurações IA"
+                        title="Configurações da Igreja"
                       >
                         <Settings className="h-4 w-4" />
-                      </a>
-                      <a
-                        href={`/admin/clientes?church=${church.id}`}
+                      </button>
+                      <button
+                        onClick={() => navigate(`/admin/clientes?church=${church.id}`)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-green-400"
                         title="Ver clientes"
                       >
                         <Users className="h-4 w-4" />
-                      </a>
-                      <a
-                        href={`/admin/arquivos?church=${church.id}`}
+                      </button>
+                      <button
+                        onClick={() => navigate(`/admin/arquivos?church=${church.id}`)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-blue-400"
                         title="Ver arquivos"
                       >
                         <FileText className="h-4 w-4" />
-                      </a>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -146,6 +194,89 @@ export function AdminIgrejas() {
           </table>
         )}
       </div>
+
+      {/* Create Form Modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg m-4 border border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white">Cadastrar Nova Igreja</h2>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateChurch} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Nome da Igreja *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Telefone</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Endereço</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">ID do Proprietário (User ID) *</label>
+                <input
+                  type="text"
+                  value={formData.owner_id}
+                  onChange={(e) => setFormData({ ...formData, owner_id: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                  placeholder="UUID do usuário proprietário"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-lg hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {isCreating ? 'Cadastrando...' : 'Cadastrar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Detail Modal */}
       {selectedChurch && (

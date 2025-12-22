@@ -30,6 +30,41 @@ export const adminService = {
     return data;
   },
 
+  async createChurch(input: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    owner_id: string;
+  }): Promise<Church | null> {
+    const { data, error } = await supabase
+      .from('churches')
+      .insert([input])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[admin.createChurch] Erro:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async updateChurch(id: string, input: Partial<Church>): Promise<Church | null> {
+    const { data, error } = await supabase
+      .from('churches')
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[admin.updateChurch] Erro:', error);
+      throw error;
+    }
+    return data;
+  },
+
   // ==================== AI CONFIGS ====================
   async listAIConfigs(): Promise<(AIConfig & { church?: Church })[]> {
     const { data, error } = await supabase
