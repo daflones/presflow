@@ -69,23 +69,26 @@ export function AdminIgrejas() {
 
   async function handleCreateChurch(e: React.FormEvent) {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.owner_id.trim()) {
-      toast.error('Nome da igreja e ID do proprietário são obrigatórios');
+    if (!formData.name.trim()) {
+      toast.error('Nome da igreja é obrigatório');
       return;
     }
 
     setIsCreating(true);
     try {
+      // Gerar UUID aleatório para o proprietário
+      const randomOwnerId = crypto.randomUUID();
+      
       await adminService.createChurch({
         name: formData.name.trim(),
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
         address: formData.address.trim() || undefined,
-        owner_id: formData.owner_id.trim()
+        owner_id: randomOwnerId
       });
       toast.success('Igreja cadastrada com sucesso!');
       setShowCreateForm(false);
-      setFormData({ name: '', email: '', phone: '', address: '', owner_id: '' });
+      setFormData({ name: '', email: '', phone: '', address: '' });
       loadChurches();
     } catch (error: any) {
       toast.error('Erro ao cadastrar igreja: ' + error.message);
