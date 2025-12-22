@@ -105,18 +105,18 @@ export function AdminIgrejas() {
   async function toggleManagerRole(church: ChurchType) {
     if (!church.owner_id) {
       toast.error('Igreja sem proprietário definido');
-      // Atualizar role na tabela profiles
       return;
-        fro('fils')
-    }.pe()
-   .eq('id',church.owner_id
+    }
+
     const currentIsManager = churchOwners[church.owner_id]?.isManager || false;
     const newRole = currentIsManager ? null : 'manager';
 
     try {
-      const { error } = await supabase.auth.admin.updateUserById(church.owner_id, {
-        user_metadata: { role: newRole }
-      });
+      // Atualizar role na tabela profiles
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', church.owner_id);
 
       if (error) throw error;
 
