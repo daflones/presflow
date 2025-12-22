@@ -122,9 +122,14 @@ export function PublicVisitationForm() {
   const renderField = (key: string, fieldConfig: { ativo: boolean; obrigatorio: boolean; label: string }) => {
     if (!fieldConfig.ativo) return null;
 
+    const inputClassName = `w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-2 outline-none transition-all text-gray-800 placeholder:text-gray-400`;
+    const focusStyle = { borderColor: config?.cor_primaria || '#8B5CF6' };
+
     const commonProps = {
       required: fieldConfig.obrigatorio,
-      className: "w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all text-gray-800",
+      className: inputClassName,
+      onFocus: (e: any) => Object.assign(e.target.style, focusStyle),
+      onBlur: (e: any) => e.target.style.borderColor = '',
     };
 
     switch (key) {
@@ -139,8 +144,8 @@ export function PublicVisitationForm() {
       case 'qual_igreja':
       case 'melhor_horario_contato':
         return (
-          <div key={key} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+          <div key={key} className="space-y-2.5">
+            <label className="block text-sm font-semibold text-gray-700">
               {fieldConfig.label}
               {fieldConfig.obrigatorio && <span className="text-red-500 ml-1">*</span>}
             </label>
@@ -148,7 +153,7 @@ export function PublicVisitationForm() {
               type={key === 'email' ? 'email' : key === 'telefone' ? 'tel' : 'text'}
               value={formData[key] || ''}
               onChange={(e) => handleInputChange(key, e.target.value)}
-              placeholder={fieldConfig.label}
+              placeholder={`Digite ${fieldConfig.label.toLowerCase()}`}
               {...commonProps}
             />
           </div>
@@ -291,27 +296,64 @@ export function PublicVisitationForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div 
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-            style={{ backgroundColor: config.cor_primaria }}
-          >
-            <Church className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">{config.titulo}</h1>
+    <div className="min-h-screen py-12 px-4" style={{
+      background: `linear-gradient(135deg, ${config.cor_primaria}15 0%, ${config.cor_primaria}05 100%)`,
+    }}>
+      <div className="max-w-3xl mx-auto">
+        {/* Header Card */}
+        <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8 text-center">
+          {/* Logo da Igreja */}
+          {churchData?.logo_url ? (
+            <div className="mb-6">
+              <img 
+                src={churchData.logo_url} 
+                alt={churchData.name}
+                className="w-24 h-24 object-contain mx-auto rounded-2xl"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+              <div 
+                className="hidden w-24 h-24 rounded-2xl flex items-center justify-center mx-auto shadow-lg"
+                style={{ backgroundColor: config.cor_primaria }}
+              >
+                <Church className="w-12 h-12 text-white" />
+              </div>
+            </div>
+          ) : (
+            <div 
+              className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg"
+              style={{ backgroundColor: config.cor_primaria }}
+            >
+              <Church className="w-12 h-12 text-white" />
+            </div>
+          )}
+          
+          {/* Nome da Igreja */}
+          {churchData?.name && (
+            <h2 className="text-xl font-semibold mb-2" style={{ color: config.cor_primaria }}>
+              {churchData.name}
+            </h2>
+          )}
+          
+          {/* Título do Formulário */}
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">{config.titulo}</h1>
+          
+          {/* Mensagem de Boas-vindas */}
           {config.mensagem_boas_vindas && (
-            <p className="text-gray-600 max-w-md mx-auto">{config.mensagem_boas_vindas}</p>
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto leading-relaxed">
+              {config.mensagem_boas_vindas}
+            </p>
           )}
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-6 md:p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl text-red-700 text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -367,30 +409,40 @@ export function PublicVisitationForm() {
           ))}
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 rounded-xl text-white font-semibold text-lg transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ backgroundColor: config.cor_primaria }}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5" />
-                Enviar
-              </>
-            )}
-          </button>
+          <div className="pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-xl text-white font-bold text-lg transition-all hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3 shadow-lg"
+              style={{ 
+                backgroundColor: config.cor_primaria,
+                boxShadow: `0 10px 30px ${config.cor_primaria}40`
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-6 h-6" />
+                  <span>Enviar Formulário</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
 
         {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Powered by PrestFlow
-        </p>
+        <div className="text-center mt-8 space-y-2">
+          <p className="text-gray-500 text-sm">
+            Seus dados estão seguros e serão tratados com confidencialidade
+          </p>
+          <p className="text-gray-400 text-xs">
+            Powered by <span className="font-semibold">PrestFlow</span>
+          </p>
+        </div>
       </div>
     </div>
   );
