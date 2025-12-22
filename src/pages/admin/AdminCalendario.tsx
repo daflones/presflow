@@ -185,35 +185,105 @@ export function AdminCalendario() {
       </div>
 
       {/* Calendar */}
-      <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl border border-gray-700/50 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg">
         {isLoading ? (
           <div className="flex items-center justify-center h-96">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
           </div>
         ) : (
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            locale={ptBrLocale}
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay',
-            }}
-            events={filteredEvents}
-            eventClick={handleEventClick}
-            height="auto"
-            eventTimeFormat={{
-              hour: '2-digit',
-              minute: '2-digit',
-              meridiem: false,
-            }}
-            slotLabelFormat={{
-              hour: '2-digit',
-              minute: '2-digit',
-              meridiem: false,
-            }}
-          />
+          <div className="calendar-light-theme">
+            <style>{`
+              .calendar-light-theme .fc {
+                --fc-border-color: #e5e7eb;
+                --fc-button-bg-color: #8B5CF6;
+                --fc-button-border-color: #7C3AED;
+                --fc-button-hover-bg-color: #7C3AED;
+                --fc-button-hover-border-color: #6D28D9;
+                --fc-button-active-bg-color: #6D28D9;
+                --fc-button-active-border-color: #5B21B6;
+                --fc-today-bg-color: #F3F4F6;
+              }
+              
+              .calendar-light-theme .fc-theme-standard td,
+              .calendar-light-theme .fc-theme-standard th {
+                border-color: #e5e7eb;
+              }
+              
+              .calendar-light-theme .fc-col-header-cell {
+                background-color: #F9FAFB;
+                font-weight: 600;
+                color: #374151;
+                padding: 12px 4px;
+              }
+              
+              .calendar-light-theme .fc-daygrid-day-number {
+                color: #1F2937;
+                font-weight: 500;
+                padding: 8px;
+              }
+              
+              .calendar-light-theme .fc-day-today .fc-daygrid-day-number {
+                background-color: #8B5CF6;
+                color: white;
+                border-radius: 50%;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              
+              .calendar-light-theme .fc-toolbar-title {
+                color: #1F2937;
+                font-size: 1.5rem;
+                font-weight: 700;
+              }
+              
+              .calendar-light-theme .fc-event {
+                border-radius: 6px;
+                padding: 2px 6px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                border: none;
+              }
+              
+              .calendar-light-theme .fc-daygrid-day {
+                background-color: white;
+              }
+              
+              .calendar-light-theme .fc-daygrid-day:hover {
+                background-color: #F9FAFB;
+              }
+              
+              .calendar-light-theme .fc-scrollgrid {
+                border-color: #e5e7eb;
+              }
+            `}</style>
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
+              locale={ptBrLocale}
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay',
+              }}
+              events={filteredEvents}
+              eventClick={handleEventClick}
+              height="auto"
+              eventTimeFormat={{
+                hour: '2-digit',
+                minute: '2-digit',
+                meridiem: false,
+              }}
+              slotLabelFormat={{
+                hour: '2-digit',
+                minute: '2-digit',
+                meridiem: false,
+              }}
+            />
+          </div>
         )}
       </div>
 
