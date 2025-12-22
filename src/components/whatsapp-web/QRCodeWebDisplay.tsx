@@ -21,12 +21,12 @@ export function QRCodeWebDisplay({ qrCode }: QRCodeWebDisplayProps) {
           light: '#FFFFFF'
         }
       })
-      .then(url => {
+      .then((url: string) => {
         setQrDataUrl(url)
         setQrExpired(false)
         setCountdown(60)
       })
-      .catch(err => {
+      .catch((err: Error) => {
         console.error('Erro ao gerar QR Code:', err)
       })
     }

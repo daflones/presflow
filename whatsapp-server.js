@@ -30,21 +30,30 @@ let connectedClients = new Set();
 
 // Configurar cliente WhatsApp
 function initializeWhatsAppClient() {
+  const puppeteerConfig = {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--disable-extensions'
+    ]
+  };
+
+  // Usar Chromium do sistema em produção (EasyPanel/Docker)
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    console.log('Usando Chromium do sistema:', process.env.PUPPETEER_EXECUTABLE_PATH);
+  }
+
   whatsappClient = new Client({
     authStrategy: new LocalAuth({
       clientId: 'prestflow-whatsapp',
       dataPath: './.wwebjs_auth'
     }),
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run'
-      ]
-    },
+    puppeteer: puppeteerConfig,
     webVersionCache: {
       type: 'local'
     }

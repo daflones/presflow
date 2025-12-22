@@ -3,14 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "vite",
     "dev:backend": "node server/index.cjs",
     "dev:whatsapp": "node whatsapp-server.js",
     "dev:all": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:whatsapp\"",
-    "build": "npx tsc -b && npx vite build",
-    "start": "node server/index.cjs",
+    "build": "tsc -b && vite build",
+    "start": "concurrently \"node server/index.cjs\" \"node whatsapp-server.js\"",
+    "start:server": "node server/index.cjs",
     "start:whatsapp": "node whatsapp-server.js",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -46,7 +50,6 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.87.2",
-    "@tailwindcss/postcss": "^4.1.18",
     "@tanstack/react-query": "^5.90.12",
     "@uppy/core": "^5.2.0",
     "@uppy/drag-drop": "^5.1.0",
@@ -55,6 +58,7 @@
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "concurrently": "^9.2.1",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
@@ -88,15 +92,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query-devtools": "^5.91.1",
     "@types/node": "^24.10.4",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.5",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.23",
-    "concurrently": "^9.2.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -106,10 +109,10 @@
     "postcss": "^8.5.6",
     "prettier": "^3.7.4",
     "supabase": "^2.67.1",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4",
+    "vite": "^5.4.11",
     "vite-plugin-pwa": "^1.2.0"
   }
 }
