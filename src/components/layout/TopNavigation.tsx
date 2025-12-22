@@ -108,10 +108,11 @@ export function TopNavigation() {
             </Link>
             <button
               onClick={signOut}
-              className="flex items-center gap-2 p-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all text-red-400 hover:bg-red-500/20 hover:text-red-300"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all text-red-400 hover:bg-red-500/20 hover:text-red-300"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
