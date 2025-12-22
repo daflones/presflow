@@ -15,7 +15,8 @@ import { NoticesPage } from './pages/NoticesPage';
 import { UsersPage } from './pages/UsersPage';
 import { ArquivosIAPage } from './pages/ArquivosIAPage';
 import { PerfilIgrejaPage } from './pages/PerfilIgrejaPage';
-import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos, AdminServicos, AdminHospedagem } from './pages/admin';
+import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos, AdminServicos, AdminHospedagem, AdminVisitacao } from './pages/admin';
+import { PublicVisitationForm } from './pages/PublicVisitationForm';
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/form/:slug',
+    element: <PublicVisitationForm />,
   },
   {
     path: '/',
@@ -56,6 +61,7 @@ export const router = createBrowserRouter([
           { path: 'config-ia', element: <AdminConfigIA /> },
           { path: 'servicos', element: <AdminServicos /> },
           { path: 'hospedagem', element: <AdminHospedagem /> },
+          { path: 'visitacao', element: <AdminVisitacao /> },
           { path: 'clientes', element: <AdminClientes /> },
           { path: 'arquivos', element: <AdminArquivos /> },
         ],

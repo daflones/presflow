@@ -659,3 +659,191 @@ export type ServiceAppointment = {
   created_at: string;
   updated_at: string;
 };
+
+// ============================================
+// TIPOS PARA FORMULÁRIO DE VISITAÇÃO
+// ============================================
+
+export type VisitationFieldConfig = {
+  ativo: boolean;
+  obrigatorio: boolean;
+  label: string;
+};
+
+export type VisitationFieldsConfig = {
+  nome: VisitationFieldConfig;
+  email: VisitationFieldConfig;
+  telefone: VisitationFieldConfig;
+  data_nascimento: VisitationFieldConfig;
+  endereco: VisitationFieldConfig;
+  bairro: VisitationFieldConfig;
+  cidade: VisitationFieldConfig;
+  estado: VisitationFieldConfig;
+  cep: VisitationFieldConfig;
+  como_conheceu: VisitationFieldConfig;
+  motivo_visita: VisitationFieldConfig;
+  pedido_oracao: VisitationFieldConfig;
+  ja_frequenta_igreja: VisitationFieldConfig;
+  qual_igreja: VisitationFieldConfig;
+  deseja_receber_visita: VisitationFieldConfig;
+  melhor_horario_contato: VisitationFieldConfig;
+  observacoes: VisitationFieldConfig;
+};
+
+export type CustomField = {
+  id: string;
+  tipo: 'text' | 'select' | 'checkbox' | 'textarea' | 'number' | 'date';
+  label: string;
+  obrigatorio: boolean;
+  opcoes?: string[];
+};
+
+export type VisitationFormConfig = {
+  id: string;
+  church_id: string;
+  titulo: string;
+  descricao?: string;
+  ativo: boolean;
+  cor_primaria: string;
+  logo_url?: string;
+  mensagem_boas_vindas?: string;
+  mensagem_agradecimento: string;
+  campos_config: VisitationFieldsConfig;
+  campos_personalizados: CustomField[];
+  opcoes_como_conheceu: string[];
+  opcoes_motivo_visita: string[];
+  notificar_email: boolean;
+  emails_notificacao?: string[];
+  notificar_whatsapp: boolean;
+  slug?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VisitationResponseStatus = 'novo' | 'contatado' | 'visitado' | 'membro' | 'inativo';
+
+export type VisitationFormResponse = {
+  id: string;
+  church_id: string;
+  form_config_id: string;
+  nome: string;
+  email?: string;
+  telefone?: string;
+  data_nascimento?: string;
+  endereco?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  como_conheceu?: string;
+  motivo_visita?: string;
+  pedido_oracao?: string;
+  ja_frequenta_igreja?: boolean;
+  qual_igreja?: string;
+  deseja_receber_visita?: boolean;
+  melhor_horario_contato?: string;
+  observacoes?: string;
+  campos_personalizados_respostas: Record<string, any>;
+  data_visita: string;
+  ip_address?: string;
+  user_agent?: string;
+  status: VisitationResponseStatus;
+  notas_acompanhamento?: string;
+  responsavel_acompanhamento?: string;
+  data_ultimo_contato?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VisitationFollowupType = 'ligacao' | 'whatsapp' | 'visita' | 'email' | 'outro';
+
+export type VisitationFollowupHistory = {
+  id: string;
+  response_id: string;
+  church_id: string;
+  tipo: VisitationFollowupType;
+  descricao: string;
+  resultado?: string;
+  responsavel_id?: string;
+  responsavel_nome?: string;
+  data_contato: string;
+  proxima_acao?: string;
+  data_proxima_acao?: string;
+  created_at: string;
+};
+
+// ============================================
+// TIPOS PARA TICKETS DE SUPORTE
+// ============================================
+
+export type TicketPrioridade = 'baixa' | 'normal' | 'alta' | 'urgente';
+export type TicketStatus = 'pendente' | 'em_andamento' | 'aguardando_resposta' | 'resolvido' | 'cancelado';
+export type TicketOrigem = 'manual' | 'whatsapp' | 'site' | 'telefone';
+export type TicketMessageTipo = 'mensagem' | 'nota_interna' | 'status_change' | 'whatsapp_enviado' | 'whatsapp_recebido';
+export type TicketAutorTipo = 'atendente' | 'sistema' | 'solicitante';
+
+export type SupportTicket = {
+  id: string;
+  church_id: string;
+  nome: string;
+  telefone: string;
+  email?: string;
+  motivo: string;
+  categoria?: string;
+  assunto?: string;
+  observacao?: string;
+  prioridade: TicketPrioridade;
+  status: TicketStatus;
+  data_criacao: string;
+  data_atualizacao: string;
+  data_resolucao?: string;
+  responsavel_id?: string;
+  responsavel_nome?: string;
+  origem: TicketOrigem;
+  conversa_id?: string;
+  tags?: string[];
+  anexos?: { url: string; nome: string; tipo: string }[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupportTicketMessage = {
+  id: string;
+  ticket_id: string;
+  church_id: string;
+  tipo: TicketMessageTipo;
+  conteudo: string;
+  autor_id?: string;
+  autor_nome?: string;
+  autor_tipo: TicketAutorTipo;
+  whatsapp_message_id?: string;
+  whatsapp_status?: string;
+  anexos?: { url: string; nome: string; tipo: string }[];
+  created_at: string;
+};
+
+export type SupportTicketCategory = {
+  id: string;
+  church_id: string;
+  nome: string;
+  descricao?: string;
+  cor: string;
+  icone?: string;
+  ativo: boolean;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupportTicketReason = {
+  id: string;
+  church_id: string;
+  nome: string;
+  descricao?: string;
+  categoria_id?: string;
+  prioridade_padrao: TicketPrioridade;
+  ativo: boolean;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};

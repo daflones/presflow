@@ -89,8 +89,8 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Carregando dashboard...</span>
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <span className="ml-2 text-gray-400">Carregando dashboard...</span>
       </div>
     );
   }
@@ -99,26 +99,26 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard Admin</h1>
-          <p className="text-sm text-gray-500">Monitoramento em tempo real do sistema</p>
+          <h1 className="text-2xl font-bold text-white">Dashboard Admin</h1>
+          <p className="text-sm text-gray-400">Monitoramento em tempo real do sistema</p>
         </div>
         <button 
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 shadow-lg shadow-purple-500/25 transition-all"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
           {isRefreshing ? 'Atualizando...' : 'Atualizar Tudo'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiData.map((kpi) => (
           <KpiCard key={kpi.title} {...kpi} />
         ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {statData.map((stat) => (
             <StatCard key={stat.label} {...stat} />
         ))}
@@ -131,15 +131,6 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6">
         <MessagesWidget />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="font-semibold text-gray-700">Monitor</h2>
-            <div className='mt-4 h-64 bg-gray-100 rounded-md flex items-center justify-center'>
-                <p className='text-gray-400'>Gráfico do monitor aqui</p>
-            </div>
-        </div>
       </div>
     </div>
   );

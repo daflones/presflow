@@ -12,3 +12,5 @@ export { churchServicesService } from './churchServices';
 export { hostingConfigService, accommodationsService, hostingReservationsService } from './hostingService';
 export { storageService } from './storageService';
 export type { BucketType, ImageCategory, UploadResult, ImageItem } from './storageService';
+export { visitationConfigService, visitationResponsesService, visitationFollowupService } from './visitationService';
+export { supportTicketsService, ticketMessagesService, ticketCategoriesService, ticketReasonsService } from './supportTicketsService';

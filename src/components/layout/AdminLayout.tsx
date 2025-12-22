@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Shield, Church, Bot, Users, FileText, LogOut, Home, Briefcase, Bed } from 'lucide-react';
+import { Shield, Church, Bot, Users, FileText, LogOut, Home, Briefcase, Bed, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect } from 'react';
 
@@ -9,6 +9,7 @@ const adminNavItems = [
   { name: 'Configurações IA', href: '/admin/config-ia', icon: Bot },
   { name: 'Serviços', href: '/admin/servicos', icon: Briefcase },
   { name: 'Hospedagem', href: '/admin/hospedagem', icon: Bed },
+  { name: 'Visitação', href: '/admin/visitacao', icon: ClipboardList },
   { name: 'Clientes', href: '/admin/clientes', icon: Users },
   { name: 'Arquivos IA', href: '/admin/arquivos', icon: FileText },
 ];

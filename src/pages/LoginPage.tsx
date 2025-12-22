@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Church } from 'lucide-react';
+import { Mail, Lock, Church, MessageSquare, Calendar, Users, Bot, Bed } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const loginSchema = z.object({
@@ -13,7 +13,7 @@ const loginSchema = z.object({
 type LoginFormInputs = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormInputs>({
     resolver: zodResolver(loginSchema),
   });
@@ -31,7 +31,6 @@ export function LoginPage() {
       }
 
       if (authData.user) {
-        // Login bem sucedido - navegar para dashboard
         navigate('/');
       }
     } catch (err: any) {
@@ -40,57 +39,108 @@ export function LoginPage() {
     }
   };
 
+  const features = [
+    { icon: Bot, text: 'Atendimento com IA' },
+    { icon: MessageSquare, text: 'WhatsApp Integrado' },
+    { icon: Calendar, text: 'Agendamentos' },
+    { icon: Users, text: 'Gestão de Membros' },
+    { icon: Bed, text: 'Hospedagem' },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="flex w-full max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+      <div className="flex w-full max-w-5xl mx-4 bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700/50">
         {/* Coluna da Esquerda (Branding) */}
-        <div className="hidden md:flex flex-col items-center justify-center w-1/2 bg-blue-800 p-12 text-white">
-          <Church className="h-24 w-24 mb-4" />
-          <h1 className="text-3xl font-bold">PrestFlow</h1>
-          <p className="mt-2 text-center text-blue-200">Gestão e comunicação para sua igreja.</p>
+        <div className="hidden lg:flex flex-col items-center justify-center w-1/2 bg-gradient-to-br from-purple-600 to-indigo-700 p-12 text-white relative overflow-hidden">
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-10 left-10 w-32 h-32 border border-white rounded-full"></div>
+            <div className="absolute bottom-20 right-10 w-48 h-48 border border-white rounded-full"></div>
+            <div className="absolute top-1/2 left-1/4 w-24 h-24 border border-white rounded-full"></div>
+          </div>
+          
+          <div className="relative z-10 text-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-full p-6 mb-6 inline-block">
+              <Church className="h-16 w-16" />
+            </div>
+            <h1 className="text-4xl font-bold mb-2">PrestFlow</h1>
+            <p className="text-purple-200 text-lg mb-8">Sistema de Gestão para Igrejas</p>
+            
+            <div className="space-y-4 text-left">
+              {features.map((feature, index) => (
+                <div key={index} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3">
+                  <feature.icon className="h-5 w-5 text-yellow-300" />
+                  <span className="text-sm font-medium">{feature.text}</span>
+                </div>
+              ))}
+            </div>
+            
+            <p className="mt-8 text-sm text-purple-200/80">
+              Automatize o atendimento, gerencie eventos e conecte-se com seus fiéis de forma inteligente.
+            </p>
+          </div>
         </div>
 
         {/* Coluna da Direita (Formulário) */}
-        <div className="w-full md:w-1/2 p-8 md:p-12">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-800">Bem-vindo de volta!</h2>
-            <p className="mt-2 text-gray-600">Faça login para acessar seu painel.</p>
+        <div className="w-full lg:w-1/2 p-8 md:p-12">
+          {/* Logo mobile */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="bg-purple-600 rounded-full p-4 inline-block mb-4">
+              <Church className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">PrestFlow</h1>
+            <p className="text-gray-400 text-sm">Sistema de Gestão para Igrejas</p>
           </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white">Bem-vindo de volta!</h2>
+            <p className="mt-2 text-gray-400">Faça login para acessar seu painel.</p>
+          </div>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="relative">
-              <Mail className="absolute w-5 h-5 text-gray-400 left-3 top-1/2 -translate-y-1/2" />
+              <Mail className="absolute w-5 h-5 text-gray-500 left-4 top-1/2 -translate-y-1/2" />
               <input
                 {...register('email')}
                 type="email"
                 placeholder="Email"
-                className="w-full pl-10 pr-4 py-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                className="w-full pl-12 pr-4 py-3.5 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
               />
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+              {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>}
             </div>
+            
             <div className="relative">
-              <Lock className="absolute w-5 h-5 text-gray-400 left-3 top-1/2 -translate-y-1/2" />
+              <Lock className="absolute w-5 h-5 text-gray-500 left-4 top-1/2 -translate-y-1/2" />
               <input
                 {...register('password')}
                 type="password"
                 placeholder="Senha"
-                className="w-full pl-10 pr-4 py-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                className="w-full pl-12 pr-4 py-3.5 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
               />
-              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
+              {errors.password && <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>}
             </div>
-                        <button
+            
+            <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3.5 text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/25"
             >
-              Entrar
+              {isSubmitting ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
-          <p className="mt-8 text-sm text-center text-gray-600">
+          
+          <p className="mt-8 text-sm text-center text-gray-400">
             Não tem uma conta?{' '}
-            <Link to="/register" className="font-medium text-blue-600 hover:underline">
-              Cadastre-se
+            <Link to="/register" className="font-medium text-purple-400 hover:text-purple-300 transition-colors">
+              Cadastre-se gratuitamente
             </Link>
           </p>
+          
+          <div className="mt-8 pt-6 border-t border-gray-700">
+            <p className="text-xs text-center text-gray-500">
+              © 2024 PrestFlow. Todos os direitos reservados.
+            </p>
+          </div>
         </div>
       </div>
     </div>

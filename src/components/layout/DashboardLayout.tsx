@@ -3,7 +3,7 @@ import { TopNavigation } from './TopNavigation'
 
 export function DashboardLayout() {
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/30">
       <TopNavigation />
       <main className="flex-1 p-6 overflow-y-auto">
         <Outlet />
