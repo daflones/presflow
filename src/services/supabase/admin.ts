@@ -66,7 +66,38 @@ export const adminService = {
     const { data, error } = await supabase
       .from('ai_configs')
       .update({
-        ...input,
+        agent_name: input.agent_name,
+        informacoes_adicionais: input.informacoes_adicionais,
+        perguntas_frequentes: input.perguntas_frequentes,
+        principais_eventos: input.principais_eventos,
+        menu_principal: input.menu_principal,
+        localizacao_igreja: input.localizacao_igreja,
+        informacao_historica: input.informacao_historica,
+        documentacao_necessaria: input.documentacao_necessaria,
+        tone_of_voice: input.tone_of_voice,
+        text_size: input.text_size,
+        use_emojis: input.use_emojis,
+        send_documents: input.send_documents,
+        auto_scheduling: input.auto_scheduling,
+        outside_hours_message: input.outside_hours_message,
+        // Novos campos
+        google_maps_link: input.google_maps_link,
+        espacos_disponiveis: input.espacos_disponiveis,
+        info_casamento: input.info_casamento,
+        exige_sinal: input.exige_sinal,
+        regras_sinal: input.regras_sinal,
+        info_batizados: input.info_batizados,
+        cursos: input.cursos,
+        sessao_fotos: input.sessao_fotos,
+        regras_hospedagem: input.regras_hospedagem,
+        link_visitacao: input.link_visitacao,
+        guia_turistico: input.guia_turistico,
+        projetos_sociais_empresas: input.projetos_sociais_empresas,
+        projetos_sociais_comunidade: input.projetos_sociais_comunidade,
+        regras_especificas: input.regras_especificas,
+        hospedagem_disponivel: input.hospedagem_disponivel,
+        qualification_fields: input.qualification_fields,
+        business_hours: input.business_hours,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -75,7 +106,7 @@ export const adminService = {
 
     if (error) {
       console.error('[admin.updateAIConfig] Erro:', error);
-      return null;
+      throw error;
     }
     return data;
   },

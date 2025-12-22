@@ -33,6 +33,14 @@ export type DaySchedule = {
   endTime: string;
 };
 
+export type InfoCerimonia = {
+  lugares: string;
+  horarios: string;
+  documentacao: string;
+  prazo_entrega: string;
+  valores: string;
+};
+
 export type AIConfig = {
   id: string;
   church_id: string;
@@ -50,6 +58,24 @@ export type AIConfig = {
   use_emojis: boolean;
   send_documents: boolean;
   auto_scheduling: boolean;
+  
+  // Novos campos
+  google_maps_link?: string;
+  espacos_disponiveis?: string;
+  info_casamento?: InfoCerimonia;
+  exige_sinal: boolean;
+  regras_sinal?: string;
+  info_batizados?: InfoCerimonia;
+  cursos?: string;
+  sessao_fotos?: string;
+  regras_hospedagem?: string;
+  link_visitacao?: string;
+  guia_turistico?: string;
+  projetos_sociais_empresas?: string;
+  projetos_sociais_comunidade?: string;
+  regras_especificas?: string;
+  hospedagem_disponivel: boolean;
+  
   qualification_fields: {
     nome: boolean;
     telefone: boolean;
@@ -58,9 +84,6 @@ export type AIConfig = {
     motivacao: boolean;
     expectativa: boolean;
     tipo_evento: boolean;
-    nome_igreja: boolean;
-    segmento: boolean;
-    volume_mensal: boolean;
   };
   business_hours: {
     monday: DaySchedule;

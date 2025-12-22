@@ -9,6 +9,14 @@ type DaySchedule = {
   endTime: string;
 };
 
+type InfoCerimonia = {
+  lugares: string;
+  horarios: string;
+  documentacao: string;
+  prazo_entrega: string;
+  valores: string;
+};
+
 type AIConfig = {
   agentName: string;
   informacoesAdicionais: string;
@@ -24,6 +32,23 @@ type AIConfig = {
   sendDocuments: boolean;
   autoScheduling: boolean;
   
+  // Novos campos
+  googleMapsLink: string;
+  espacosDisponiveis: string;
+  infoCasamento: InfoCerimonia;
+  exigeSinal: boolean;
+  regrasSinal: string;
+  infoBatizados: InfoCerimonia;
+  cursos: string;
+  sessaoFotos: string;
+  regrasHospedagem: string;
+  linkVisitacao: string;
+  guiaTuristico: string;
+  projetosSociaisEmpresas: string;
+  projetosSociaisComunidade: string;
+  regrasEspecificas: string;
+  hospedagemDisponivel: boolean;
+  
   qualificationFields: {
     nome: boolean;
     telefone: boolean;
@@ -32,9 +57,6 @@ type AIConfig = {
     motivacao: boolean;
     expectativa: boolean;
     tipo_evento: boolean;
-    nome_igreja: boolean;
-    segmento: boolean;
-    volume_mensal: boolean;
   };
   
   businessHours: {
@@ -49,6 +71,16 @@ type AIConfig = {
   
   outsideHoursMessage: string;
 };
+
+function getDefaultInfoCerimonia(): InfoCerimonia {
+  return {
+    lugares: '',
+    horarios: '',
+    documentacao: '',
+    prazo_entrega: '',
+    valores: '',
+  };
+}
 
 function getDefaultConfig(): AIConfig {
   return {
@@ -65,6 +97,24 @@ function getDefaultConfig(): AIConfig {
     useEmojis: false,
     sendDocuments: false,
     autoScheduling: false,
+    
+    // Novos campos
+    googleMapsLink: '',
+    espacosDisponiveis: '',
+    infoCasamento: getDefaultInfoCerimonia(),
+    exigeSinal: false,
+    regrasSinal: '',
+    infoBatizados: getDefaultInfoCerimonia(),
+    cursos: '',
+    sessaoFotos: '',
+    regrasHospedagem: '',
+    linkVisitacao: '',
+    guiaTuristico: '',
+    projetosSociaisEmpresas: '',
+    projetosSociaisComunidade: '',
+    regrasEspecificas: '',
+    hospedagemDisponivel: false,
+    
     qualificationFields: {
       nome: true,
       telefone: true,
@@ -73,9 +123,6 @@ function getDefaultConfig(): AIConfig {
       motivacao: true,
       expectativa: true,
       tipo_evento: true,
-      nome_igreja: false,
-      segmento: false,
-      volume_mensal: false,
     },
     businessHours: {
       monday: { enabled: true, startTime: '09:00', endTime: '18:00' },
@@ -128,7 +175,7 @@ export function AgentPage() {
       const data = await aiConfigService.get();
       console.log('[AgentPage] Dados recebidos:', data);
       if (data) {
-        const newConfig = {
+        const newConfig: AIConfig = {
           agentName: data.agent_name || 'Iara',
           informacoesAdicionais: data.informacoes_adicionais || '',
           perguntasFrequentes: data.perguntas_frequentes || '',
@@ -142,6 +189,24 @@ export function AgentPage() {
           useEmojis: data.use_emojis ?? false,
           sendDocuments: data.send_documents ?? false,
           autoScheduling: data.auto_scheduling ?? false,
+          
+          // Novos campos
+          googleMapsLink: data.google_maps_link || '',
+          espacosDisponiveis: data.espacos_disponiveis || '',
+          infoCasamento: data.info_casamento as InfoCerimonia || getDefaultInfoCerimonia(),
+          exigeSinal: data.exige_sinal ?? false,
+          regrasSinal: data.regras_sinal || '',
+          infoBatizados: data.info_batizados as InfoCerimonia || getDefaultInfoCerimonia(),
+          cursos: data.cursos || '',
+          sessaoFotos: data.sessao_fotos || '',
+          regrasHospedagem: data.regras_hospedagem || '',
+          linkVisitacao: data.link_visitacao || '',
+          guiaTuristico: data.guia_turistico || '',
+          projetosSociaisEmpresas: data.projetos_sociais_empresas || '',
+          projetosSociaisComunidade: data.projetos_sociais_comunidade || '',
+          regrasEspecificas: data.regras_especificas || '',
+          hospedagemDisponivel: data.hospedagem_disponivel ?? false,
+          
           qualificationFields: data.qualification_fields as AIConfig['qualificationFields'] || getDefaultConfig().qualificationFields,
           businessHours: data.business_hours as AIConfig['businessHours'] || getDefaultConfig().businessHours,
           outsideHoursMessage: data.outside_hours_message || 'Desculpe, estamos fora do horário de atendimento. Retornaremos em breve!',
@@ -169,13 +234,6 @@ export function AgentPage() {
     setHasChanges(true);
   }
 
-  function updateQualificationField(field: keyof AIConfig['qualificationFields'], value: boolean) {
-    setConfig((prev) => ({
-      ...prev,
-      qualificationFields: { ...prev.qualificationFields, [field]: value },
-    }));
-    setHasChanges(true);
-  }
 
   function updateBusinessHours(day: keyof AIConfig['businessHours'], updates: Partial<DaySchedule>) {
     setConfig((prev) => ({
@@ -184,6 +242,14 @@ export function AgentPage() {
         ...prev.businessHours,
         [day]: { ...prev.businessHours[day], ...updates },
       },
+    }));
+    setHasChanges(true);
+  }
+
+  function updateInfoCerimonia(tipo: 'infoCasamento' | 'infoBatizados', field: keyof InfoCerimonia, value: string) {
+    setConfig((prev) => ({
+      ...prev,
+      [tipo]: { ...prev[tipo], [field]: value },
     }));
     setHasChanges(true);
   }
@@ -205,6 +271,24 @@ export function AgentPage() {
         use_emojis: config.useEmojis,
         send_documents: config.sendDocuments,
         auto_scheduling: config.autoScheduling,
+        
+        // Novos campos
+        google_maps_link: config.googleMapsLink,
+        espacos_disponiveis: config.espacosDisponiveis,
+        info_casamento: config.infoCasamento,
+        exige_sinal: config.exigeSinal,
+        regras_sinal: config.regrasSinal,
+        info_batizados: config.infoBatizados,
+        cursos: config.cursos,
+        sessao_fotos: config.sessaoFotos,
+        regras_hospedagem: config.regrasHospedagem,
+        link_visitacao: config.linkVisitacao,
+        guia_turistico: config.guiaTuristico,
+        projetos_sociais_empresas: config.projetosSociaisEmpresas,
+        projetos_sociais_comunidade: config.projetosSociaisComunidade,
+        regras_especificas: config.regrasEspecificas,
+        hospedagem_disponivel: config.hospedagemDisponivel,
+        
         qualification_fields: config.qualificationFields,
         business_hours: config.businessHours,
         outside_hours_message: config.outsideHoursMessage,
@@ -368,6 +452,313 @@ export function AgentPage() {
                 className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Link do Google Maps</label>
+              <input
+                type="url"
+                value={config.googleMapsLink}
+                onChange={(e) => updateConfig('googleMapsLink', e.target.value)}
+                placeholder="https://maps.google.com/..."
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Espaços Disponíveis</label>
+              <textarea
+                value={config.espacosDisponiveis}
+                onChange={(e) => updateConfig('espacosDisponiveis', e.target.value)}
+                rows={4}
+                placeholder="Descreva os espaços disponíveis (capelas, santuários, salões, jardins, etc.)..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Regras Específicas</label>
+              <textarea
+                value={config.regrasEspecificas}
+                onChange={(e) => updateConfig('regrasEspecificas', e.target.value)}
+                rows={4}
+                placeholder="Regras específicas da igreja que a IA deve informar..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Informações sobre Casamentos */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Informações sobre Casamentos</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure as informações sobre casamentos que a IA deve fornecer.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Lugares para Casamentos</label>
+              <textarea
+                value={config.infoCasamento.lugares}
+                onChange={(e) => updateInfoCerimonia('infoCasamento', 'lugares', e.target.value)}
+                rows={3}
+                placeholder="Capelas, santuários, jardins disponíveis para casamentos..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Horários Disponíveis</label>
+              <textarea
+                value={config.infoCasamento.horarios}
+                onChange={(e) => updateInfoCerimonia('infoCasamento', 'horarios', e.target.value)}
+                rows={3}
+                placeholder="Horários disponíveis para cerimônias de casamento..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Documentação Necessária</label>
+              <textarea
+                value={config.infoCasamento.documentacao}
+                onChange={(e) => updateInfoCerimonia('infoCasamento', 'documentacao', e.target.value)}
+                rows={3}
+                placeholder="Lista de documentos necessários para casamento..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Prazo para Entrega de Documentos</label>
+              <textarea
+                value={config.infoCasamento.prazo_entrega}
+                onChange={(e) => updateInfoCerimonia('infoCasamento', 'prazo_entrega', e.target.value)}
+                rows={2}
+                placeholder="Prazo mínimo para entrega de documentação..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Valores e Pagamento</label>
+              <textarea
+                value={config.infoCasamento.valores}
+                onChange={(e) => updateInfoCerimonia('infoCasamento', 'valores', e.target.value)}
+                rows={3}
+                placeholder="Valores, formas de pagamento, taxas..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Informações sobre Batizados */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Informações sobre Batizados</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure as informações sobre batizados que a IA deve fornecer.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Lugares para Batizados</label>
+              <textarea
+                value={config.infoBatizados.lugares}
+                onChange={(e) => updateInfoCerimonia('infoBatizados', 'lugares', e.target.value)}
+                rows={3}
+                placeholder="Capelas, batistérios disponíveis para batizados..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Horários Disponíveis</label>
+              <textarea
+                value={config.infoBatizados.horarios}
+                onChange={(e) => updateInfoCerimonia('infoBatizados', 'horarios', e.target.value)}
+                rows={3}
+                placeholder="Horários disponíveis para cerimônias de batizado..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Documentação Necessária</label>
+              <textarea
+                value={config.infoBatizados.documentacao}
+                onChange={(e) => updateInfoCerimonia('infoBatizados', 'documentacao', e.target.value)}
+                rows={3}
+                placeholder="Lista de documentos necessários para batizado..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Prazo para Entrega de Documentos</label>
+              <textarea
+                value={config.infoBatizados.prazo_entrega}
+                onChange={(e) => updateInfoCerimonia('infoBatizados', 'prazo_entrega', e.target.value)}
+                rows={2}
+                placeholder="Prazo mínimo para entrega de documentação..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Valores e Pagamento</label>
+              <textarea
+                value={config.infoBatizados.valores}
+                onChange={(e) => updateInfoCerimonia('infoBatizados', 'valores', e.target.value)}
+                rows={3}
+                placeholder="Valores, formas de pagamento, taxas..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Sinal e Reservas */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Sinal e Reservas</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure as regras de sinal para reservas.</p>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Exige Sinal para Reservas?</p>
+                <p className="text-xs text-gray-500">Se ativado, a IA informará sobre a necessidade de sinal.</p>
+              </div>
+              <Toggle checked={config.exigeSinal} onChange={(val) => updateConfig('exigeSinal', val)} />
+            </div>
+
+            {config.exigeSinal && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Regras para Sinal</label>
+                <textarea
+                  value={config.regrasSinal}
+                  onChange={(e) => updateConfig('regrasSinal', e.target.value)}
+                  rows={4}
+                  placeholder="Valor do sinal, prazo, formas de pagamento, política de cancelamento..."
+                  className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cursos e Sessão de Fotos */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Cursos e Sessão de Fotos</h2>
+          <p className="text-sm text-gray-500 mb-6">Informações sobre cursos oferecidos e sessões de fotos.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Cursos Oferecidos</label>
+              <textarea
+                value={config.cursos}
+                onChange={(e) => updateConfig('cursos', e.target.value)}
+                rows={4}
+                placeholder="Cursos de preparação para casamento, batismo, catequese, etc..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Sessão de Fotos</label>
+              <textarea
+                value={config.sessaoFotos}
+                onChange={(e) => updateConfig('sessaoFotos', e.target.value)}
+                rows={4}
+                placeholder="Regras, horários, valores e locais disponíveis para sessão de fotos..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Hospedagem */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Hospedagem</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure informações sobre hospedagem disponível.</p>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Hospedagem Disponível?</p>
+                <p className="text-xs text-gray-500">Se a igreja oferece hospedagem para visitantes.</p>
+              </div>
+              <Toggle checked={config.hospedagemDisponivel} onChange={(val) => updateConfig('hospedagemDisponivel', val)} />
+            </div>
+
+            {config.hospedagemDisponivel && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Regras para Hospedagem</label>
+                <textarea
+                  value={config.regrasHospedagem}
+                  onChange={(e) => updateConfig('regrasHospedagem', e.target.value)}
+                  rows={4}
+                  placeholder="Regras, valores, disponibilidade, como reservar..."
+                  className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Visitação e Turismo */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Visitação e Turismo</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure informações sobre visitação e turismo.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Link para Agendamento de Visitação</label>
+              <input
+                type="url"
+                value={config.linkVisitacao}
+                onChange={(e) => updateConfig('linkVisitacao', e.target.value)}
+                placeholder="https://..."
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Guia Turístico / Visita Autoguiada</label>
+              <textarea
+                value={config.guiaTuristico}
+                onChange={(e) => updateConfig('guiaTuristico', e.target.value)}
+                rows={4}
+                placeholder="Informações sobre visita autoguiada, pontos de interesse, horários de visitação..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Projetos Sociais */}
+        <div className="rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Projetos Sociais</h2>
+          <p className="text-sm text-gray-500 mb-6">Configure informações sobre projetos sociais da igreja.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Projetos Sociais para Parceria com Empresas</label>
+              <textarea
+                value={config.projetosSociaisEmpresas}
+                onChange={(e) => updateConfig('projetosSociaisEmpresas', e.target.value)}
+                rows={4}
+                placeholder="Projetos disponíveis para parceria com empresas, patrocínios, doações corporativas..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Projetos Sociais para Comunidade</label>
+              <textarea
+                value={config.projetosSociaisComunidade}
+                onChange={(e) => updateConfig('projetosSociaisComunidade', e.target.value)}
+                rows={4}
+                placeholder="Projetos disponíveis para a comunidade, como participar, voluntariado..."
+                className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
           </div>
         </div>
 
@@ -438,10 +829,10 @@ export function AgentPage() {
                 { key: 'nome' as const, label: 'Nome' },
                 { key: 'telefone' as const, label: 'Telefone' },
                 { key: 'email' as const, label: 'Email' },
-                { key: 'interesse' as const, label: 'Produto de Interesse' },
+                { key: 'interesse' as const, label: 'Serviço de Interesse' },
                 { key: 'motivacao' as const, label: 'Motivação' },
                 { key: 'expectativa' as const, label: 'Expectativa' },
-                { key: 'tipoEvento' as const, label: 'Tipo de Evento' },
+                { key: 'tipo_evento' as const, label: 'Tipo de Evento' },
               ].map((field) => (
                 <div key={field.key} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <span className="text-sm text-gray-700">{field.label}</span>
@@ -454,29 +845,6 @@ export function AgentPage() {
             </div>
           </div>
 
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-3">Campos Adicionais</h3>
-            <p className="text-xs text-gray-500 mb-4">Configure quais campos adicionais a IA deve coletar.</p>
-            
-            <div className="space-y-3">
-              {[
-                { key: 'nome_igreja' as const, label: 'Nome da Igreja', desc: 'Solicitar nome da igreja do lead.' },
-                { key: 'segmento' as const, label: 'Segmento', desc: 'Solicitar segmento de atuação do lead.' },
-                { key: 'volume_mensal' as const, label: 'Volume Mensal', desc: 'Solicitar volume mensal estimado do lead.' },
-              ].map((field) => (
-                <div key={field.key} className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">{field.label}</p>
-                    <p className="text-xs text-gray-500">{field.desc}</p>
-                  </div>
-                  <Toggle
-                    checked={config.qualificationFields[field.key]}
-                    onChange={(val) => updateQualificationField(field.key, val)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Horários de Funcionamento */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings } from 'lucide-react';
+import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings, MapPin } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { AIConfig, Church as ChurchType } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
@@ -22,9 +22,6 @@ const DEFAULT_QUALIFICATION_FIELDS = {
   motivacao: true,
   expectativa: true,
   tipo_evento: true,
-  nome_igreja: true,
-  segmento: true,
-  volume_mensal: true,
 };
 
 const DAY_LABELS: Record<string, string> = {
@@ -41,13 +38,10 @@ const QUALIFICATION_LABELS: Record<string, string> = {
   nome: 'Nome',
   telefone: 'Telefone',
   email: 'Email',
-  interesse: 'Produto de Interesse',
+  interesse: 'Serviço de Interesse',
   motivacao: 'Motivação',
   expectativa: 'Expectativa',
   tipo_evento: 'Tipo de Evento',
-  nome_igreja: 'Nome da Igreja',
-  segmento: 'Segmento',
-  volume_mensal: 'Volume Mensal',
 };
 
 export function AdminConfigIA() {
@@ -64,7 +58,7 @@ export function AdminConfigIA() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<AIConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'qualification' | 'hours'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'services' | 'qualification' | 'hours'>('general');
   
   const [editForm, setEditForm] = useState({
     agent_name: '',
@@ -81,6 +75,22 @@ export function AdminConfigIA() {
     send_documents: false,
     auto_scheduling: false,
     outside_hours_message: '',
+    // Novos campos
+    google_maps_link: '',
+    espacos_disponiveis: '',
+    info_casamento: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+    exige_sinal: false,
+    regras_sinal: '',
+    info_batizados: { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+    cursos: '',
+    sessao_fotos: '',
+    regras_hospedagem: '',
+    link_visitacao: '',
+    guia_turistico: '',
+    projetos_sociais_empresas: '',
+    projetos_sociais_comunidade: '',
+    regras_especificas: '',
+    hospedagem_disponivel: false,
     qualification_fields: DEFAULT_QUALIFICATION_FIELDS,
     business_hours: DEFAULT_BUSINESS_HOURS,
   });
@@ -129,6 +139,22 @@ export function AdminConfigIA() {
       send_documents: config.send_documents || false,
       auto_scheduling: config.auto_scheduling || false,
       outside_hours_message: config.outside_hours_message || '',
+      // Novos campos
+      google_maps_link: config.google_maps_link || '',
+      espacos_disponiveis: config.espacos_disponiveis || '',
+      info_casamento: config.info_casamento || { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+      exige_sinal: config.exige_sinal || false,
+      regras_sinal: config.regras_sinal || '',
+      info_batizados: config.info_batizados || { lugares: '', horarios: '', documentacao: '', prazo_entrega: '', valores: '' },
+      cursos: config.cursos || '',
+      sessao_fotos: config.sessao_fotos || '',
+      regras_hospedagem: config.regras_hospedagem || '',
+      link_visitacao: config.link_visitacao || '',
+      guia_turistico: config.guia_turistico || '',
+      projetos_sociais_empresas: config.projetos_sociais_empresas || '',
+      projetos_sociais_comunidade: config.projetos_sociais_comunidade || '',
+      regras_especificas: config.regras_especificas || '',
+      hospedagem_disponivel: config.hospedagem_disponivel || false,
       qualification_fields: config.qualification_fields || DEFAULT_QUALIFICATION_FIELDS,
       business_hours: config.business_hours || DEFAULT_BUSINESS_HOURS,
     });
@@ -140,12 +166,17 @@ export function AdminConfigIA() {
     
     setIsSaving(true);
     try {
-      await adminService.updateAIConfig(selectedConfig.id, editForm);
-      setIsEditModalOpen(false);
-      loadData();
+      const result = await adminService.updateAIConfig(selectedConfig.id, editForm);
+      if (result) {
+        alert('Configurações salvas com sucesso!');
+        setIsEditModalOpen(false);
+        loadData();
+      } else {
+        alert('Erro ao salvar configuração. Tente novamente.');
+      }
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar configuração');
+      alert(`Erro ao salvar configuração: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setIsSaving(false);
     }
@@ -299,6 +330,17 @@ export function AdminConfigIA() {
                 Geral
               </button>
               <button
+                onClick={() => setActiveTab('services')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'services'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                <MapPin className="h-4 w-4" />
+                Serviços
+              </button>
+              <button
                 onClick={() => setActiveTab('qualification')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'qualification'
@@ -331,81 +373,90 @@ export function AdminConfigIA() {
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Informações do Agente</h3>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Nome do Agente</label>
+                      <p className="text-xs text-gray-500 mb-2">Nome que a IA usará para se identificar nas conversas com os clientes</p>
                       <input
                         type="text"
                         value={editForm.agent_name}
                         onChange={(e) => setEditForm({ ...editForm, agent_name: e.target.value })}
+                        placeholder="Ex: Maria, Assistente Virtual, Secretaria Paroquial..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Informações Adicionais para IA</label>
+                      <p className="text-xs text-gray-500 mb-2">Contexto extra sobre a igreja que a IA deve saber (história, diferenciais, valores, missão)</p>
                       <textarea
                         value={editForm.informacoes_adicionais}
                         onChange={(e) => setEditForm({ ...editForm, informacoes_adicionais: e.target.value })}
                         rows={4}
-                        placeholder="Informações extras que a IA deve saber sobre a igreja..."
+                        placeholder="Ex: Somos uma paróquia centenária fundada em 1920, conhecida pela arquitetura neogótica e pelos vitrais históricos. Nossa missão é acolher a todos com amor e fé..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Perguntas Frequentes</label>
+                      <p className="text-xs text-gray-500 mb-2">Liste perguntas comuns e suas respostas para a IA responder com precisão</p>
                       <textarea
                         value={editForm.perguntas_frequentes}
                         onChange={(e) => setEditForm({ ...editForm, perguntas_frequentes: e.target.value })}
                         rows={4}
-                        placeholder="Liste as perguntas mais comuns e suas respostas..."
+                        placeholder="Ex: P: Qual o horário das missas? R: Missas de segunda a sexta às 7h e 19h, sábados às 17h, domingos às 8h, 10h e 19h..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Principais Eventos</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva eventos principais (missas, cultos, retiros, festividades, celebrações especiais)</p>
                       <textarea
                         value={editForm.principais_eventos}
                         onChange={(e) => setEditForm({ ...editForm, principais_eventos: e.target.value })}
                         rows={4}
-                        placeholder="Descreva os principais eventos da igreja (missas, cultos, retiros, etc.)..."
+                        placeholder="Ex: Festa do Padroeiro em junho, Retiro de Carnaval, Via Sacra na Semana Santa, Missa de Natal às 22h..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Documentação Necessária</label>
+                      <p className="text-xs text-gray-500 mb-2">Liste documentos gerais necessários para cada tipo de serviço oferecido</p>
                       <textarea
                         value={editForm.documentacao_necessaria}
                         onChange={(e) => setEditForm({ ...editForm, documentacao_necessaria: e.target.value })}
                         rows={4}
-                        placeholder="Liste os documentos necessários para cada tipo de serviço..."
+                        placeholder="Ex: Para casamento: certidão de batismo, curso de noivos. Para batizado: certidão de nascimento, RG dos padrinhos..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Menu Principal</label>
+                      <p className="text-xs text-gray-500 mb-2">Digite o conteúdo do menu de opções que será exibido ao cliente no início da conversa</p>
                       <textarea
                         value={editForm.menu_principal}
                         onChange={(e) => setEditForm({ ...editForm, menu_principal: e.target.value })}
                         rows={4}
-                        placeholder="Digite o conteúdo do menu que será exibido para o cliente..."
+                        placeholder="Ex: Olá! Como posso ajudar? Digite: 1️⃣ Horários de missas 2️⃣ Casamentos 3️⃣ Batizados 4️⃣ Outros serviços 5️⃣ Falar com atendente"
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Se preenchido, a IA exibirá este menu de opções para o cliente.</p>
+                      <p className="text-xs text-gray-500 mt-1">Se preenchido, a IA exibirá este menu de opções para o cliente no início da conversa.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Localização da Igreja (Capelas e Santuários)</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva a localização, capelas, santuários e pontos de referência para orientar visitantes</p>
                       <textarea
                         value={editForm.localizacao_igreja}
                         onChange={(e) => setEditForm({ ...editForm, localizacao_igreja: e.target.value })}
                         rows={4}
-                        placeholder="Descreva a localização, capelas, santuários e pontos de referência..."
+                        placeholder="Ex: Rua das Flores, 123 - Centro. Próximo à Praça da Matriz. Estacionamento próprio. Capela lateral dedicada a Nossa Senhora..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Informação Histórica</label>
+                      <p className="text-xs text-gray-500 mb-2">Conte a história da igreja, fundação, eventos importantes e curiosidades</p>
                       <textarea
                         value={editForm.informacao_historica}
                         onChange={(e) => setEditForm({ ...editForm, informacao_historica: e.target.value })}
                         rows={4}
-                        placeholder="Conte a história da igreja, fundação, eventos importantes..."
+                        placeholder="Ex: Fundada em 1850 por imigrantes italianos, nossa igreja foi tombada como patrimônio histórico em 1980. Os vitrais foram trazidos da Europa..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
@@ -417,67 +468,378 @@ export function AdminConfigIA() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Tom de Voz</label>
+                        <p className="text-xs text-gray-500 mb-2">Defina o estilo de comunicação da IA</p>
                         <select
                           value={editForm.tone_of_voice}
                           onChange={(e) => setEditForm({ ...editForm, tone_of_voice: e.target.value as any })}
                           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                         >
-                          <option value="amigavel">Amigável</option>
-                          <option value="formal">Formal</option>
-                          <option value="profissional">Profissional</option>
+                          <option value="amigavel">Amigável - Acolhedor e próximo</option>
+                          <option value="formal">Formal - Respeitoso e tradicional</option>
+                          <option value="profissional">Profissional - Objetivo e claro</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Tamanho do Texto</label>
+                        <p className="text-xs text-gray-500 mb-2">Configure a extensão das respostas</p>
                         <select
                           value={editForm.text_size}
                           onChange={(e) => setEditForm({ ...editForm, text_size: e.target.value as any })}
                           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                         >
-                          <option value="curto">Curto</option>
-                          <option value="medio">Médio</option>
-                          <option value="longo">Longo</option>
+                          <option value="curto">Curto - Respostas diretas</option>
+                          <option value="medio">Médio - Respostas equilibradas</option>
+                          <option value="longo">Longo - Respostas detalhadas</option>
                         </select>
                       </div>
                     </div>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editForm.use_emojis}
-                        onChange={(e) => setEditForm({ ...editForm, use_emojis: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
-                      />
-                      <span className="text-sm text-gray-300">Usar Emojis nas respostas</span>
-                    </label>
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.use_emojis}
+                          onChange={(e) => setEditForm({ ...editForm, use_emojis: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">Usar Emojis nas respostas</span>
+                          <p className="text-xs text-gray-500">A IA incluirá emojis para tornar as mensagens mais expressivas e amigáveis</p>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Scheduling & Documents */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Agendamento e Documentos</h3>
-                    <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.send_documents}
+                          onChange={(e) => setEditForm({ ...editForm, send_documents: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">IA envia documentos?</span>
+                          <p className="text-xs text-gray-500">Quando ativado, a IA pode enviar arquivos, imagens e PDFs cadastrados aos clientes</p>
+                        </div>
+                      </label>
+                    </div>
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.auto_scheduling}
+                          onChange={(e) => setEditForm({ ...editForm, auto_scheduling: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">Agendamento com IA?</span>
+                          <p className="text-xs text-gray-500">Permite que a IA realize agendamentos automaticamente no calendário da igreja</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Services */}
+              {activeTab === 'services' && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Localização e Espaços</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Link do Google Maps</label>
+                      <p className="text-xs text-gray-500 mb-2">Cole o link do Google Maps da localização da sua igreja/instituição</p>
                       <input
-                        type="checkbox"
-                        checked={editForm.send_documents}
-                        onChange={(e) => setEditForm({ ...editForm, send_documents: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        type="url"
+                        value={editForm.google_maps_link}
+                        onChange={(e) => setEditForm({ ...editForm, google_maps_link: e.target.value })}
+                        placeholder="https://maps.google.com/..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                       />
-                      <div>
-                        <span className="text-sm text-gray-300">IA envia documentos?</span>
-                        <p className="text-xs text-gray-500">Quando ativado, a IA pode enviar arquivos e imagens aos clientes.</p>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer">
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Espaços Disponíveis</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva os espaços que a igreja oferece (ex: "Capelas, santuários, salões, jardins, estacionamento")</p>
+                      <textarea
+                        value={editForm.espacos_disponiveis}
+                        onChange={(e) => setEditForm({ ...editForm, espacos_disponiveis: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Capela principal com capacidade para 200 pessoas, Salão de festas, Jardim para cerimônias ao ar livre..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Regras Específicas</label>
+                      <p className="text-xs text-gray-500 mb-2">Liste as regras particulares da igreja (ex: "Vestimenta adequada, silêncio durante celebrações, respeito aos horários")</p>
+                      <textarea
+                        value={editForm.regras_especificas}
+                        onChange={(e) => setEditForm({ ...editForm, regras_especificas: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Vestimenta adequada obrigatória, Proibido uso de celular durante celebrações, Chegada com 15 minutos de antecedência..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Casamentos</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Lugares</label>
+                      <p className="text-xs text-gray-500 mb-2">Liste os locais disponíveis para cerimônias de casamento</p>
+                      <textarea
+                        value={editForm.info_casamento.lugares}
+                        onChange={(e) => setEditForm({ ...editForm, info_casamento: { ...editForm.info_casamento, lugares: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Capela Nossa Senhora, Santuário Principal, Jardim das Oliveiras..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Horários</label>
+                      <p className="text-xs text-gray-500 mb-2">Informe os horários disponíveis para cerimônias de casamento</p>
+                      <textarea
+                        value={editForm.info_casamento.horarios}
+                        onChange={(e) => setEditForm({ ...editForm, info_casamento: { ...editForm.info_casamento, horarios: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Sábados às 10h, 14h e 17h. Sextas às 19h..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Documentação</label>
+                      <p className="text-xs text-gray-500 mb-2">Liste os documentos necessários para realizar casamento</p>
+                      <textarea
+                        value={editForm.info_casamento.documentacao}
+                        onChange={(e) => setEditForm({ ...editForm, info_casamento: { ...editForm.info_casamento, documentacao: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Certidão de nascimento, Comprovante de batismo, Certificado do curso de noivos, RG e CPF..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Prazo de Antecedência</label>
+                      <p className="text-xs text-gray-500 mb-2">Informe com quanto tempo de antecedência deve ser feita a solicitação</p>
                       <input
-                        type="checkbox"
-                        checked={editForm.auto_scheduling}
-                        onChange={(e) => setEditForm({ ...editForm, auto_scheduling: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        type="text"
+                        value={editForm.info_casamento.prazo_entrega}
+                        onChange={(e) => setEditForm({ ...editForm, info_casamento: { ...editForm.info_casamento, prazo_entrega: e.target.value } })}
+                        placeholder="Ex: Mínimo 6 meses de antecedência"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Valores</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva os custos envolvidos (taxas, contribuições)</p>
+                      <textarea
+                        value={editForm.info_casamento.valores}
+                        onChange={(e) => setEditForm({ ...editForm, info_casamento: { ...editForm.info_casamento, valores: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Taxa de reserva R$ 500, Contribuição para a igreja R$ 1.000..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Batizados</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Lugares</label>
+                      <p className="text-xs text-gray-500 mb-2">Locais onde são realizados os batizados</p>
+                      <textarea
+                        value={editForm.info_batizados.lugares}
+                        onChange={(e) => setEditForm({ ...editForm, info_batizados: { ...editForm.info_batizados, lugares: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Batistério da Capela Principal, Fonte Batismal do Santuário..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Horários</label>
+                      <p className="text-xs text-gray-500 mb-2">Horários disponíveis para batizados</p>
+                      <textarea
+                        value={editForm.info_batizados.horarios}
+                        onChange={(e) => setEditForm({ ...editForm, info_batizados: { ...editForm.info_batizados, horarios: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Domingos após a missa das 10h, Sábados às 15h..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Documentação</label>
+                      <p className="text-xs text-gray-500 mb-2">Documentos necessários para realizar batizado</p>
+                      <textarea
+                        value={editForm.info_batizados.documentacao}
+                        onChange={(e) => setEditForm({ ...editForm, info_batizados: { ...editForm.info_batizados, documentacao: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Certidão de nascimento da criança, RG dos pais e padrinhos, Comprovante de residência..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Prazo de Antecedência</label>
+                      <p className="text-xs text-gray-500 mb-2">Informe com quanto tempo de antecedência deve ser feita a solicitação</p>
+                      <input
+                        type="text"
+                        value={editForm.info_batizados.prazo_entrega}
+                        onChange={(e) => setEditForm({ ...editForm, info_batizados: { ...editForm.info_batizados, prazo_entrega: e.target.value } })}
+                        placeholder="Ex: Mínimo 30 dias de antecedência"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Valores</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva os custos envolvidos (taxas, contribuições)</p>
+                      <textarea
+                        value={editForm.info_batizados.valores}
+                        onChange={(e) => setEditForm({ ...editForm, info_batizados: { ...editForm.info_batizados, valores: e.target.value } })}
+                        rows={2}
+                        placeholder="Ex: Contribuição sugerida R$ 100, Vela batismal R$ 30..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Sinal e Reservas</h3>
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.exige_sinal}
+                          onChange={(e) => setEditForm({ ...editForm, exige_sinal: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">Exige Sinal para Reservas</span>
+                          <p className="text-xs text-gray-500">Marque se for necessário pagamento antecipado para reservar datas</p>
+                        </div>
+                      </label>
+                    </div>
+                    {editForm.exige_sinal && (
                       <div>
-                        <span className="text-sm text-gray-300">Agendamento com IA?</span>
-                        <p className="text-xs text-gray-500">Permite que a IA realize agendamentos automaticamente.</p>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Regras para Sinal</label>
+                        <p className="text-xs text-gray-500 mb-2">Descreva valor, prazo de pagamento e formas aceitas</p>
+                        <textarea
+                          value={editForm.regras_sinal}
+                          onChange={(e) => setEditForm({ ...editForm, regras_sinal: e.target.value })}
+                          rows={3}
+                          placeholder="Ex: Sinal de 30% do valor total, pagamento via PIX ou boleto, prazo de 7 dias após confirmação..."
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                        />
                       </div>
-                    </label>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Outros Serviços</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Cursos</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva cursos oferecidos pela igreja (ex: "Curso de noivos, catequese, crisma, formação bíblica")</p>
+                      <textarea
+                        value={editForm.cursos}
+                        onChange={(e) => setEditForm({ ...editForm, cursos: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Curso de Noivos (duração 3 meses, aos sábados), Catequese (1 ano), Crisma (2 anos), Formação Bíblica..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Sessão de Fotos</label>
+                      <p className="text-xs text-gray-500 mb-2">Informe regras, horários e valores para sessões fotográficas na igreja</p>
+                      <textarea
+                        value={editForm.sessao_fotos}
+                        onChange={(e) => setEditForm({ ...editForm, sessao_fotos: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Permitido de segunda a sexta das 9h às 17h, Taxa de R$ 200 por sessão, Necessário agendamento prévio..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Hospedagem</h3>
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.hospedagem_disponivel}
+                          onChange={(e) => setEditForm({ ...editForm, hospedagem_disponivel: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">Hospedagem Disponível</span>
+                          <p className="text-xs text-gray-500">Marque se a igreja oferece hospedagem para visitantes ou retirantes</p>
+                        </div>
+                      </label>
+                    </div>
+                    {editForm.hospedagem_disponivel && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Regras para Hospedagem</label>
+                        <p className="text-xs text-gray-500 mb-2">Descreva regras, valores, capacidade e disponibilidade</p>
+                        <textarea
+                          value={editForm.regras_hospedagem}
+                          onChange={(e) => setEditForm({ ...editForm, regras_hospedagem: e.target.value })}
+                          rows={3}
+                          placeholder="Ex: Casa de retiros com 20 quartos, Diária R$ 80 por pessoa com café da manhã, Check-in às 14h..."
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Visitação e Turismo</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Link para Agendamento de Visitação</label>
+                      <p className="text-xs text-gray-500 mb-2">Cole link para sistema de agendamento de visitas turísticas ou guiadas</p>
+                      <input
+                        type="url"
+                        value={editForm.link_visitacao}
+                        onChange={(e) => setEditForm({ ...editForm, link_visitacao: e.target.value })}
+                        placeholder="https://calendly.com/sua-igreja ou https://forms.google.com/..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Guia Turístico / Visita Autoguiada</label>
+                      <p className="text-xs text-gray-500 mb-2">Forneça informações sobre visitação turística, horários, se há guia disponível</p>
+                      <textarea
+                        value={editForm.guia_turistico}
+                        onChange={(e) => setEditForm({ ...editForm, guia_turistico: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Visitas guiadas de terça a domingo das 9h às 17h, Guia disponível em português e inglês, Visita autoguiada com QR codes..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Projetos Sociais</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Para Parceria com Empresas</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva projetos sociais disponíveis para parceria empresarial (doações, voluntariado corporativo)</p>
+                      <textarea
+                        value={editForm.projetos_sociais_empresas}
+                        onChange={(e) => setEditForm({ ...editForm, projetos_sociais_empresas: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Programa de apadrinhamento de crianças, Doação de cestas básicas, Voluntariado em eventos beneficentes..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Para Comunidade</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva projetos sociais abertos para a comunidade participar</p>
+                      <textarea
+                        value={editForm.projetos_sociais_comunidade}
+                        onChange={(e) => setEditForm({ ...editForm, projetos_sociais_comunidade: e.target.value })}
+                        rows={3}
+                        placeholder="Ex: Sopão solidário às sextas, Bazar beneficente mensal, Aulas de reforço escolar, Atendimento jurídico gratuito..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -485,13 +847,26 @@ export function AdminConfigIA() {
               {/* Tab: Qualification */}
               {activeTab === 'qualification' && (
                 <div className="space-y-6">
+                  <div className="p-4 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+                    <p className="text-sm text-purple-300">
+                      A qualificação de leads permite que a IA colete informações importantes dos visitantes antes de encaminhá-los para atendimento humano ou agendar serviços.
+                    </p>
+                  </div>
+
                   <div>
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2">Campos Obrigatórios</h3>
-                    <p className="text-xs text-gray-500 mb-4">Estes campos são sempre obrigatórios na qualificação do lead.</p>
+                    <p className="text-xs text-gray-500 mb-4">Estes campos são sempre coletados pela IA durante a qualificação do lead. Não podem ser desativados.</p>
                     <div className="space-y-2">
                       {['nome', 'telefone', 'email'].map((field) => (
                         <div key={field} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                          <span className="text-sm text-gray-300">{QUALIFICATION_LABELS[field]}</span>
+                          <div>
+                            <span className="text-sm text-gray-300">{QUALIFICATION_LABELS[field]}</span>
+                            <p className="text-xs text-gray-500">
+                              {field === 'nome' && 'Nome completo do visitante para identificação'}
+                              {field === 'telefone' && 'Número de telefone para contato posterior'}
+                              {field === 'email' && 'E-mail para envio de informações e confirmações'}
+                            </p>
+                          </div>
                           <span className="text-xs text-green-400 flex items-center gap-1">
                             <Check className="h-3 w-3" />
                             Obrigatório
@@ -503,14 +878,22 @@ export function AdminConfigIA() {
 
                   <div>
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2">Campos Adicionais</h3>
-                    <p className="text-xs text-gray-500 mb-4">Configure quais informações a IA deve coletar para qualificar os leads.</p>
+                    <p className="text-xs text-gray-500 mb-4">Configure quais informações extras a IA deve coletar para qualificar melhor os leads. Ative ou desative conforme necessário.</p>
                     <div className="space-y-2">
-                      {['interesse', 'motivacao', 'expectativa', 'tipo_evento', 'nome_igreja', 'segmento', 'volume_mensal'].map((field) => (
+                      {['interesse', 'motivacao', 'expectativa', 'tipo_evento'].map((field) => (
                         <label key={field} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700">
-                          <span className="text-sm text-gray-300">{QUALIFICATION_LABELS[field]}</span>
+                          <div>
+                            <span className="text-sm text-gray-300">{QUALIFICATION_LABELS[field]}</span>
+                            <p className="text-xs text-gray-500">
+                              {field === 'interesse' && 'Qual serviço o visitante está interessado (casamento, batizado, etc.)'}
+                              {field === 'motivacao' && 'Por que o visitante procurou a igreja (indicação, proximidade, etc.)'}
+                              {field === 'expectativa' && 'O que o visitante espera do atendimento ou serviço'}
+                              {field === 'tipo_evento' && 'Tipo específico de evento que deseja realizar'}
+                            </p>
+                          </div>
                           <div className="flex items-center gap-2">
                             <span className={`text-xs ${editForm.qualification_fields[field as keyof typeof editForm.qualification_fields] ? 'text-green-400' : 'text-gray-500'}`}>
-                              {editForm.qualification_fields[field as keyof typeof editForm.qualification_fields] ? 'Obrigatório' : 'Desativado'}
+                              {editForm.qualification_fields[field as keyof typeof editForm.qualification_fields] ? 'Ativo' : 'Desativado'}
                             </span>
                             <input
                               type="checkbox"
@@ -535,9 +918,15 @@ export function AdminConfigIA() {
               {/* Tab: Hours */}
               {activeTab === 'hours' && (
                 <div className="space-y-6">
+                  <div className="p-4 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+                    <p className="text-sm text-purple-300">
+                      Configure os horários de funcionamento do atendimento via IA. Fora desses horários, a IA enviará a mensagem configurada abaixo.
+                    </p>
+                  </div>
+
                   <div>
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2">Horários de Funcionamento</h3>
-                    <p className="text-xs text-gray-500 mb-4">Configure os horários em que a IA estará ativa para atendimento.</p>
+                    <p className="text-xs text-gray-500 mb-4">Marque os dias e defina os horários de início e fim do atendimento. A IA só responderá automaticamente dentro desses horários.</p>
                     <div className="space-y-3">
                       {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
                         <div key={day} className="flex items-center gap-4 p-3 bg-gray-700/50 rounded-lg">
@@ -592,14 +981,15 @@ export function AdminConfigIA() {
 
                   <div>
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2">Mensagem Fora do Horário</h3>
-                    <p className="text-xs text-gray-500 mb-4">Mensagem exibida quando o atendimento estiver indisponível fora do horário de funcionamento.</p>
+                    <p className="text-xs text-gray-500 mb-4">Mensagem automática enviada quando alguém entrar em contato fora do horário de funcionamento configurado acima.</p>
                     <textarea
                       value={editForm.outside_hours_message}
                       onChange={(e) => setEditForm({ ...editForm, outside_hours_message: e.target.value })}
-                      rows={3}
-                      placeholder="Desculpe, estamos fora do horário de atendimento. Retornaremos em breve!"
+                      rows={4}
+                      placeholder="Ex: Olá! Obrigado por entrar em contato com a Paróquia São José. Nosso horário de atendimento é de segunda a sexta, das 9h às 18h. Deixe sua mensagem que retornaremos assim que possível. Deus abençoe!"
                       className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none"
                     />
+                    <p className="text-xs text-gray-500 mt-2">Dica: Inclua os horários de atendimento e uma mensagem acolhedora para que o visitante saiba quando será respondido.</p>
                   </div>
                 </div>
               )}
