@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings, MapPin, Phone, MessageSquare, Calendar, Plus, Trash2 } from 'lucide-react';
+import { Bot, Search, Pencil, X, Check, Church, Clock, FileText, Settings, MapPin, Phone, MessageSquare, Calendar, Plus, Trash2, Bed, ClipboardList } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { AIConfig, Church as ChurchType, BlockedDatePeriod } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
@@ -58,7 +58,7 @@ export function AdminConfigIA() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<AIConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'hospedagem' | 'visitacao' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('general');
   
   const [editForm, setEditForm] = useState({
     agent_name: '',
@@ -373,6 +373,8 @@ export function AdminConfigIA() {
                     { id: 'identity', label: 'Identidade', icon: Bot },
                     { id: 'contacts', label: 'Contatos', icon: Phone },
                     { id: 'services', label: 'Serviços', icon: MapPin },
+                    { id: 'hospedagem', label: 'Hospedagem', icon: Bed },
+                    { id: 'visitacao', label: 'Visitação', icon: ClipboardList },
                     { id: 'scheduling', label: 'Agendamento', icon: Calendar },
                     { id: 'messages', label: 'Mensagens', icon: MessageSquare },
                     { id: 'qualification', label: 'Qualificação', icon: FileText },
@@ -1182,6 +1184,151 @@ export function AdminConfigIA() {
                         onChange={(e) => setEditForm({ ...editForm, projetos_sociais_comunidade: e.target.value })}
                         rows={3}
                         placeholder="Ex: Sopão solidário às sextas, Bazar beneficente mensal, Aulas de reforço escolar, Atendimento jurídico gratuito..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Hospedagem */}
+              {activeTab === 'hospedagem' && (
+                <div className="space-y-6">
+                  <div className="p-4 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+                    <p className="text-sm text-purple-300">
+                      Configure as informações sobre hospedagem oferecida pela igreja. Estas informações serão usadas pela IA para responder perguntas sobre acomodação.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Disponibilidade de Hospedagem</h3>
+                    <div className="p-3 bg-gray-700/50 rounded-lg">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.hospedagem_disponivel}
+                          onChange={(e) => setEditForm({ ...editForm, hospedagem_disponivel: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                        />
+                        <div>
+                          <span className="text-sm text-gray-300">Hospedagem Disponível</span>
+                          <p className="text-xs text-gray-500">Marque se a igreja oferece hospedagem para visitantes, retirantes ou grupos</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {editForm.hospedagem_disponivel && (
+                    <>
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Informações de Hospedagem</h3>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Regras e Informações Gerais</label>
+                          <p className="text-xs text-gray-500 mb-2">Descreva regras, valores, capacidade, horários de check-in/out e disponibilidade</p>
+                          <textarea
+                            value={editForm.regras_hospedagem}
+                            onChange={(e) => setEditForm({ ...editForm, regras_hospedagem: e.target.value })}
+                            rows={6}
+                            placeholder="Ex: Casa de retiros com 20 quartos (10 duplos, 10 individuais). Diária R$ 80 por pessoa com café da manhã incluído. Check-in às 14h, check-out às 12h. Reservas com mínimo de 7 dias de antecedência. Grupos acima de 10 pessoas têm desconto de 15%..."
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Comodidades e Estrutura</h3>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Descrição das Acomodações</label>
+                          <p className="text-xs text-gray-500 mb-2">Liste os tipos de quartos, capacidade e comodidades disponíveis</p>
+                          <textarea
+                            value={editForm.espacos_disponiveis}
+                            onChange={(e) => setEditForm({ ...editForm, espacos_disponiveis: e.target.value })}
+                            rows={4}
+                            placeholder="Ex: Quartos com ar-condicionado, TV, Wi-Fi gratuito. Refeitório com capacidade para 50 pessoas. Capela para orações. Salão de eventos. Estacionamento gratuito..."
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Visitação */}
+              {activeTab === 'visitacao' && (
+                <div className="space-y-6">
+                  <div className="p-4 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+                    <p className="text-sm text-purple-300">
+                      Configure as informações sobre visitação turística e guiada na igreja. A IA usará estas informações para orientar visitantes.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Agendamento de Visitação</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Link para Formulário de Visitação</label>
+                      <p className="text-xs text-gray-500 mb-2">Cole o link para sistema de agendamento de visitas (Calendly, Google Forms, etc)</p>
+                      <input
+                        type="url"
+                        value={editForm.link_visitacao}
+                        onChange={(e) => setEditForm({ ...editForm, link_visitacao: e.target.value })}
+                        placeholder="https://calendly.com/sua-igreja ou https://forms.google.com/..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Informações de Visitação</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Guia Turístico e Horários</label>
+                      <p className="text-xs text-gray-500 mb-2">Forneça informações sobre visitação turística, horários, tipos de visita e disponibilidade de guias</p>
+                      <textarea
+                        value={editForm.guia_turistico}
+                        onChange={(e) => setEditForm({ ...editForm, guia_turistico: e.target.value })}
+                        rows={6}
+                        placeholder="Ex: Visitas guiadas de terça a domingo das 9h às 17h. Última entrada às 16h30. Guias disponíveis em português, inglês e espanhol. Visita autoguiada com QR codes informativos. Duração média: 45 minutos. Grupos acima de 15 pessoas devem agendar com antecedência. Entrada gratuita, doações são bem-vindas..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Pontos de Interesse</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Informação Histórica e Pontos Turísticos</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva a história da igreja e principais pontos de interesse para visitantes</p>
+                      <textarea
+                        value={editForm.informacao_historica}
+                        onChange={(e) => setEditForm({ ...editForm, informacao_historica: e.target.value })}
+                        rows={6}
+                        placeholder="Ex: Fundada em 1850 por imigrantes italianos, nossa igreja foi tombada como patrimônio histórico em 1980. Principais pontos: Vitrais europeus do século XIX, Órgão de tubos alemão de 1920, Capela lateral com imagens sacras históricas, Cripta dos fundadores, Jardim das oliveiras centenárias..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Localização</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Link do Google Maps</label>
+                      <p className="text-xs text-gray-500 mb-2">Cole o link do Google Maps para facilitar a localização</p>
+                      <input
+                        type="url"
+                        value={editForm.google_maps_link}
+                        onChange={(e) => setEditForm({ ...editForm, google_maps_link: e.target.value })}
+                        placeholder="https://maps.google.com/..."
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Localização e Acesso</label>
+                      <p className="text-xs text-gray-500 mb-2">Descreva a localização, pontos de referência e como chegar</p>
+                      <textarea
+                        value={editForm.localizacao_igreja}
+                        onChange={(e) => setEditForm({ ...editForm, localizacao_igreja: e.target.value })}
+                        rows={4}
+                        placeholder="Ex: Rua das Flores, 123 - Centro Histórico. Próximo à Praça da Matriz e ao Museu Municipal. Estacionamento próprio com 50 vagas. Acesso por transporte público: linhas 10, 20 e 30 (ponto em frente). Acessibilidade para cadeirantes..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
