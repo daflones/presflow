@@ -58,6 +58,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboard /> },
           { path: 'igrejas', element: <AdminIgrejas /> },
+          { path: 'calendario', element: <AdminCalendario /> },
           { path: 'config-ia', element: <AdminConfigIA /> },
           { path: 'servicos', element: <AdminServicos /> },
           { path: 'hospedagem', element: <AdminHospedagem /> },
