@@ -141,6 +141,27 @@ ALTER TABLE public.support_ticket_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_ticket_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_ticket_reasons ENABLE ROW LEVEL SECURITY;
 
+-- Remover políticas existentes (se houver)
+DROP POLICY IF EXISTS "support_tickets_select" ON public.support_tickets;
+DROP POLICY IF EXISTS "support_tickets_insert" ON public.support_tickets;
+DROP POLICY IF EXISTS "support_tickets_update" ON public.support_tickets;
+DROP POLICY IF EXISTS "support_tickets_delete" ON public.support_tickets;
+
+DROP POLICY IF EXISTS "support_ticket_messages_select" ON public.support_ticket_messages;
+DROP POLICY IF EXISTS "support_ticket_messages_insert" ON public.support_ticket_messages;
+DROP POLICY IF EXISTS "support_ticket_messages_update" ON public.support_ticket_messages;
+DROP POLICY IF EXISTS "support_ticket_messages_delete" ON public.support_ticket_messages;
+
+DROP POLICY IF EXISTS "support_ticket_categories_select" ON public.support_ticket_categories;
+DROP POLICY IF EXISTS "support_ticket_categories_insert" ON public.support_ticket_categories;
+DROP POLICY IF EXISTS "support_ticket_categories_update" ON public.support_ticket_categories;
+DROP POLICY IF EXISTS "support_ticket_categories_delete" ON public.support_ticket_categories;
+
+DROP POLICY IF EXISTS "support_ticket_reasons_select" ON public.support_ticket_reasons;
+DROP POLICY IF EXISTS "support_ticket_reasons_insert" ON public.support_ticket_reasons;
+DROP POLICY IF EXISTS "support_ticket_reasons_update" ON public.support_ticket_reasons;
+DROP POLICY IF EXISTS "support_ticket_reasons_delete" ON public.support_ticket_reasons;
+
 -- Políticas para support_tickets
 CREATE POLICY "support_tickets_select" ON public.support_tickets
   FOR SELECT TO authenticated

@@ -13,6 +13,7 @@ import type { VisitationFormConfig, VisitationFieldsConfig } from '../types/data
 export function PublicVisitationForm() {
   const { slug } = useParams<{ slug: string }>();
   const [config, setConfig] = useState<VisitationFormConfig | null>(null);
+  const [churchData, setChurchData] = useState<{ name: string; logo_url?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -32,7 +33,7 @@ export function PublicVisitationForm() {
 
       const { data, error: fetchError } = await supabase
         .from('visitation_form_config')
-        .select('*')
+        .select('*, churches(name, logo_url)')
         .eq('slug', slug)
         .eq('ativo', true)
         .single();
@@ -47,6 +48,12 @@ export function PublicVisitationForm() {
       }
 
       setConfig(data);
+      if (data.churches) {
+        setChurchData({
+          name: data.churches.name,
+          logo_url: data.churches.logo_url,
+        });
+      }
     } catch (err) {
       console.error('Erro ao carregar formulário:', err);
       setError('Erro ao carregar formulário');

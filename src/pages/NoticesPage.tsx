@@ -41,6 +41,7 @@ export function NoticesPage() {
   const { church } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | ''>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -65,6 +66,7 @@ export function NoticesPage() {
     
     try {
       setIsLoading(true);
+      setError(null);
       const [ticketsData, statsData] = await Promise.all([
         supportTicketsService.list(church.id, {
           status: statusFilter || undefined,
@@ -74,8 +76,13 @@ export function NoticesPage() {
       ]);
       setTickets(ticketsData);
       setStats(statsData);
-    } catch (error) {
-      console.error('Erro ao carregar tickets:', error);
+    } catch (err: any) {
+      console.error('Erro ao carregar tickets:', err);
+      if (err?.code === '42P01' || err?.message?.includes('does not exist')) {
+        setError('As tabelas de tickets ainda não foram criadas. Execute o SQL sql_support_tickets.sql no Supabase.');
+      } else {
+        setError('Erro ao carregar tickets. Verifique o console para mais detalhes.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -279,16 +286,38 @@ export function NoticesPage() {
         </select>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <Card className="bg-red-500/10 border-red-500/30">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Bell className="w-6 h-6 text-red-400" />
+              <div>
+                <p className="text-red-400 font-medium">Erro ao carregar tickets</p>
+                <p className="text-red-300 text-sm">{error}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tickets List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {isLoading ? (
           <div className="col-span-2 flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
           </div>
+        ) : error ? (
+          <div className="col-span-2 text-center py-12">
+            <Bell className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-gray-400">Execute o SQL para criar as tabelas de tickets</p>
+            <p className="text-gray-500 text-sm mt-2">Arquivo: sql_support_tickets.sql</p>
+          </div>
         ) : tickets.length === 0 ? (
           <div className="col-span-2 text-center py-12">
             <Bell className="w-12 h-12 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">Nenhum ticket encontrado</p>
+            <p className="text-gray-500 text-sm mt-2">Clique em "Novo Ticket" para criar o primeiro</p>
           </div>
         ) : (
           tickets.map((ticket) => (
