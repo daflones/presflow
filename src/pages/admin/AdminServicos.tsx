@@ -232,6 +232,8 @@ export function AdminServicos() {
   async function handleSave() {
     if (!churchId || !form.nome || !form.slug) return;
 
+    console.log('Saving service with form data:', form);
+
     setIsSaving(true);
     try {
       if (selectedService) {
@@ -360,6 +362,8 @@ export function AdminServicos() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredServices.map((service) => {
+            console.log('Service object being rendered:', service);
+
             const ServiceIcon = ICON_MAP[service.icone || 'church'] || ChurchIcon;
             return (
               <div
