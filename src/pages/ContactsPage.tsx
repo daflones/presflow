@@ -255,7 +255,7 @@ export function ContactsPage() {
   function openEdit(client: Client) {
     setEditingClientId(client.id);
     setFormName(client.name);
-    setFormPhone(client.phone ?? '');
+    setFormPhone(client.whatsapp || client.phone || '');
     setFormEmail(client.email ?? '');
     setFormStatus(client.status);
     setFormCategory(client.category);
@@ -274,9 +274,11 @@ export function ContactsPage() {
 
     setIsSaving(true);
     try {
+      const normalizedPhone = formPhone.trim() || undefined;
       const clientData = {
         name,
-        phone: formPhone.trim() || undefined,
+        phone: normalizedPhone,
+        whatsapp: normalizedPhone,
         email: formEmail.trim() || undefined,
         status: formStatus,
         category: formCategory,

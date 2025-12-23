@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { 
   Settings, Search, Plus, Pencil, Trash2, X, Check,
   Heart, Droplets, ChurchIcon, Camera, Map, Sunrise, Users, BookOpen, GripVertical,
-  FileText, DollarSign, Calendar, Bot, Image
+  FileText, DollarSign, Calendar, Bot, Image, MapPin, Car, CircleHelp, CircleAlert,
+  Medal, HandHeart, Infinity
 } from 'lucide-react';
 import { ImageUploader } from '../../components/ui/ImageUploader';
 import { churchServicesService } from '../../services/supabase/churchServices';
@@ -10,6 +11,12 @@ import { adminService } from '../../services/supabase/admin';
 import type { ChurchService, ServiceEtapa, ServiceDocumento, Church as ChurchType } from '../../types/database';
 import { useSearchParams } from 'react-router-dom';
 import "react";
+
+const makeEmojiIcon = (emoji: string) => (props: any) => (
+  <span className={props.className || ''} aria-label="emoji" role="img">
+    {emoji}
+  </span>
+);
 
 const ICON_MAP: Record<string, any> = {
   heart: Heart,
@@ -20,6 +27,20 @@ const ICON_MAP: Record<string, any> = {
   sunrise: Sunrise,
   users: Users,
   'book-open': BookOpen,
+  'map-pin': MapPin,
+  car: Car,
+  calendar: Calendar,
+  'circle-help': CircleHelp,
+  'circle-alert': CircleAlert,
+  medal: Medal,
+  'hand-heart': HandHeart,
+  infinity: Infinity,
+  sos: makeEmojiIcon('🆘'),
+  handshake: makeEmojiIcon('🤝'),
+  speak: makeEmojiIcon('🗣️'),
+  bed: makeEmojiIcon('🛏️'),
+  'hand-raised': makeEmojiIcon('🙋🏻‍♀️'),
+  party: makeEmojiIcon('🥳'),
 };
 
 const TIPO_LABELS: Record<string, string> = {
@@ -513,6 +534,20 @@ export function AdminServicos() {
                         <option value="sunrise">🌅 Nascer do Sol (Retiro)</option>
                         <option value="users">👥 Pessoas (Curso)</option>
                         <option value="book-open">📖 Livro (Catequese)</option>
+                        <option value="map-pin">📌 Pin (Localização)</option>
+                        <option value="car">🚗 Carro (Transporte)</option>
+                        <option value="calendar">🗓️ Calendário (Agendas)</option>
+                        <option value="circle-help">❓ Ajuda (Dúvidas)</option>
+                        <option value="circle-alert">⚠️ Alerta (Avisos)</option>
+                        <option value="medal">🏅 Medalha (Reconhecimento)</option>
+                        <option value="hand-heart">🤝 Mãos (Solidariedade)</option>
+                        <option value="infinity">♾️ Infinito (Outros)</option>
+                        <option value="sos">🆘 SOS (Emergência)</option>
+                        <option value="handshake">🤝 Aperto de Mãos</option>
+                        <option value="speak">🗣️ Boneco Falando</option>
+                        <option value="bed">🛏️ Cama</option>
+                        <option value="hand-raised">🙋🏻‍♀️ Mão Levantada</option>
+                        <option value="party">🥳 Festa</option>
                       </select>
                     </div>
                   </div>

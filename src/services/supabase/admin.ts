@@ -260,7 +260,10 @@ export const adminService = {
       console.error('[admin.listClientsByChurch] Erro:', error);
       return [];
     }
-    return data || [];
+    return (data || []).map((item) => ({
+      ...item,
+      phone: item.whatsapp || item.phone,
+    }));
   },
 
   async listAllClients(): Promise<(Client & { church?: Church })[]> {

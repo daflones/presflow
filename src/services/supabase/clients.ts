@@ -5,6 +5,7 @@ export type CreateClientInput = {
   name: string;
   email?: string;
   phone?: string;
+  whatsapp?: string;
   status?: ClientStatus;
   category?: ClientCategory;
   tags?: string[];
@@ -38,7 +39,10 @@ export const clientsService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map((client) => ({
+      ...client,
+      phone: client.whatsapp || client.phone,
+    }));
   },
 
   async getById(id: string): Promise<Client | null> {
@@ -49,7 +53,12 @@ export const clientsService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return data
+      ? {
+          ...data,
+          phone: data.whatsapp || data.phone,
+        }
+      : null;
   },
 
   async create(input: CreateClientInput): Promise<Client> {
@@ -71,7 +80,8 @@ export const clientsService = {
         church_id: church.id,
         name: input.name,
         email: input.email,
-        phone: input.phone,
+        phone: input.phone || input.whatsapp,
+        whatsapp: input.whatsapp || input.phone,
         status: input.status || 'lead',
         category: input.category || 'sem-categoria',
         tags: input.tags || [],
@@ -93,6 +103,8 @@ export const clientsService = {
       .from('clients')
       .update({
         ...input,
+        phone: input.phone ?? input.whatsapp,
+        whatsapp: input.whatsapp ?? input.phone,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
