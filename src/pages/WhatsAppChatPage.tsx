@@ -347,83 +347,58 @@ export default function WhatsAppChatPage() {
     if (!instanceName) return
     
     try {
-      // First try to load from database
-      let dbChats: WhatsAppChat[] = []
-      
+      // Sempre sincronizar com a Evolution (fonte de verdade) e persistir no banco.
+      // Depois, renderizar a partir do banco para manter consistência e cache.
       try {
-        dbChats = await whatsappMessagesService.getChats(instanceName)
-      } catch (dbError) {
-        console.log('Erro ao carregar chats do banco:', dbError)
-        // Continue - will try to load from API
-      }
-      
-      // If no chats in DB, fetch from Evolution API and sync
-      if (dbChats.length === 0) {
-        try {
-          // Try findChats first
-          const apiResponse = await evolutionApi.findChats(instanceName)
-          console.log('[WhatsAppChat] API findChats response:', JSON.stringify(apiResponse, null, 2))
-          const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
-          
-          for (const apiChat of apiChats) {
-            console.log('[WhatsAppChat] Processing chat:', JSON.stringify(apiChat, null, 2))
-            
-            // Evolution API retorna o JID em diferentes campos
-            // Prioridade: remoteJid > id (se contém @) > owner > jid
-            let remoteJid = ''
-            
-            if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
-              remoteJid = apiChat.remoteJid
-            } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
-              remoteJid = apiChat.id
-            } else if (apiChat.owner && apiChat.owner.includes('@')) {
-              remoteJid = apiChat.owner
-            } else if (apiChat.jid && apiChat.jid.includes('@')) {
-              remoteJid = apiChat.jid
-            } else if (apiChat.chatId && apiChat.chatId.includes('@')) {
-              remoteJid = apiChat.chatId
-            }
-            
-            if (!remoteJid) {
-              console.log('[WhatsAppChat] Skipping chat - no valid remoteJid found in:', Object.keys(apiChat))
-              continue
-            }
-            
-            console.log('[WhatsAppChat] Using remoteJid:', remoteJid)
-            
-            // Get profile picture
-            let profilePicUrl = ''
-            try {
-              const profilePic = await evolutionApi.fetchProfilePictureUrl(instanceName, remoteJid)
-              profilePicUrl = profilePic.profilePictureUrl || ''
-            } catch (e) {
-              // Profile picture not available
-            }
-            
-            try {
-              await whatsappMessagesService.createOrUpdateChat({
-                instance_name: instanceName,
-                remote_jid: remoteJid,
-                contact_name: apiChat.name || apiChat.subject || apiChat.pushName,
-                contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
-                profile_picture_url: profilePicUrl,
-                is_group: remoteJid.includes('@g.us')
-              })
-            } catch (chatError) {
-              console.log('Erro ao salvar chat:', chatError)
-            }
+        const apiResponse = await evolutionApi.findChats(instanceName)
+        const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
+
+        for (const apiChat of apiChats) {
+          // Evolution API retorna o JID em diferentes campos
+          // Prioridade: remoteJid > id (se contém @) > owner > jid
+          let remoteJid = ''
+
+          if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
+            remoteJid = apiChat.remoteJid
+          } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
+            remoteJid = apiChat.id
+          } else if (apiChat.owner && apiChat.owner.includes('@')) {
+            remoteJid = apiChat.owner
+          } else if (apiChat.jid && apiChat.jid.includes('@')) {
+            remoteJid = apiChat.jid
+          } else if (apiChat.chatId && apiChat.chatId.includes('@')) {
+            remoteJid = apiChat.chatId
           }
-          
+
+          if (!remoteJid) continue
+
+          // Get profile picture (best-effort)
+          let profilePicUrl = ''
           try {
-            dbChats = await whatsappMessagesService.getChats(instanceName)
+            const profilePic = await evolutionApi.fetchProfilePictureUrl(instanceName, remoteJid)
+            profilePicUrl = profilePic.profilePictureUrl || ''
           } catch (e) {
-            // Use empty array if DB still fails
+            // ignore
           }
-        } catch (apiError) {
-          console.log('Erro ao carregar chats da API:', apiError)
+
+          try {
+            await whatsappMessagesService.createOrUpdateChat({
+              instance_name: instanceName,
+              remote_jid: remoteJid,
+              contact_name: apiChat.name || apiChat.subject || apiChat.pushName,
+              contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
+              profile_picture_url: profilePicUrl,
+              is_group: remoteJid.includes('@g.us')
+            })
+          } catch (chatError) {
+            console.log('Erro ao salvar chat:', chatError)
+          }
         }
+      } catch (apiError) {
+        console.log('Erro ao carregar chats da API:', apiError)
       }
-      
+
+      const dbChats = await whatsappMessagesService.getChats(instanceName)
       setChats(dbChats)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
@@ -438,59 +413,51 @@ export default function WhatsAppChatPage() {
     if (!instanceName) return
     
     try {
-      // First load from database
-      let dbMessages = await whatsappMessagesService.getMessages(chat.id)
-      
-      // If no messages in DB, fetch from Evolution API
-      if (dbMessages.length === 0) {
-        try {
-          const apiResponse = await evolutionApi.findMessages(instanceName, {
-            where: {
-              key: {
-                remoteJid: chat.remote_jid
-              }
-            },
-            limit: 100
-          })
-          
-          // Handle different response structures from Evolution API
-          const apiMessages = Array.isArray(apiResponse) 
-            ? apiResponse 
-            : (apiResponse as any)?.messages || (apiResponse as any)?.data || []
-          
-          // Save messages to database
-          if (Array.isArray(apiMessages)) {
-            for (const msg of apiMessages) {
-              if (!msg?.key?.id) continue // Skip invalid messages
-              
-              const messageType = getMessageType(msg)
-              const textContent = extractTextContent(msg)
-              
-              await whatsappMessagesService.createMessage({
-                chat_id: chat.id,
-                instance_name: instanceName,
-                message_id: msg.key.id,
-                remote_jid: msg.key.remoteJid,
-                from_me: msg.key.fromMe,
-                sender_jid: msg.key.participant,
-                sender_name: msg.pushName,
-                message_type: messageType,
-                text_content: textContent,
-                caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption,
-                media_mimetype: msg.message?.imageMessage?.mimetype || msg.message?.audioMessage?.mimetype || msg.message?.videoMessage?.mimetype || msg.message?.documentMessage?.mimetype,
-                media_filename: msg.message?.documentMessage?.fileName,
-                message_timestamp: new Date((msg.messageTimestamp || Date.now() / 1000) * 1000).toISOString()
-              })
+      // Sempre sincronizar mensagens da Evolution (fonte de verdade) e persistir.
+      // A função createMessage é idempotente (evita duplicados), então podemos chamar em polling.
+      try {
+        const apiResponse = await evolutionApi.findMessages(instanceName, {
+          where: {
+            key: {
+              remoteJid: chat.remote_jid
             }
+          },
+          limit: 100
+        })
+
+        const apiMessages = Array.isArray(apiResponse)
+          ? apiResponse
+          : (apiResponse as any)?.messages || (apiResponse as any)?.data || []
+
+        if (Array.isArray(apiMessages)) {
+          for (const msg of apiMessages) {
+            if (!msg?.key?.id) continue
+
+            const messageType = getMessageType(msg)
+            const textContent = extractTextContent(msg)
+
+            await whatsappMessagesService.createMessage({
+              chat_id: chat.id,
+              instance_name: instanceName,
+              message_id: msg.key.id,
+              remote_jid: msg.key.remoteJid,
+              from_me: msg.key.fromMe,
+              sender_jid: msg.key.participant,
+              sender_name: msg.pushName,
+              message_type: messageType,
+              text_content: textContent,
+              caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption,
+              media_mimetype: msg.message?.imageMessage?.mimetype || msg.message?.audioMessage?.mimetype || msg.message?.videoMessage?.mimetype || msg.message?.documentMessage?.mimetype,
+              media_filename: msg.message?.documentMessage?.fileName,
+              message_timestamp: new Date((msg.messageTimestamp || Date.now() / 1000) * 1000).toISOString()
+            })
           }
-          
-          dbMessages = await whatsappMessagesService.getMessages(chat.id)
-        } catch (apiError) {
-          console.log('Não foi possível carregar mensagens da API:', apiError)
-          // Continue without API messages - just show empty chat
         }
+      } catch (apiError) {
+        console.log('Não foi possível sincronizar mensagens da API:', apiError)
       }
-      
+
+      const dbMessages = await whatsappMessagesService.getMessages(chat.id)
       setMessages(dbMessages)
       
       // Mark as read
@@ -641,11 +608,29 @@ export default function WhatsAppChatPage() {
     loadChats()
   }, [loadChats])
 
+  // Poll chats for near real-time updates
+  useEffect(() => {
+    if (!instanceName) return
+    const interval = setInterval(() => {
+      loadChats()
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [instanceName, loadChats])
+
   useEffect(() => {
     if (selectedChat) {
       loadMessages(selectedChat)
     }
   }, [selectedChat, loadMessages])
+
+  // Poll messages for near real-time updates when a chat is selected
+  useEffect(() => {
+    if (!instanceName || !selectedChat) return
+    const interval = setInterval(() => {
+      loadMessages(selectedChat)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [instanceName, selectedChat, loadMessages])
 
   // Filter chats by search
   const filteredChats = chats.filter(chat => {

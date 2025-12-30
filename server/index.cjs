@@ -77,6 +77,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// Proxy para Evolution API
+app.use('/api/evolution', async (req, res) => {
+  try {
+    const upstreamPath = req.originalUrl.replace(/^\/api\/evolution/, '');
+    const upstreamUrl = `${EVOLUTION_API_URL}${upstreamPath}`;
+
+    const method = req.method.toUpperCase();
+    const shouldSendBody = !['GET', 'HEAD'].includes(method);
+
+    const upstreamResponse = await fetchAPI(upstreamUrl, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'apikey': EVOLUTION_API_KEY,
+      },
+      body: shouldSendBody ? JSON.stringify(req.body ?? {}) : undefined,
+    });
+
+    const contentType = upstreamResponse.headers.get('content-type') || '';
+    const status = upstreamResponse.status;
+
+    if (contentType.includes('application/json')) {
+      const data = await upstreamResponse.json().catch(() => null);
+      return res.status(status).json(data);
+    }
+
+    const text = await upstreamResponse.text();
+    return res.status(status).send(text);
+  } catch (error) {
+    console.error('Erro no proxy Evolution:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 // Em produção, servir arquivos estáticos do build
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../dist')));

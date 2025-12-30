@@ -157,8 +157,11 @@ class EvolutionApiService {
   private apiKey: string
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_EVOLUTION_API_URL || ''
-    this.apiKey = import.meta.env.VITE_EVOLUTION_API_KEY || ''
+    // Em produção (HTTPS), não podemos chamar a Evolution API via HTTP direto do browser (Mixed Content).
+    // Então usamos o backend como proxy (mesma origem) em /api/evolution.
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    this.baseUrl = isHttps ? '/api/evolution' : (import.meta.env.VITE_EVOLUTION_API_URL || '')
+    this.apiKey = isHttps ? '' : (import.meta.env.VITE_EVOLUTION_API_KEY || '')
     this.baseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl
   }
 
@@ -171,7 +174,7 @@ class EvolutionApiService {
       mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': this.apiKey,
+        ...(this.apiKey ? { apikey: this.apiKey } : {}),
         'Accept': 'application/json',
         ...options.headers,
       },

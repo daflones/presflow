@@ -127,9 +127,9 @@ export const dashboardService = {
         .select('id, type, priority, is_active, church_id')
         .eq('church_id', churchId),
       
-      // Conversations
-      supabase.from('conversations')
-        .select('id, status, last_message_at, church_id')
+      // Conversas (WhatsApp) - fonte de verdade é o sync da Evolution em whatsapp_chats
+      supabase.from('whatsapp_chats')
+        .select('id, last_message_at, church_id')
         .eq('church_id', churchId),
       
       // AI Config (para verificar se está ativo)
@@ -185,7 +185,7 @@ export const dashboardService = {
 
     // Processar Conversas
     const conversations = conversationsResult.data || [];
-    const activeConversations = conversations.filter(c => c.status === 'open').length;
+    const activeConversations = conversations.length;
 
     // Processar IA
     const aiConfigs = aiConfigResult.data || [];

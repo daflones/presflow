@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { getUserData } from '../../lib/user'
 
 // =====================================================
 // TYPES
@@ -126,14 +127,24 @@ class WhatsAppMessagesService {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Usuário não autenticado')
 
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single()
+    // Preferir vínculo do perfil (users.church_id) para suportar usuários que não são owner.
+    const profile = await getUserData()
+    let churchId: string | null = profile?.church_id || null
 
-    if (!church) throw new Error('Igreja não encontrada')
-    return church.id
+    // Fallback: tentar por owner_id
+    if (!churchId) {
+      const { data: church } = await supabase
+        .from('churches')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .single()
+
+      if (!church) throw new Error('Igreja não encontrada')
+      churchId = church.id
+    }
+
+    if (!churchId) throw new Error('Igreja não encontrada')
+    return churchId
   }
 
   // =====================================================

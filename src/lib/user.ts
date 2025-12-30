@@ -22,17 +22,27 @@ export async function getUserData(): Promise<UserProfile | null> {
     return null;
   }
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('auth_id', user.id)
-    .single();
+  // Este projeto não possui tabela `public.users` no Supabase.
+  // Para obter o church_id, usamos o vínculo direto em `churches.owner_id`.
+  const { data: church, error: churchError } = await supabase
+    .from('churches')
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle();
 
-  if (error) {
-    console.error('Error fetching user profile:', error);
+  if (churchError || !church?.id) {
     return null;
   }
 
-  userProfileCache = data;
-  return data;
+  const profile: UserProfile = {
+    id: user.id,
+    auth_id: user.id,
+    church_id: church.id,
+    name: (user.user_metadata as any)?.name || (user.user_metadata as any)?.full_name || '',
+    email: user.email || '',
+    role: 'owner',
+  };
+
+  userProfileCache = profile;
+  return profile;
 }
