@@ -1,15 +1,42 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Bell, Clock, CheckCircle, AlertTriangle, FileText, MessageCircle } from 'lucide-react';
-
-const noticesData = [
-    { label: 'Pendentes', value: 0, icon: Clock, bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-    { label: 'Aprovados', value: 21, icon: CheckCircle, bgColor: 'bg-green-500/20', textColor: 'text-green-400', borderColor: 'border-green-500/30' },
-    { label: 'Confirmados', value: 0, icon: CheckCircle, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
-    { label: 'Urgentes', value: 0, icon: AlertTriangle, bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
-    { label: 'Pedidos', value: 20, icon: FileText, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-400', borderColor: 'border-indigo-500/30' },
-    { label: 'Avisos', value: 1, icon: MessageCircle, bgColor: 'bg-purple-500/20', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
-]
+import { supportTicketsService } from '../../services/supabase/supportTicketsService';
+import { getUserData } from '../../lib/user';
 
 export function NoticesWidget() {
+  const [stats, setStats] = useState({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const profile = await getUserData();
+        const churchId = profile?.church_id;
+        if (!churchId) {
+          setStats({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+          return;
+        }
+
+        const data = await supportTicketsService.getStats(churchId);
+        setStats(data);
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas de tickets:', error);
+        setStats({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+      }
+    };
+
+    load();
+  }, []);
+
+  const noticesData = useMemo(() => [
+    { label: 'Pendentes', value: stats.pendentes, icon: Clock, bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+    { label: 'Aprovados', value: stats.emAndamento, icon: CheckCircle, bgColor: 'bg-green-500/20', textColor: 'text-green-400', borderColor: 'border-green-500/30' },
+    { label: 'Confirmados', value: stats.resolvidos, icon: CheckCircle, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
+    { label: 'Urgentes', value: stats.urgentes, icon: AlertTriangle, bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
+    { label: 'Pedidos', value: stats.hoje, icon: FileText, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-400', borderColor: 'border-indigo-500/30' },
+    { label: 'Avisos', value: stats.total, icon: MessageCircle, bgColor: 'bg-purple-500/20', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  ], [stats]);
+
   return (
     <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700/50">
       <div className="flex items-center justify-between mb-4">
@@ -19,7 +46,7 @@ export function NoticesWidget() {
           </div>
           <h2 className="font-semibold text-white">Intenções e Avisos</h2>
         </div>
-        <button className="text-sm text-purple-400 hover:text-purple-300 transition-colors">Ver Todos</button>
+        <Link to="/avisos" className="text-sm text-purple-400 hover:text-purple-300 transition-colors">Ver Todos</Link>
       </div>
       <div className="grid grid-cols-3 gap-3">
         {noticesData.map(item => (
