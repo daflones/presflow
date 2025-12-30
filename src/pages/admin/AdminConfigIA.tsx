@@ -112,7 +112,7 @@ export function AdminConfigIA() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<AIConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'hospedagem' | 'visitacao' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'identity' | 'contacts' | 'services' | 'hospedagem' | 'visitacao' | 'scheduling' | 'messages' | 'qualification' | 'hours'>('identity');
   
   const [modalMode, setModalMode] = useState<'edit' | 'create'>('edit');
   const [creatingChurchId, setCreatingChurchId] = useState<string | null>(null);
@@ -147,7 +147,7 @@ export function AdminConfigIA() {
 
   function openEdit(config: AIConfig) {
     setSelectedConfig(config);
-    setActiveTab('general');
+    setActiveTab('identity');
     setEditForm({
       agent_name: config.agent_name || '',
       informacoes_adicionais: config.informacoes_adicionais || '',
@@ -225,7 +225,7 @@ export function AdminConfigIA() {
     setCreatingChurchId(churchId);
     setSelectedConfig(null);
     setEditForm(createDefaultEditForm());
-    setActiveTab('general');
+    setActiveTab('identity');
     setIsModalOpen(true);
   };
 
@@ -428,8 +428,8 @@ export function AdminConfigIA() {
               <div className="w-48 bg-gray-900/50 border-r border-gray-700 py-4 shrink-0">
                 <nav className="space-y-1 px-2">
                   {[
-                    { id: 'general', label: 'Geral', icon: Settings },
                     { id: 'identity', label: 'Identidade', icon: Bot },
+                    { id: 'general', label: 'Geral', icon: Settings },
                     { id: 'contacts', label: 'Contatos', icon: Phone },
                     { id: 'visitacao', label: 'Visitação', icon: ClipboardList },
                     { id: 'scheduling', label: 'Agendamento', icon: Calendar },
@@ -462,15 +462,16 @@ export function AdminConfigIA() {
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Informações do Agente</h3>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Nome do Agente</label>
-                      <p className="text-xs text-gray-500 mb-2">Nome que a IA usará para se identificar nas conversas com os clientes</p>
-                      <input
-                        type="text"
-                        value={editForm.agent_name}
-                        onChange={(e) => setEditForm({ ...editForm, agent_name: e.target.value })}
-                        placeholder="Ex: Maria, Assistente Virtual, Secretaria Paroquial..."
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Menu Principal</label>
+                      <p className="text-xs text-gray-500 mb-2">Digite o conteúdo do menu de opções que será exibido ao cliente no início da conversa</p>
+                      <textarea
+                        value={editForm.menu_principal}
+                        onChange={(e) => setEditForm({ ...editForm, menu_principal: e.target.value })}
+                        rows={4}
+                        placeholder="Ex: Olá! Como posso ajudar? Digite: 1️⃣ Horários de missas 2️⃣ Casamentos 3️⃣ Batizados 4️⃣ Outros serviços 5️⃣ Falar com atendente"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
+                      <p className="text-xs text-gray-500 mt-1">Se preenchido, a IA exibirá este menu de opções para o cliente no início da conversa.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Informações Adicionais para IA</label>
@@ -517,18 +518,6 @@ export function AdminConfigIA() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Menu Principal</label>
-                      <p className="text-xs text-gray-500 mb-2">Digite o conteúdo do menu de opções que será exibido ao cliente no início da conversa</p>
-                      <textarea
-                        value={editForm.menu_principal}
-                        onChange={(e) => setEditForm({ ...editForm, menu_principal: e.target.value })}
-                        rows={4}
-                        placeholder="Ex: Olá! Como posso ajudar? Digite: 1️⃣ Horários de missas 2️⃣ Casamentos 3️⃣ Batizados 4️⃣ Outros serviços 5️⃣ Falar com atendente"
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Se preenchido, a IA exibirá este menu de opções para o cliente no início da conversa.</p>
-                    </div>
-                    <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Localização da Igreja (Capelas e Santuários)</label>
                       <p className="text-xs text-gray-500 mb-2">Descreva a localização, capelas, santuários e pontos de referência para orientar visitantes</p>
                       <textarea
@@ -536,17 +525,6 @@ export function AdminConfigIA() {
                         onChange={(e) => setEditForm({ ...editForm, localizacao_igreja: e.target.value })}
                         rows={4}
                         placeholder="Ex: Rua das Flores, 123 - Centro. Próximo à Praça da Matriz. Estacionamento próprio. Capela lateral dedicada a Nossa Senhora..."
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Informação Histórica</label>
-                      <p className="text-xs text-gray-500 mb-2">Conte a história da igreja, fundação, eventos importantes e curiosidades</p>
-                      <textarea
-                        value={editForm.informacao_historica}
-                        onChange={(e) => setEditForm({ ...editForm, informacao_historica: e.target.value })}
-                        rows={4}
-                        placeholder="Ex: Fundada em 1850 por imigrantes italianos, nossa igreja foi tombada como patrimônio histórico em 1980. Os vitrais foram trazidos da Europa..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 resize-none text-sm"
                       />
                     </div>
