@@ -39,8 +39,11 @@ class WhatsAppService {
 
   constructor() {
     // Obter configurações do ambiente
-    this.baseUrl = import.meta.env.VITE_EVOLUTION_API_URL || ''
-    this.apiKey = import.meta.env.VITE_EVOLUTION_API_KEY || ''
+    // Em produção (HTTPS), não podemos chamar a Evolution API via HTTP direto do browser (Mixed Content).
+    // Então usamos o backend como proxy (mesma origem) em /api.
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    this.baseUrl = isHttps ? '/api' : (import.meta.env.VITE_EVOLUTION_API_URL || '')
+    this.apiKey = isHttps ? '' : (import.meta.env.VITE_EVOLUTION_API_KEY || '')
     this.webhookUrl = import.meta.env.VITE_WEBHOOK_URL || ''
     
     // Remover barra final da URL se existir
@@ -63,7 +66,7 @@ class WhatsAppService {
       mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': this.apiKey,
+        ...(this.apiKey ? { apikey: this.apiKey } : {}),
         'Accept': 'application/json',
         ...options.headers,
       },
@@ -133,6 +136,10 @@ class WhatsAppService {
   }
 
   async getInstanceStatus(instanceName: string): Promise<any> {
+    // Quando usando proxy do backend (/api), o endpoint de status é diferente.
+    if (this.baseUrl === '/api') {
+      return this.makeRequest(`/instance/status/${instanceName}`)
+    }
     return this.makeRequest(`/instance/connectionState/${instanceName}`)
   }
 

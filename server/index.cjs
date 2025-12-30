@@ -102,31 +102,25 @@ app.post('/api/instance/create', async (req, res) => {
     console.log('=== CRIAÇÃO DE INSTÂNCIA ===');
     console.log('Recebendo requisição para criar instância:', req.body);
     
-    const { instanceName, phoneNumber } = req.body;
+    const { instanceName, phoneNumber, number } = req.body;
+    const resolvedNumber = phoneNumber || number;
     
-    if (!instanceName || !phoneNumber) {
-      console.log('Erro: instanceName ou phoneNumber não fornecidos');
-      return res.status(400).json({ error: 'instanceName e phoneNumber são obrigatórios' });
+    if (!instanceName || !resolvedNumber) {
+      console.log('Erro: instanceName ou number/phoneNumber não fornecidos');
+      return res.status(400).json({ error: 'instanceName e number (ou phoneNumber) são obrigatórios' });
     }
     
     const formattedName = formatInstanceName(instanceName);
     console.log('Nome formatado:', formattedName);
     
+    // Aceita payload "completo" enviado pelo frontend (webhook/settings/etc)
+    // e também o formato antigo (phoneNumber).
     const body = {
+      ...req.body,
       instanceName: formattedName,
-      token: '',
-      qrcode: true,
-      number: phoneNumber,
-      integration: 'WHATSAPP-BAILEYS',
-      reject_call: false,
-      msg_call: '',
-      groups_ignore: true,
-      always_online: false,
-      read_messages: false,
-      read_status: false,
-      websocket_enabled: false,
-      rabbitmq_enabled: false,
-      sqs_enabled: false
+      number: resolvedNumber,
+      qrcode: typeof req.body.qrcode === 'boolean' ? req.body.qrcode : true,
+      integration: req.body.integration || 'WHATSAPP-BAILEYS',
     };
 
     console.log('Enviando para Evolution API:', EVOLUTION_API_URL);
