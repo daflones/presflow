@@ -3,6 +3,7 @@ import { KpiCard } from '../components/dashboard/KpiCard';
 import { StatCard } from '../components/dashboard/StatCard';
 import { CalendarWidget } from '../components/dashboard/CalendarWidget';
 import { NoticesWidget } from '../components/dashboard/NoticesWidget';
+import { FormsWidget } from '../components/dashboard/FormsWidget';
 import { MessagesWidget } from '../components/dashboard/MessagesWidget';
 import { RefreshCw, Wifi, Bot, MessageSquare, Users, Percent, ArrowUp, ArrowDown, Clock, Check, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
 import { dashboardService, type DashboardStats } from '../services/supabase/dashboard';
@@ -127,6 +128,10 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CalendarWidget />
         <NoticesWidget />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <FormsWidget />
       </div>
 
       <div className="grid grid-cols-1 gap-6">

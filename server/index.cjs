@@ -29,10 +29,20 @@ async function supabaseRequest(endpoint, options = {}) {
     }
   });
   
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Status ${response.statusText}`);
+      throw new Error(`Supabase request failed with status ${response.status}: ${errorText}`);
+    }
+    return null; // Retorna nulo para respostas vazias bem-sucedidas (ex: 201 com prefer=minimal)
+  }
+
   const data = await response.json();
+
   if (!response.ok) {
     throw new Error(data.message || data.error || 'Supabase request failed');
   }
+
   return data;
 }
 
@@ -731,6 +741,42 @@ app.post('/api/auth/create-user', async (req, res) => {
     res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
+
+// ==========================================
+// ENDPOINTS DE FORMULÁRIO DE VISITAÇÃO
+// ==========================================
+
+app.post('/api/forms/submit', async (req, res) => {
+  try {
+    console.log('=== SUBMISSÃO DE FORMULÁRIO DE VISITAÇÃO ===');
+    const responseData = req.body;
+
+    if (!responseData.church_id || !responseData.form_config_id) {
+      return res.status(400).json({ error: 'church_id e form_config_id são obrigatórios' });
+    }
+
+    // Adicionar metadados do servidor
+    responseData.ip_address = req.ip;
+    responseData.user_agent = req.headers['user-agent'];
+
+    console.log('Dados recebidos para salvar:', responseData);
+
+    const data = await supabaseRequest('visitation_form_responses', {
+      method: 'POST',
+      body: JSON.stringify(responseData),
+      prefer: 'return=minimal' // Não precisa retornar o objeto inserido
+    });
+
+    console.log('Resposta do Supabase:', data);
+
+    res.status(201).json({ success: true, message: 'Formulário enviado com sucesso!' });
+
+  } catch (error) {
+    console.error('Erro ao salvar resposta do formulário:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 
 // Servir frontend em produção
 app.use((req, res, next) => {

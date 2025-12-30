@@ -62,7 +62,7 @@ export function PublicVisitationForm() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config) return;
 
@@ -70,39 +70,27 @@ export function PublicVisitationForm() {
       setIsSubmitting(true);
       setError(null);
 
-      // Preparar dados para envio
       const responseData = {
+        ...formData,
         church_id: config.church_id,
         form_config_id: config.id,
-        nome: formData.nome || '',
-        email: formData.email || null,
-        telefone: formData.telefone || null,
-        data_nascimento: formData.data_nascimento || null,
-        endereco: formData.endereco || null,
-        bairro: formData.bairro || null,
-        cidade: formData.cidade || null,
-        estado: formData.estado || null,
-        cep: formData.cep || null,
-        como_conheceu: formData.como_conheceu || null,
-        motivo_visita: formData.motivo_visita || null,
-        pedido_oracao: formData.pedido_oracao || null,
-        ja_frequenta_igreja: formData.ja_frequenta_igreja || false,
-        qual_igreja: formData.qual_igreja || null,
-        deseja_receber_visita: formData.deseja_receber_visita || false,
-        melhor_horario_contato: formData.melhor_horario_contato || null,
-        observacoes: formData.observacoes || null,
         campos_personalizados_respostas: formData.campos_personalizados || {},
         status: 'novo',
         data_visita: new Date().toISOString().split('T')[0],
       };
 
-      const { error: insertError } = await supabase
-        .from('visitation_form_responses')
-        .insert(responseData);
+      const response = await fetch('/api/forms/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(responseData),
+      });
 
-      if (insertError) {
-        console.error('Erro ao enviar:', insertError);
-        setError('Erro ao enviar formulário. Tente novamente.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro ao enviar:', errorData);
+        setError(errorData.message || 'Erro ao enviar formulário. Tente novamente.');
         return;
       }
 
@@ -115,8 +103,19 @@ export function PublicVisitationForm() {
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const handleInputChange = (field: string, value: any) => {
+    if (field.startsWith('campos_personalizados.')) {
+      const customFieldId = field.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        campos_personalizados: {
+          ...prev.campos_personalizados,
+          [customFieldId]: value,
+        },
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const renderField = (key: string, fieldConfig: { ativo: boolean; obrigatorio: boolean; label: string }) => {
