@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { getUserData } from '../../lib/user';
 
 export type DashboardStats = {
   // WhatsApp
@@ -50,16 +51,22 @@ export const dashboardService = {
     const endOfWeek = new Date(today);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-    // Identificar igreja do usuário logado (owner)
-    const { data: userData } = await supabase.auth.getUser();
-    let churchId: string | null = null;
-    if (userData.user) {
-      const { data: church } = await supabase
-        .from('churches')
-        .select('id')
-        .eq('owner_id', userData.user.id)
-        .single();
-      churchId = church?.id || null;
+    // Identificar igreja do usuário logado
+    // Preferir o vínculo do perfil (users.church_id) para suportar usuários que não são owner.
+    const profile = await getUserData();
+    let churchId: string | null = profile?.church_id || null;
+
+    // Fallback: caso não exista perfil/vínculo, tentar por owner_id.
+    if (!churchId) {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const { data: church } = await supabase
+          .from('churches')
+          .select('id')
+          .eq('owner_id', userData.user.id)
+          .single();
+        churchId = church?.id || null;
+      }
     }
 
     // Se o usuário não tem igreja associada, retornar zeros para evitar mostrar dados globais
@@ -99,10 +106,11 @@ export const dashboardService = {
       conversationsResult,
       aiConfigResult,
     ] = await Promise.all([
-      // WhatsApp instances
-      supabase.from('whatsapp_instances')
-        .select('id, status, church_id')
-        .eq('church_id', churchId),
+      // WhatsApp (a instância é persistida na tabela churches)
+      supabase.from('churches')
+        .select('id, instance, instance_connected_at')
+        .eq('id', churchId)
+        .single(),
       
       // Clients/CRM
       supabase.from('clients')
@@ -131,8 +139,9 @@ export const dashboardService = {
     ]);
 
     // Processar WhatsApp
-    const whatsappInstances = whatsappResult.data || [];
-    const connectedInstances = whatsappInstances.filter(i => i.status === 'open').length;
+    const churchWhatsapp = whatsappResult.data;
+    const totalInstances = churchWhatsapp?.instance ? 1 : 0;
+    const connectedInstances = churchWhatsapp?.instance_connected_at ? 1 : 0;
 
     // Processar Clientes
     const clients = clientsResult.data || [];
@@ -188,7 +197,7 @@ export const dashboardService = {
     const messagesReceived = 0;
 
     return {
-      whatsappConnections: { connected: connectedInstances, total: whatsappInstances.length },
+      whatsappConnections: { connected: connectedInstances, total: totalInstances },
       aiAgentsActive,
       activeConversations,
       totalContacts,

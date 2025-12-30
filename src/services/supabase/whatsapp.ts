@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { getUserData } from '../../lib/user';
 
 export interface WhatsAppInstanceData {
   instance_name: string;
@@ -18,19 +19,27 @@ export const whatsappDbService = {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Usuário não autenticado');
 
-    // Buscar church_id do usuário
-    const { data: church, error: churchError } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
+    // Identificar igreja do usuário logado
+    // Preferir o vínculo do perfil (users.church_id) para suportar usuários que não são owner.
+    const profile = await getUserData();
+    let churchId: string | null = profile?.church_id || null;
 
-    if (churchError || !church) {
-      console.error('[whatsappDb.saveInstance] Erro ao buscar igreja:', churchError);
-      throw new Error('Igreja não encontrada');
+    // Fallback: caso não exista perfil/vínculo, tentar por owner_id.
+    if (!churchId) {
+      const { data: church, error: churchError } = await supabase
+        .from('churches')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .single();
+
+      if (churchError || !church) {
+        console.error('[whatsappDb.saveInstance] Erro ao buscar igreja:', churchError);
+        throw new Error('Igreja não encontrada');
+      }
+      churchId = church.id;
     }
 
-    console.log('[whatsappDb.saveInstance] Salvando instância para church:', church.id, data);
+    console.log('[whatsappDb.saveInstance] Salvando instância para church:', churchId, data);
 
     // Preparar dados para atualização
     const updateData: Record<string, any> = {
@@ -47,7 +56,7 @@ export const whatsappDbService = {
     const { error: updateError } = await supabase
       .from('churches')
       .update(updateData)
-      .eq('id', church.id);
+      .eq('id', churchId);
 
     if (updateError) {
       console.error('[whatsappDb.saveInstance] Erro ao atualizar igreja:', updateError);
@@ -64,11 +73,30 @@ export const whatsappDbService = {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return { instance_name: null, connected_at: null };
 
+    // Identificar igreja do usuário logado
+    const profile = await getUserData();
+    let churchId: string | null = profile?.church_id || null;
+
+    // Fallback: tentar por owner_id
+    if (!churchId) {
+      const { data: church, error: churchError } = await supabase
+        .from('churches')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .single();
+
+      if (churchError || !church) {
+        console.log('[whatsappDb.getInstance] Igreja não encontrada ou erro:', churchError);
+        return { instance_name: null, connected_at: null };
+      }
+      churchId = church.id;
+    }
+
     // Buscar church com o campo instance e instance_connected_at
     const { data: church, error } = await supabase
       .from('churches')
       .select('instance, instance_connected_at')
-      .eq('owner_id', userData.user.id)
+      .eq('id', churchId)
       .single();
 
     if (error || !church) {
@@ -90,18 +118,25 @@ export const whatsappDbService = {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Usuário não autenticado');
 
-    // Buscar church_id do usuário
-    const { data: church, error: churchError } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
+    // Identificar igreja do usuário logado
+    const profile = await getUserData();
+    let churchId: string | null = profile?.church_id || null;
 
-    if (churchError || !church) {
-      throw new Error('Igreja não encontrada');
+    // Fallback: tentar por owner_id
+    if (!churchId) {
+      const { data: church, error: churchError } = await supabase
+        .from('churches')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .single();
+
+      if (churchError || !church) {
+        throw new Error('Igreja não encontrada');
+      }
+      churchId = church.id;
     }
 
-    console.log('[whatsappDb.clearInstance] Limpando instância para church:', church.id);
+    console.log('[whatsappDb.clearInstance] Limpando instância para church:', churchId);
 
     // Limpar os campos instance e instance_connected_at na tabela churches
     const { error: updateError } = await supabase
@@ -111,7 +146,7 @@ export const whatsappDbService = {
         instance_connected_at: null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', church.id);
+      .eq('id', churchId);
 
     if (updateError) {
       console.error('[whatsappDb.clearInstance] Erro ao limpar instância:', updateError);
