@@ -452,6 +452,7 @@ export default function WhatsAppChatPage() {
   const [isImageEditing, setIsImageEditing] = useState(false)
   const [imageEditorMode, setImageEditorMode] = useState<'crop' | 'draw' | 'text'>('crop')
   const [imageEditorSrc, setImageEditorSrc] = useState<string>('')
+  const [imageWorkingSrc, setImageWorkingSrc] = useState<string>('')
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -465,6 +466,8 @@ export default function WhatsAppChatPage() {
   const drawCtxRef = useRef<CanvasRenderingContext2D | null>(null)
   const isDrawingRef = useRef(false)
   const editorStageRef = useRef<HTMLDivElement | null>(null)
+  const editorSquareRef = useRef<HTMLDivElement | null>(null)
+  const [editorSquareSize, setEditorSquareSize] = useState<number>(0)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -496,6 +499,7 @@ export default function WhatsAppChatPage() {
     if (!pendingMedia || pendingMedia.type !== 'image') return
     const url = URL.createObjectURL(pendingMedia.file)
     setImageEditorSrc(url)
+    setImageWorkingSrc(url)
     setEditedImageFile(null)
     setIsImageEditing(true)
     setImageEditorMode('crop')
@@ -504,6 +508,7 @@ export default function WhatsAppChatPage() {
     setCroppedAreaPixels(null)
     setTextToAdd('')
     setTextBoxPos({ x: 0.5, y: 0.1 })
+    clearDrawLayer()
     return () => URL.revokeObjectURL(url)
   }, [pendingMedia])
 
@@ -528,8 +533,10 @@ export default function WhatsAppChatPage() {
     const resize = () => {
       const rect = stage.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
-      const nextW = Math.max(1, Math.floor(rect.width * dpr))
-      const nextH = Math.max(1, Math.floor(rect.height * dpr))
+      const sizeCss = Math.max(1, Math.floor(Math.min(rect.width, rect.height)))
+      setEditorSquareSize(sizeCss)
+      const nextW = Math.max(1, Math.floor(sizeCss * dpr))
+      const nextH = Math.max(1, Math.floor(sizeCss * dpr))
       if (canvas.width === nextW && canvas.height === nextH) return
 
       // preservar desenho atual
@@ -616,7 +623,7 @@ export default function WhatsAppChatPage() {
 
   const handleTextPointerMove = (evt: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingText) return
-    const stage = editorStageRef.current
+    const stage = editorSquareRef.current || editorStageRef.current
     if (!stage) return
     const rect = stage.getBoundingClientRect()
     const x = (evt.clientX - rect.left) / rect.width
@@ -1167,15 +1174,10 @@ export default function WhatsAppChatPage() {
 
   const applyImageEdits = useCallback(async () => {
     if (!pendingMedia || pendingMedia.type !== 'image') return
-    if (!imageEditorSrc) return
+    if (!imageWorkingSrc) return
 
-    let base = imageEditorSrc
-    if (croppedAreaPixels) {
-      base = await getCroppedDataUrl(imageEditorSrc, croppedAreaPixels)
-    }
-
-    // Desenho/texto em canvas
-    const img = await createImage(base)
+    // Desenho/texto em canvas (sobre a imagem já "baked"/quadrada)
+    const img = await createImage(imageWorkingSrc)
     const canvas = document.createElement('canvas')
     canvas.width = img.width
     canvas.height = img.height
@@ -1208,7 +1210,63 @@ export default function WhatsAppChatPage() {
     const newFile = await dataUrlToFile(out, pendingMedia.file.name.replace(/\.[^/.]+$/, '') + '_edit.jpg')
     setEditedImageFile(newFile)
     setIsImageEditing(false)
-  }, [pendingMedia, imageEditorSrc, croppedAreaPixels, textToAdd, textBoxPos])
+  }, [pendingMedia, imageWorkingSrc, textToAdd, textBoxPos])
+
+  const applyCropOnly = useCallback(async () => {
+    if (!pendingMedia || pendingMedia.type !== 'image') return
+    if (!imageEditorSrc) return
+    if (!croppedAreaPixels) return
+
+    const out = await getCroppedDataUrl(imageEditorSrc, croppedAreaPixels)
+    setImageWorkingSrc(out)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedAreaPixels(null)
+    clearDrawLayer()
+    setTextToAdd('')
+    setTextBoxPos({ x: 0.5, y: 0.1 })
+    setImageEditorMode('draw')
+  }, [pendingMedia, imageEditorSrc, croppedAreaPixels])
+
+  const hasPendingEdits = () => {
+    const hasText = !!textToAdd.trim()
+    const drawCanvas = drawCanvasRef.current
+    const hasDraw = !!drawCanvas && drawCanvas.width > 0 && drawCanvas.height > 0
+    return hasText || hasDraw
+  }
+
+  const buildEditedImageFile = useCallback(async (): Promise<File | null> => {
+    if (!pendingMedia || pendingMedia.type !== 'image') return null
+    if (!imageWorkingSrc) return null
+    const img = await createImage(imageWorkingSrc)
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0)
+
+    const drawCanvas = drawCanvasRef.current
+    if (drawCanvas) {
+      ctx.drawImage(drawCanvas, 0, 0, drawCanvas.width, drawCanvas.height, 0, 0, canvas.width, canvas.height)
+    }
+
+    if (textToAdd.trim()) {
+      ctx.font = `bold ${Math.max(18, Math.floor(canvas.width * 0.05))}px sans-serif`
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 4
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'center'
+      const tx = canvas.width * textBoxPos.x
+      const ty = canvas.height * textBoxPos.y
+      ctx.strokeText(textToAdd.trim(), tx, ty)
+      ctx.fillText(textToAdd.trim(), tx, ty)
+    }
+
+    const out = canvas.toDataURL('image/jpeg', 0.92)
+    return dataUrlToFile(out, pendingMedia.file.name.replace(/\.[^/.]+$/, '') + '_edit.jpg')
+  }, [pendingMedia, imageWorkingSrc, textToAdd, textBoxPos])
 
   const handleToggleRecording = async () => {
     if (!selectedChat || !instanceName) return
@@ -1656,13 +1714,26 @@ export default function WhatsAppChatPage() {
                         </button>
                         <button
                           className={`px-3 py-1.5 rounded border ${imageEditorMode === 'draw' ? 'bg-gray-100' : ''}`}
-                          onClick={() => setImageEditorMode('draw')}
+                          onClick={async () => {
+                            if (imageEditorMode === 'crop' && croppedAreaPixels) {
+                              await applyCropOnly()
+                              return
+                            }
+                            setImageEditorMode('draw')
+                          }}
                         >
                           Desenhar
                         </button>
                         <button
                           className={`px-3 py-1.5 rounded border ${imageEditorMode === 'text' ? 'bg-gray-100' : ''}`}
-                          onClick={() => setImageEditorMode('text')}
+                          onClick={async () => {
+                            if (imageEditorMode === 'crop' && croppedAreaPixels) {
+                              await applyCropOnly()
+                              setImageEditorMode('text')
+                              return
+                            }
+                            setImageEditorMode('text')
+                          }}
                         >
                           Texto
                         </button>
@@ -1671,78 +1742,102 @@ export default function WhatsAppChatPage() {
                         <button className="px-3 py-1.5 rounded border" onClick={() => setIsImageEditing(false)}>
                           Visualizar
                         </button>
-                        <button className="px-3 py-1.5 rounded bg-green-500 text-white hover:bg-green-600" onClick={applyImageEdits}>
-                          Aplicar
-                        </button>
+                        {imageEditorMode === 'crop' ? (
+                          <button className="px-3 py-1.5 rounded bg-green-500 text-white hover:bg-green-600" onClick={applyCropOnly}>
+                            Aplicar corte
+                          </button>
+                        ) : (
+                          <button className="px-3 py-1.5 rounded bg-green-500 text-white hover:bg-green-600" onClick={applyImageEdits}>
+                            Aplicar
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     <div ref={editorStageRef} className="relative w-full h-[50vh] bg-black/10 rounded overflow-hidden">
-                      <Cropper
-                        image={imageEditorSrc}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={1}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={(_area: any, pixels: { x: number; y: number; width: number; height: number }) =>
-                          setCroppedAreaPixels(pixels)
-                        }
-                        objectFit="contain"
-                      />
-                      {imageEditorMode === 'draw' && (
-                        <canvas
-                          ref={drawCanvasRef}
-                          className="absolute inset-0 w-full h-full touch-none"
-                          onPointerDown={handleDrawPointerDown}
-                          onPointerMove={handleDrawPointerMove}
-                          onPointerUp={handleDrawPointerUp}
-                          onPointerCancel={handleDrawPointerUp}
-                          onPointerLeave={handleDrawPointerUp}
+                      {imageEditorMode === 'crop' ? (
+                        <Cropper
+                          image={imageEditorSrc}
+                          crop={crop}
+                          zoom={zoom}
+                          aspect={1}
+                          onCropChange={setCrop}
+                          onZoomChange={setZoom}
+                          onCropComplete={(_area: any, pixels: { x: number; y: number; width: number; height: number }) =>
+                            setCroppedAreaPixels(pixels)
+                          }
+                          objectFit="contain"
                         />
-                      )}
-                      {imageEditorMode === 'text' && (
-                        <div
-                          className="absolute left-0 top-0 w-full h-full"
-                          onPointerMove={handleTextPointerMove}
-                          onPointerUp={handleTextPointerUp}
-                          onPointerCancel={handleTextPointerUp}
-                          onPointerLeave={handleTextPointerUp}
-                        >
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
                           <div
-                            onPointerDown={handleTextPointerDown}
-                            className="absolute px-2 py-1 rounded bg-black/40 text-white border border-white/30 cursor-move select-none"
-                            style={{
-                              left: `${textBoxPos.x * 100}%`,
-                              top: `${textBoxPos.y * 100}%`,
-                              transform: 'translate(-50%, -50%)',
-                              maxWidth: '90%',
-                            }}
-                            title="Arraste para mover"
+                            ref={editorSquareRef}
+                            className="relative"
+                            style={{ width: editorSquareSize || '100%', height: editorSquareSize || '100%' }}
                           >
-                            <input
-                              value={textToAdd}
-                              onChange={(e) => setTextToAdd(e.target.value)}
-                              placeholder="Digite..."
-                              className="bg-transparent outline-none text-sm w-[220px] max-w-[80vw]"
+                            <img
+                              src={imageWorkingSrc}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              alt="edit"
                             />
+                            {(imageEditorMode === 'draw' || imageEditorMode === 'text') && (
+                              <canvas
+                                ref={drawCanvasRef}
+                                className={`absolute inset-0 w-full h-full ${imageEditorMode === 'draw' ? 'touch-none' : 'pointer-events-none'}`}
+                                onPointerDown={imageEditorMode === 'draw' ? handleDrawPointerDown : undefined}
+                                onPointerMove={imageEditorMode === 'draw' ? handleDrawPointerMove : undefined}
+                                onPointerUp={imageEditorMode === 'draw' ? handleDrawPointerUp : undefined}
+                                onPointerCancel={imageEditorMode === 'draw' ? handleDrawPointerUp : undefined}
+                                onPointerLeave={imageEditorMode === 'draw' ? handleDrawPointerUp : undefined}
+                              />
+                            )}
+                            {imageEditorMode === 'text' && (
+                              <div
+                                className="absolute left-0 top-0 w-full h-full"
+                                onPointerMove={handleTextPointerMove}
+                                onPointerUp={handleTextPointerUp}
+                                onPointerCancel={handleTextPointerUp}
+                                onPointerLeave={handleTextPointerUp}
+                              >
+                                <div
+                                  onPointerDown={handleTextPointerDown}
+                                  className="absolute px-2 py-1 rounded bg-black/40 text-white border border-white/30 cursor-move select-none"
+                                  style={{
+                                    left: `${textBoxPos.x * 100}%`,
+                                    top: `${textBoxPos.y * 100}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    maxWidth: '90%',
+                                  }}
+                                  title="Arraste para mover"
+                                >
+                                  <input
+                                    value={textToAdd}
+                                    onChange={(e) => setTextToAdd(e.target.value)}
+                                    placeholder="Digite..."
+                                    className="bg-transparent outline-none text-sm w-[220px] max-w-[80vw]"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="mt-3 flex items-center gap-3">
-                      <label className="text-sm text-gray-600">Zoom</label>
-                      <input
-                        type="range"
-                        min={1}
-                        max={3}
-                        step={0.05}
-                        value={zoom}
-                        onChange={(e) => setZoom(Number(e.target.value))}
-                        className="flex-1"
-                      />
-                    </div>
+                    {imageEditorMode === 'crop' && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <label className="text-sm text-gray-600">Zoom</label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={3}
+                          step={0.05}
+                          value={zoom}
+                          onChange={(e) => setZoom(Number(e.target.value))}
+                          className="flex-1"
+                        />
+                      </div>
+                    )}
 
                     {imageEditorMode === 'draw' && (
                       <div className="mt-3 flex items-center gap-3">
@@ -1804,25 +1899,39 @@ export default function WhatsAppChatPage() {
               />
             </div>
 
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex gap-2 justify-end">
               <button
-                className="px-4 py-2 rounded border hover:bg-gray-50"
-                onClick={() => setPendingMedia(null)}
+                onClick={() => {
+                  setPendingMedia(null)
+                  setPendingCaption('')
+                }}
+                className="px-4 py-2 rounded border"
               >
                 Cancelar
               </button>
               <button
-                className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
-                disabled={!selectedChat || !instanceName || isSending}
                 onClick={async () => {
                   const { file, type } = pendingMedia
-                  setPendingMedia(null)
-                  if (type === 'image' && editedImageFile) {
-                    await handleSendMedia(editedImageFile, 'image')
-                  } else {
-                    await handleSendMedia(file, type)
+                  if (type === 'image') {
+                    // Se ainda está em crop, mas tem seleção, bake crop antes
+                    if (imageEditorMode === 'crop' && croppedAreaPixels) {
+                      await applyCropOnly()
+                    }
+                    // Se existe edição (desenho/texto), gerar arquivo final antes de enviar
+                    const finalFile = editedImageFile || (hasPendingEdits() ? await buildEditedImageFile() : null)
+                    setPendingMedia(null)
+                    if (finalFile) {
+                      await handleSendMedia(finalFile, 'image')
+                    } else {
+                      await handleSendMedia(file, 'image')
+                    }
+                    return
                   }
+
+                  setPendingMedia(null)
+                  await handleSendMedia(file, type)
                 }}
+                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
               >
                 Enviar
               </button>
