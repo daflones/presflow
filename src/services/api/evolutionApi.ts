@@ -933,7 +933,7 @@ class EvolutionApiService {
    */
   formatNumber(number: string): string {
     // If already in JID format, return as-is
-    if (number.includes('@s.whatsapp.net') || number.includes('@g.us')) {
+    if (number.includes('@s.whatsapp.net') || number.includes('@g.us') || number.includes('@lid')) {
       return number
     }
     // Clean the number - remove all non-digits
@@ -947,7 +947,7 @@ class EvolutionApiService {
    * Extract phone number from JID
    */
   extractNumber(jid: string): string {
-    return jid.replace('@s.whatsapp.net', '').replace('@g.us', '')
+    return jid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace('@lid', '')
   }
 
   /**

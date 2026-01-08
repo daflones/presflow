@@ -97,21 +97,21 @@ export const dashboardService = {
       };
     }
 
+    // WhatsApp (a instância é persistida na tabela churches)
+    const whatsappResult = await supabase
+      .from('churches')
+      .select('id, instance, instance_connected_at')
+      .eq('id', churchId)
+      .single();
+
     // Buscar estatísticas em paralelo (filtrando por igreja quando aplicável)
     const [
-      whatsappResult,
       clientsResult,
       eventsResult,
       noticesResult,
-      conversationsResult,
       aiConfigResult,
+      conversationsResult,
     ] = await Promise.all([
-      // WhatsApp (a instância é persistida na tabela churches)
-      supabase.from('churches')
-        .select('id, instance, instance_connected_at')
-        .eq('id', churchId)
-        .single(),
-      
       // Clients/CRM
       supabase.from('clients')
         .select('id, status, created_at, church_id')
@@ -126,16 +126,24 @@ export const dashboardService = {
       supabase.from('notices')
         .select('id, type, priority, is_active, church_id')
         .eq('church_id', churchId),
-      
-      // Conversas (WhatsApp) - fonte de verdade é o sync da Evolution em whatsapp_chats
-      supabase.from('whatsapp_chats')
-        .select('id, last_message_at, church_id')
-        .eq('church_id', churchId),
-      
+
       // AI Config (para verificar se está ativo)
       supabase.from('ai_configs')
         .select('id, church_id')
         .eq('church_id', churchId),
+
+      // Conversas (WhatsApp) - contar apenas da instância ativa/configurada nessa igreja
+      (async () => {
+        const instanceName = whatsappResult.data?.instance || null;
+        if (!instanceName) {
+          return { data: [], error: null } as any;
+        }
+        return supabase
+          .from('whatsapp_chats')
+          .select('id, last_message_at, church_id, instance_name')
+          .eq('church_id', churchId)
+          .eq('instance_name', instanceName);
+      })(),
     ]);
 
     // Processar WhatsApp
@@ -184,7 +192,7 @@ export const dashboardService = {
     const noticesAlerts = activeNotices.filter(n => n.type === 'event').length;
 
     // Processar Conversas
-    const conversations = conversationsResult.data || [];
+    const conversations = conversationsResult?.data || [];
     const activeConversations = conversations.length;
 
     // Processar IA

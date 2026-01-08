@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Cropper from 'react-easy-crop'
 import { 
   Send, 
   Paperclip, 
@@ -21,13 +22,41 @@ import {
   X,
   Camera,
   MapPin,
-  User
+  User,
+  Square
 } from 'lucide-react'
 import { evolutionApi } from '../services/api/evolutionApi'
 import { whatsappMessagesService } from '../services/supabase/whatsappMessages'
 import type { WhatsAppChat, WhatsAppMessage } from '../services/supabase/whatsappMessages'
 import { useWhatsAppInstance } from '../hooks/useWhatsApp'
 import { toast } from 'sonner'
+
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener('load', () => resolve(image))
+    image.addEventListener('error', (error) => reject(error))
+    image.setAttribute('crossOrigin', 'anonymous')
+    image.src = url
+  })
+}
+
+async function getCroppedDataUrl(imageSrc: string, crop: { x: number; y: number; width: number; height: number }): Promise<string> {
+  const image = await createImage(imageSrc)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.floor(crop.width))
+  canvas.height = Math.max(1, Math.floor(crop.height))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return imageSrc
+  ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.92)
+}
+
+async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  return new File([blob], fileName, { type: blob.type || 'image/jpeg' })
+}
 
 // =====================================================
 // MESSAGE BUBBLE COMPONENT
@@ -36,6 +65,9 @@ import { toast } from 'sonner'
 function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; onMediaClick?: (message: WhatsAppMessage) => void }) {
   const isFromMe = message.from_me
   const [isPlaying, setIsPlaying] = useState(false)
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
+  const [audioDuration, setAudioDuration] = useState<number>(message.media_duration || 0)
+  const [audioCurrentTime, setAudioCurrentTime] = useState<number>(0)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const formatTime = (timestamp: string) => {
@@ -58,14 +90,80 @@ function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; on
   }
 
   const toggleAudio = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause()
-      } else {
-        audioRef.current.play()
-      }
-      setIsPlaying(!isPlaying)
+    // Se ainda não temos base64 carregado, buscar on-demand
+    if (!message.media_base64) {
+      setShouldAutoPlay(true)
+      ;(onMediaClick as any)?.(message, { openModal: false })
+      return
     }
+
+    if (!audioRef.current) return
+
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      setShouldAutoPlay(false)
+      return
+    }
+
+    audioRef.current
+      .play()
+      .then(() => {
+        setIsPlaying(true)
+        setShouldAutoPlay(false)
+      })
+      .catch(() => {
+        // ignore
+      })
+  }
+
+  useEffect(() => {
+    if (!shouldAutoPlay) return
+    if (!message.media_base64) return
+    // Quando a mídia chegar, tocar automaticamente
+    setTimeout(() => {
+      audioRef.current
+        ?.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {})
+      setShouldAutoPlay(false)
+    }, 0)
+  }, [shouldAutoPlay, message.media_base64])
+
+  useEffect(() => {
+    // Atualiza duração inicial se veio no payload
+    if (message.media_duration && message.media_duration !== audioDuration) {
+      setAudioDuration(message.media_duration)
+    }
+  }, [message.media_duration])
+
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el) return
+
+    const onLoaded = () => {
+      const d = Number.isFinite(el.duration) ? el.duration : 0
+      if (d > 0) setAudioDuration(Math.floor(d))
+    }
+
+    const onTime = () => {
+      setAudioCurrentTime(el.currentTime || 0)
+    }
+
+    el.addEventListener('loadedmetadata', onLoaded)
+    el.addEventListener('timeupdate', onTime)
+
+    return () => {
+      el.removeEventListener('loadedmetadata', onLoaded)
+      el.removeEventListener('timeupdate', onTime)
+    }
+  }, [message.media_base64])
+
+  const formatAudioTime = (seconds: number) => {
+    const s = Math.max(0, Math.floor(seconds))
+    const mm = Math.floor(s / 60)
+    const ss = s % 60
+    return `${mm}:${ss.toString().padStart(2, '0')}`
   }
 
   const renderContent = () => {
@@ -83,6 +181,12 @@ function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; on
             {message.media_base64 ? (
               <img 
                 src={`data:${message.media_mimetype || 'image/jpeg'};base64,${message.media_base64}`}
+                alt="Imagem"
+                className="max-w-xs rounded-lg"
+              />
+            ) : message.thumbnail_base64 ? (
+              <img 
+                src={`data:image/jpeg;base64,${message.thumbnail_base64}`}
                 alt="Imagem"
                 className="max-w-xs rounded-lg"
               />
@@ -113,19 +217,23 @@ function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; on
             </button>
             <div className="flex-1">
               <div className="h-1 bg-gray-300 rounded-full">
-                <div className="h-1 bg-green-500 rounded-full w-0" />
+                <div
+                  className="h-1 bg-green-500 rounded-full"
+                  style={{
+                    width: audioDuration > 0 ? `${Math.min(100, (audioCurrentTime / audioDuration) * 100)}%` : '0%'
+                  }}
+                />
               </div>
               <span className="text-xs text-gray-500">
-                {message.media_duration ? `${Math.floor(message.media_duration / 60)}:${(message.media_duration % 60).toString().padStart(2, '0')}` : '0:00'}
+                {audioDuration > 0 ? formatAudioTime(audioDuration) : '0:00'}
               </span>
             </div>
-            {message.media_base64 && (
-              <audio 
-                ref={audioRef} 
-                src={`data:${message.media_mimetype || 'audio/ogg'};base64,${message.media_base64}`}
-                onEnded={() => setIsPlaying(false)}
-              />
-            )}
+            <audio 
+              ref={audioRef} 
+              src={message.media_base64 ? `data:${message.media_mimetype || 'audio/ogg'};base64,${message.media_base64}` : undefined}
+              onEnded={() => setIsPlaying(false)}
+              onPause={() => setIsPlaying(false)}
+            />
           </div>
         )
 
@@ -337,6 +445,23 @@ export default function WhatsAppChatPage() {
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [mediaPreview, setMediaPreview] = useState<WhatsAppMessage | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false)
+  const [pendingMedia, setPendingMedia] = useState<{ file: File; type: 'image' | 'video' | 'document' } | null>(null)
+  const [pendingCaption, setPendingCaption] = useState('')
+  const [isImageEditing, setIsImageEditing] = useState(false)
+  const [imageEditorMode, setImageEditorMode] = useState<'crop' | 'draw' | 'text'>('crop')
+  const [imageEditorSrc, setImageEditorSrc] = useState<string>('')
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  const [drawColor, setDrawColor] = useState('#16a34a')
+  const [drawSize, setDrawSize] = useState(4)
+  const [textToAdd, setTextToAdd] = useState('')
+  const [editedImageFile, setEditedImageFile] = useState<File | null>(null)
+  const drawCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const drawCtxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const isDrawingRef = useRef(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -349,6 +474,8 @@ export default function WhatsAppChatPage() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
+  const profileNameCacheRef = useRef<Map<string, string>>(new Map())
+  const contactsLoadedRef = useRef(false)
 
   // Neste modo a tela é "fonte de verdade = Evolution".
   // Persistir em Supabase exige `chat_id` UUID real. Como aqui usamos um `id` sintético,
@@ -356,6 +483,103 @@ export default function WhatsAppChatPage() {
   const persistToSupabase = false
 
   const instanceName = instance?.instanceName
+
+  useEffect(() => {
+    contactsLoadedRef.current = false
+    profileNameCacheRef.current = new Map()
+  }, [instanceName])
+
+  useEffect(() => {
+    if (!pendingMedia || pendingMedia.type !== 'image') return
+    const url = URL.createObjectURL(pendingMedia.file)
+    setImageEditorSrc(url)
+    setEditedImageFile(null)
+    setIsImageEditing(true)
+    setImageEditorMode('crop')
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedAreaPixels(null)
+    setTextToAdd('')
+    return () => URL.revokeObjectURL(url)
+  }, [pendingMedia])
+
+  useEffect(() => {
+    if (!isImageEditing) return
+    if (imageEditorMode !== 'draw') return
+    const canvas = drawCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    drawCtxRef.current = ctx
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+  }, [isImageEditing, imageEditorMode])
+
+  const clearDrawLayer = () => {
+    const canvas = drawCanvasRef.current
+    const ctx = drawCtxRef.current
+    if (!canvas || !ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  }
+
+  const getPoint = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = evt.currentTarget
+    const rect = canvas.getBoundingClientRect()
+    const x = evt.clientX - rect.left
+    const y = evt.clientY - rect.top
+    return { x, y }
+  }
+
+  const handleDrawPointerDown = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const ctx = drawCtxRef.current
+    if (!ctx) return
+    isDrawingRef.current = true
+    const { x, y } = getPoint(evt)
+    ctx.strokeStyle = drawColor
+    ctx.lineWidth = drawSize
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+
+  const handleDrawPointerMove = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const ctx = drawCtxRef.current
+    if (!ctx) return
+    if (!isDrawingRef.current) return
+    const { x, y } = getPoint(evt)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const handleDrawPointerUp = () => {
+    isDrawingRef.current = false
+  }
+
+  useEffect(() => {
+    if (!isRecording || isRecordingPaused) return
+    const t = setInterval(() => setRecordingSeconds((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [isRecording, isRecordingPaused])
+
+  const formatDuration = (totalSeconds: number) => {
+    const mm = Math.floor(totalSeconds / 60)
+    const ss = totalSeconds % 60
+    return `${mm}:${ss.toString().padStart(2, '0')}`
+  }
+
+  const getChatLastMessagePreview = (lastMessage: any): string => {
+    const msg = lastMessage?.message
+    if (!msg) return ''
+    if (msg.conversation) return msg.conversation
+    if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text
+    if (msg.imageMessage) return '📷 Foto'
+    if (msg.videoMessage) return '🎥 Vídeo'
+    if (msg.audioMessage) return '🎤 Áudio'
+    if (msg.documentMessage) return `📄 ${msg.documentMessage?.fileName || 'Documento'}`
+    if (msg.stickerMessage) return '💟 Sticker'
+    if (msg.locationMessage) return '📍 Localização'
+    if (msg.contactMessage) return '👤 Contato'
+    return ''
+  }
 
   useEffect(() => {
     chatsRef.current = chats
@@ -396,6 +620,29 @@ export default function WhatsAppChatPage() {
       const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
       console.log('[WhatsAppChat] Evolution findChats:', { instanceName, count: apiChats.length })
 
+      // Resolver nomes em lote (evita chamar fetchProfile para cada chat e reduz erro 400 em massa)
+      if (!contactsLoadedRef.current) {
+        contactsLoadedRef.current = true
+        try {
+          const contacts = await evolutionApi.findContacts(instanceName)
+          for (const c of contacts || []) {
+            const jid = c?.id || c?.remoteJid || c?.jid
+            const name = c?.pushName || c?.notify || c?.name
+            if (jid && name) {
+              profileNameCacheRef.current.set(jid, name)
+              const extracted = evolutionApi.extractNumber(jid)
+              if (extracted) {
+                profileNameCacheRef.current.set(`${extracted}@s.whatsapp.net`, name)
+                profileNameCacheRef.current.set(`${extracted}@lid`, name)
+                profileNameCacheRef.current.set(extracted, name)
+              }
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const nowIso = new Date().toISOString()
       const mappedChats: WhatsAppChat[] = []
 
@@ -422,12 +669,20 @@ export default function WhatsAppChatPage() {
         // Evitar chamadas lentas em massa: preferir URL vinda no próprio chat (quando existir)
         const profilePicUrl = apiChat.profilePicUrl || apiChat.profilePictureUrl || ''
 
+        const extractedRemote = evolutionApi.extractNumber(remoteJid)
+        const cachedName =
+          profileNameCacheRef.current.get(remoteJid) ||
+          (extractedRemote ? profileNameCacheRef.current.get(extractedRemote) : undefined) ||
+          (extractedRemote ? profileNameCacheRef.current.get(`${extractedRemote}@s.whatsapp.net`) : undefined) ||
+          (extractedRemote ? profileNameCacheRef.current.get(`${extractedRemote}@lid`) : undefined)
+        const contactName = cachedName || apiChat.pushName || apiChat.notify || apiChat.verifiedName || apiChat.name || apiChat.subject
+
         const chat: WhatsAppChat = {
           id: `${instanceName}:${remoteJid}`,
           church_id: 'evolution',
           instance_name: instanceName,
           remote_jid: remoteJid,
-          contact_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName || apiChat.name || apiChat.subject,
+          contact_name: contactName,
           contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
           profile_picture_url: profilePicUrl,
           is_group: false,
@@ -436,9 +691,7 @@ export default function WhatsAppChatPage() {
             ? new Date(apiChat.lastMessage.messageTimestamp * 1000).toISOString()
             : undefined,
           last_message_preview:
-            apiChat.lastMessage?.message?.conversation ||
-            apiChat.lastMessage?.message?.extendedTextMessage?.text ||
-            '',
+            getChatLastMessagePreview(apiChat.lastMessage),
           is_archived: !!apiChat.archived,
           is_pinned: !!apiChat.pinned,
           created_at: nowIso,
@@ -534,7 +787,10 @@ export default function WhatsAppChatPage() {
             media_mimetype: msg.message?.imageMessage?.mimetype || msg.message?.audioMessage?.mimetype || msg.message?.videoMessage?.mimetype || msg.message?.documentMessage?.mimetype,
             media_filename: msg.message?.documentMessage?.fileName,
             media_base64: undefined,
-            thumbnail_base64: undefined,
+            thumbnail_base64:
+              msg.message?.imageMessage?.jpegThumbnail ||
+              msg.message?.videoMessage?.jpegThumbnail ||
+              undefined,
             latitude: undefined,
             longitude: undefined,
             location_name: undefined,
@@ -584,8 +840,29 @@ export default function WhatsAppChatPage() {
 
       // Mesclar apenas dentro do MESMO chat (para evitar piscar após envio)
       const existing = messagesRef.current
+
+      // Remover duplicação visual: quando a mensagem otimista ainda está no estado,
+      // mas a Evolution já retornou a mensagem real.
+      const realOutgoingTexts = mappedMessages
+        .filter((m) => m.from_me && m.message_type === 'text' && (m.text_content || '').trim())
+        .map((m) => ({
+          text: (m.text_content || '').trim(),
+          ts: new Date(m.message_timestamp).getTime(),
+        }))
+
+      const dedupedExisting = existing.filter((m) => {
+        if (!m.id?.startsWith('optimistic_')) return true
+        if (!m.from_me) return true
+        if (m.message_type !== 'text') return true
+        const text = (m.text_content || '').trim()
+        if (!text) return true
+        const ts = new Date(m.message_timestamp).getTime()
+        // Considerar duplicata se houver uma mensagem real igual dentro de 2 minutos
+        return !realOutgoingTexts.some((r) => r.text === text && Math.abs(r.ts - ts) <= 2 * 60 * 1000)
+      })
+
       const byId = new Map<string, WhatsAppMessage>()
-      for (const m of existing) byId.set(m.id, m)
+      for (const m of dedupedExisting) byId.set(m.id, m)
       for (const m of mappedMessages) byId.set(m.id, m)
       const merged = Array.from(byId.values()).sort((a, b) => {
         return new Date(a.message_timestamp).getTime() - new Date(b.message_timestamp).getTime()
@@ -605,6 +882,42 @@ export default function WhatsAppChatPage() {
       isFetchingMessagesRef.current = false
     }
   }, [instanceName])
+
+  const handleMediaClick = useCallback(
+    async (message: WhatsAppMessage, opts?: { openModal?: boolean }) => {
+      if (!instanceName) return
+      // Se já tem base64, só abrir
+      if (message.media_base64) {
+        if (opts?.openModal !== false) setMediaPreview(message)
+        return
+      }
+      try {
+        const res = await evolutionApi.getBase64FromMediaMessage(instanceName, message.message_id, message.remote_jid)
+        // Cachear no histórico para permitir preview inline (áudio) sem depender do modal
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === message.id
+              ? {
+                  ...m,
+                  media_base64: res.base64,
+                  media_mimetype: res.mimetype || m.media_mimetype,
+                }
+              : m
+          )
+        )
+        if (opts?.openModal !== false) {
+          setMediaPreview({
+            ...message,
+            media_base64: res.base64,
+            media_mimetype: res.mimetype || message.media_mimetype,
+          })
+        }
+      } catch (e) {
+        toast.error('Não foi possível carregar a mídia')
+      }
+    },
+    [instanceName]
+  )
 
   // Helper functions
   const getMessageType = (msg: any): WhatsAppMessage['message_type'] => {
@@ -735,12 +1048,14 @@ export default function WhatsAppChatPage() {
           mediatype: type,
           mimetype: file.type,
           fileName: file.name,
+          caption: pendingCaption || '',
           media: base64DataUrl,
         })
       }
 
       await loadMessages(selectedChat)
       setShowAttachMenu(false)
+      setPendingCaption('')
       toast.success('Mídia enviada com sucesso!')
 
       setTimeout(() => {
@@ -763,9 +1078,58 @@ export default function WhatsAppChatPage() {
     else if (file.type.startsWith('video/')) type = 'video'
     else if (file.type.startsWith('audio/')) type = 'audio'
 
-    handleSendMedia(file, type)
+    if (type === 'audio') {
+      handleSendMedia(file, 'audio')
+    } else {
+      setPendingMedia({ file, type })
+      setPendingCaption('')
+      setShowAttachMenu(false)
+    }
     e.target.value = ''
   }
+
+  const applyImageEdits = useCallback(async () => {
+    if (!pendingMedia || pendingMedia.type !== 'image') return
+    if (!imageEditorSrc) return
+
+    let base = imageEditorSrc
+    if (croppedAreaPixels) {
+      base = await getCroppedDataUrl(imageEditorSrc, croppedAreaPixels)
+    }
+
+    // Desenho/texto em canvas
+    const img = await createImage(base)
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(img, 0, 0)
+
+    // Aplicar camada de desenho (se existir)
+    const drawCanvas = drawCanvasRef.current
+    if (drawCanvas) {
+      ctx.drawImage(drawCanvas, 0, 0, canvas.width, canvas.height)
+    }
+
+    // Se existe overlay salvo em dataURL, aplicar
+    // Neste editor simples, usamos apenas texto central se existir
+    if (textToAdd.trim()) {
+      ctx.font = `bold ${Math.max(18, Math.floor(canvas.width * 0.05))}px sans-serif`
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 4
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'center'
+      ctx.strokeText(textToAdd.trim(), canvas.width / 2, canvas.height * 0.1)
+      ctx.fillText(textToAdd.trim(), canvas.width / 2, canvas.height * 0.1)
+    }
+
+    const out = canvas.toDataURL('image/jpeg', 0.92)
+    const newFile = await dataUrlToFile(out, pendingMedia.file.name.replace(/\.[^/.]+$/, '') + '_edit.jpg')
+    setEditedImageFile(newFile)
+    setIsImageEditing(false)
+  }, [pendingMedia, imageEditorSrc, croppedAreaPixels, textToAdd])
 
   const handleToggleRecording = async () => {
     if (!selectedChat || !instanceName) return
@@ -803,10 +1167,39 @@ export default function WhatsAppChatPage() {
       mediaRecorderRef.current = recorder
       recorder.start()
       setIsRecording(true)
+      setIsRecordingPaused(false)
+      setRecordingSeconds(0)
     } catch (err) {
       console.error('Erro ao acessar microfone:', err)
       toast.error('Permita acesso ao microfone para gravar áudio')
     }
+  }
+
+  const handlePauseResumeRecording = () => {
+    const rec = mediaRecorderRef.current
+    if (!rec) return
+    if (rec.state === 'recording') {
+      rec.pause()
+      setIsRecordingPaused(true)
+    } else if (rec.state === 'paused') {
+      rec.resume()
+      setIsRecordingPaused(false)
+    }
+  }
+
+  const handleCancelRecording = () => {
+    const rec = mediaRecorderRef.current
+    if (!rec) return
+    try {
+      rec.onstop = null
+      rec.stop()
+    } catch (e) {
+      // ignore
+    }
+    audioChunksRef.current = []
+    setIsRecording(false)
+    setIsRecordingPaused(false)
+    setRecordingSeconds(0)
   }
 
   // Effects
@@ -965,7 +1358,7 @@ export default function WhatsAppChatPage() {
                 <MessageBubble 
                   key={message.id} 
                   message={message}
-                  onMediaClick={setMediaPreview}
+                  onMediaClick={handleMediaClick}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -1041,13 +1434,39 @@ export default function WhatsAppChatPage() {
                     <Send className="w-6 h-6" />
                   </button>
                 ) : (
-                  <button
-                    onClick={handleToggleRecording}
-                    disabled={isSending}
-                    className={`p-2 rounded-full ${isRecording ? 'bg-red-100 hover:bg-red-200' : 'hover:bg-gray-200'} disabled:opacity-50`}
-                  >
-                    <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-gray-600'}`} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {isRecording && (
+                      <span className="text-xs text-gray-600 tabular-nums">{formatDuration(recordingSeconds)}</span>
+                    )}
+                    {isRecording && (
+                      <button
+                        onClick={handlePauseResumeRecording}
+                        disabled={isSending}
+                        className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                        title={isRecordingPaused ? 'Retomar' : 'Pausar'}
+                      >
+                        {isRecordingPaused ? <Play className="w-5 h-5 text-gray-600" /> : <Pause className="w-5 h-5 text-gray-600" />}
+                      </button>
+                    )}
+                    {isRecording && (
+                      <button
+                        onClick={handleCancelRecording}
+                        disabled={isSending}
+                        className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                        title="Cancelar"
+                      >
+                        <Square className="w-5 h-5 text-gray-600" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleToggleRecording}
+                      disabled={isSending}
+                      className={`p-2 rounded-full ${isRecording ? 'bg-red-100 hover:bg-red-200' : 'hover:bg-gray-200'} disabled:opacity-50`}
+                      title={isRecording ? 'Enviar áudio (parar gravação)' : 'Gravar áudio'}
+                    >
+                      <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-gray-600'}`} />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1102,6 +1521,213 @@ export default function WhatsAppChatPage() {
               onClick={(e) => e.stopPropagation()}
             />
           )}
+          {(mediaPreview.message_type === 'document' || mediaPreview.message_type === 'audio') && (
+            <div
+              className="bg-white rounded-lg p-6 max-w-[90vw]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{mediaPreview.media_filename || 'Arquivo'}</p>
+                  <p className="text-sm text-gray-500 truncate">{mediaPreview.media_mimetype || mediaPreview.message_type}</p>
+                </div>
+                {mediaPreview.media_base64 && (
+                  <a
+                    className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    href={`data:${mediaPreview.media_mimetype || 'application/octet-stream'};base64,${mediaPreview.media_base64}`}
+                    download={mediaPreview.media_filename || 'arquivo'}
+                  >
+                    Baixar
+                  </a>
+                )}
+              </div>
+              {mediaPreview.message_type === 'audio' && mediaPreview.media_base64 && (
+                <audio
+                  className="mt-4 w-full"
+                  controls
+                  src={`data:${mediaPreview.media_mimetype || 'audio/ogg'};base64,${mediaPreview.media_base64}`}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {pendingMedia && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setPendingMedia(null)}>
+          <div className="bg-white rounded-lg w-[min(720px,90vw)] p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">Enviar {pendingMedia.type}</h3>
+              <button className="p-2 hover:bg-gray-100 rounded" onClick={() => setPendingMedia(null)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {pendingMedia.type === 'image' && (
+              <div>
+                {isImageEditing ? (
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className={`px-3 py-1.5 rounded border ${imageEditorMode === 'crop' ? 'bg-gray-100' : ''}`}
+                          onClick={() => setImageEditorMode('crop')}
+                        >
+                          Cortar
+                        </button>
+                        <button
+                          className={`px-3 py-1.5 rounded border ${imageEditorMode === 'draw' ? 'bg-gray-100' : ''}`}
+                          onClick={() => setImageEditorMode('draw')}
+                        >
+                          Desenhar
+                        </button>
+                        <button
+                          className={`px-3 py-1.5 rounded border ${imageEditorMode === 'text' ? 'bg-gray-100' : ''}`}
+                          onClick={() => setImageEditorMode('text')}
+                        >
+                          Texto
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="px-3 py-1.5 rounded border" onClick={() => setIsImageEditing(false)}>
+                          Visualizar
+                        </button>
+                        <button className="px-3 py-1.5 rounded bg-green-500 text-white hover:bg-green-600" onClick={applyImageEdits}>
+                          Aplicar
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative w-full h-[50vh] bg-black/10 rounded overflow-hidden">
+                      <Cropper
+                        image={imageEditorSrc}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={1}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={(_area: any, pixels: { x: number; y: number; width: number; height: number }) =>
+                          setCroppedAreaPixels(pixels)
+                        }
+                        objectFit="contain"
+                      />
+                      {imageEditorMode === 'draw' && (
+                        <canvas
+                          ref={drawCanvasRef}
+                          width={1000}
+                          height={1000}
+                          className="absolute inset-0 w-full h-full touch-none"
+                          onPointerDown={handleDrawPointerDown}
+                          onPointerMove={handleDrawPointerMove}
+                          onPointerUp={handleDrawPointerUp}
+                          onPointerCancel={handleDrawPointerUp}
+                          onPointerLeave={handleDrawPointerUp}
+                        />
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-3">
+                      <label className="text-sm text-gray-600">Zoom</label>
+                      <input
+                        type="range"
+                        min={1}
+                        max={3}
+                        step={0.05}
+                        value={zoom}
+                        onChange={(e) => setZoom(Number(e.target.value))}
+                        className="flex-1"
+                      />
+                    </div>
+
+                    {imageEditorMode === 'draw' && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <label className="text-sm text-gray-600">Cor</label>
+                        <input type="color" value={drawColor} onChange={(e) => setDrawColor(e.target.value)} />
+                        <label className="text-sm text-gray-600">Esp.</label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={18}
+                          step={1}
+                          value={drawSize}
+                          onChange={(e) => setDrawSize(Number(e.target.value))}
+                        />
+                        <button className="px-3 py-1.5 rounded border" onClick={clearDrawLayer}>
+                          Limpar
+                        </button>
+                      </div>
+                    )}
+
+                    {imageEditorMode === 'text' && (
+                      <div className="mt-3">
+                        <input
+                          value={textToAdd}
+                          onChange={(e) => setTextToAdd(e.target.value)}
+                          placeholder="Texto na imagem (opcional)"
+                          className="w-full px-3 py-2 border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <img
+                      className="max-h-[50vh] mx-auto rounded"
+                      src={editedImageFile ? URL.createObjectURL(editedImageFile) : imageEditorSrc}
+                      alt="preview"
+                    />
+                    <div className="mt-2 flex justify-end">
+                      <button className="px-3 py-1.5 rounded border" onClick={() => setIsImageEditing(true)}>
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {pendingMedia.type === 'video' && (
+              <video className="max-h-[50vh] w-full" controls src={URL.createObjectURL(pendingMedia.file)} />
+            )}
+            {pendingMedia.type === 'document' && (
+              <div className="p-4 bg-gray-50 rounded">
+                <p className="font-medium">{pendingMedia.file.name}</p>
+                <p className="text-sm text-gray-500">{pendingMedia.file.type || 'documento'}</p>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <input
+                value={pendingCaption}
+                onChange={(e) => setPendingCaption(e.target.value)}
+                placeholder="Legenda (opcional)"
+                className="w-full px-3 py-2 border rounded"
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded border hover:bg-gray-50"
+                onClick={() => setPendingMedia(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
+                disabled={!selectedChat || !instanceName || isSending}
+                onClick={async () => {
+                  const { file, type } = pendingMedia
+                  setPendingMedia(null)
+                  if (type === 'image' && editedImageFile) {
+                    await handleSendMedia(editedImageFile, 'image')
+                  } else {
+                    await handleSendMedia(file, type)
+                  }
+                }}
+              >
+                Enviar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
