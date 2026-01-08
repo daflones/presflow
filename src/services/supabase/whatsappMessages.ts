@@ -198,45 +198,29 @@ class WhatsAppMessagesService {
 
   async createOrUpdateChat(input: CreateChatInput): Promise<WhatsAppChat> {
     const churchId = await this.getChurchId()
-    
-    // Check if chat exists
-    const existing = await this.getChatByJid(input.instance_name, input.remote_jid)
-    
-    if (existing) {
-      // Update existing chat
-      const { data, error } = await supabase
-        .from('whatsapp_chats')
-        .update({
-          contact_name: input.contact_name || existing.contact_name,
-          contact_push_name: input.contact_push_name || existing.contact_push_name,
-          profile_picture_url: input.profile_picture_url || existing.profile_picture_url,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select()
-        .single()
 
-      if (error) throw error
-      return data
-    } else {
-      // Create new chat
-      const { data, error } = await supabase
-        .from('whatsapp_chats')
-        .insert({
+    const { data, error } = await supabase
+      .from('whatsapp_chats')
+      .upsert(
+        {
           church_id: churchId,
           instance_name: input.instance_name,
           remote_jid: input.remote_jid,
           contact_name: input.contact_name,
           contact_push_name: input.contact_push_name,
           profile_picture_url: input.profile_picture_url,
-          is_group: input.is_group || input.remote_jid.includes('@g.us')
-        })
-        .select()
-        .single()
+          is_group: input.is_group || input.remote_jid.includes('@g.us'),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'church_id,instance_name,remote_jid',
+        }
+      )
+      .select()
+      .single()
 
-      if (error) throw error
-      return data
-    }
+    if (error) throw error
+    return data
   }
 
   async updateChatLastMessage(chatId: string, preview: string, timestamp: string): Promise<void> {
@@ -328,28 +312,28 @@ class WhatsAppMessagesService {
 
   async createMessage(input: CreateMessageInput): Promise<WhatsAppMessage> {
     const churchId = await this.getChurchId()
-    
-    // Check if message already exists (avoid duplicates)
-    const existing = await this.getMessageById(input.message_id, input.instance_name)
-    if (existing) return existing
 
     const { data, error } = await supabase
       .from('whatsapp_messages')
-      .insert({
-        church_id: churchId,
-        ...input,
-        status: input.from_me ? 'sent' : 'delivered'
-      })
+      .upsert(
+        {
+          church_id: churchId,
+          ...input,
+          status: input.from_me ? 'sent' : 'delivered',
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'church_id,instance_name,message_id',
+        }
+      )
       .select()
       .single()
 
     if (error) throw error
 
-    // Update chat's last message
     const preview = input.text_content || input.caption || `[${input.message_type}]`
     await this.updateChatLastMessage(input.chat_id, preview.substring(0, 100), input.message_timestamp)
 
-    // Increment unread count if message is received
     if (!input.from_me) {
       await this.incrementUnreadCount(input.chat_id)
     }

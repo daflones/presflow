@@ -7,8 +7,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-    "dev:frontend": "vite",
+    "dev": "node_modules\\.bin\\concurrently.cmd \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "node_modules\\.bin\\vite.cmd",
     "dev:backend": "node server/index.cjs",
     "build": "tsc -b && vite build",
     "start": "node server/index.cjs",

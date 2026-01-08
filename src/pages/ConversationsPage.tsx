@@ -61,7 +61,7 @@ type Instance = {
   connectionStatus: string;
 };
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 // Componente para renderizar mídias nas mensagens
 function MediaRenderer({ 
@@ -289,27 +289,12 @@ export function ConversationsPage() {
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        // Timestamp da data de conexão (em segundos)
-        const connectionTimestamp = connectionDate ? connectionDate.getTime() / 1000 : 0;
-        console.log('[ConversationsPage] Filtrando chats após:', connectionDate, 'timestamp:', connectionTimestamp);
-        
         const formattedChats: Chat[] = data
           .filter((chat: any) => {
             // Filtrar grupos
             if (!chat.id || chat.id.includes('@g.us')) return false;
-            
-            // Se não tiver data de conexão, mostrar todos
-            if (!connectionTimestamp) return true;
-            
-            // Filtrar apenas chats com mensagens após a data de conexão
-            const lastMsgTime = chat.lastMessage?.messageTimestamp || 0;
-            const isAfterConnection = lastMsgTime >= connectionTimestamp;
-            
-            if (!isAfterConnection) {
-              console.log('[ConversationsPage] Chat ignorado (antes da conexão):', chat.name || chat.id, 'lastMsg:', lastMsgTime);
-            }
-            
-            return isAfterConnection;
+
+            return true;
           })
           .map((chat: any) => ({
             id: chat.id,
@@ -323,7 +308,7 @@ export function ConversationsPage() {
           }))
           .sort((a: Chat, b: Chat) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
         
-        console.log('[ConversationsPage] Chats filtrados:', formattedChats.length, 'de', data.length);
+        console.log('[ConversationsPage] Chats carregados:', formattedChats.length, 'de', data.length);
         setChats(formattedChats);
       }
     } catch (error) {

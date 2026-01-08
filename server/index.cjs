@@ -808,12 +808,23 @@ app.post('/api/forms/submit', async (req, res) => {
 
 
 // Servir frontend em produção
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
+if (process.env.NODE_ENV === 'production') {
+  // Servir frontend em produção
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, '../dist/index.html'));
+  });
+} else {
+  // Em desenvolvimento o frontend é servido pelo Vite (porta 5173)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    return res.status(404).send('Not Found');
+  });
+}
 
 // Inicializar servidor
 app.listen(PORT, () => {

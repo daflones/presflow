@@ -84,72 +84,61 @@ export function useWhatsAppStatus(instanceName?: string, shouldPoll: boolean = f
     queryKey: ['whatsapp', 'status', instanceName],
     queryFn: async () => {
       if (!instanceName) return null
-      
-      // Primeiro, verificar status no localStorage
+
+      // Cache local (não é fonte de verdade)
       const localInstance = await whatsappService.getInstanceFromProfile()
-      
-      // Se já está conectado no localStorage, não precisa fazer fetch da Evolution
-      if (localInstance?.status === 'open') {
-        return {
-          instanceName,
-          status: 'open',
-          owner: null,
-          profileName: null
-        }
-      }
-      
-      // Só fazer fetch da Evolution se shouldPoll for true (quando criando instância)
-      if (!shouldPoll) {
-        return {
-          instanceName,
-          status: 'connecting',
-          owner: null,
-          profileName: null
-        }
-      }
-      
+
+      // Sempre validar contra a Evolution API para refletir status real da sessão
+      let instance: any | null = null
       try {
-        const instance = await whatsappService.getInstanceByName(instanceName)
-        
-        // Se detectou que conectou (status = 'open'), atualizar localStorage e banco
-        // MAS SÓ recarregar se o status anterior NÃO era 'open' (evitar loop infinito)
-        if (instance && instance.status === 'open' && instance.owner) {
-          const wasAlreadyOpen = localInstance?.status === 'open'
-          
-          // Atualizar localStorage
-          await whatsappService.saveInstanceToProfile({
-            instanceName: instance.instanceName,
-            instanceId: instance.instanceId,
-            status: 'open'
-          })
-          
-          // Atualizar banco de dados com status conectado
-          try {
-            await whatsappDbService.saveInstance({
-              instance_name: instance.instanceName,
-              instance_id: instance.instanceId,
-              status: 'open',
-              connected_at: new Date().toISOString(),
-              profile_name: instance.profileName,
-              profile_picture_url: instance.profilePictureUrl
-            })
-            console.log('[useWhatsAppStatus] Status atualizado no banco de dados: open')
-          } catch (dbError) {
-            console.error('[useWhatsAppStatus] Erro ao atualizar banco:', dbError)
-          }
-          
-          // Só recarregar se estava em outro status antes
-          if (!wasAlreadyOpen) {
-            setTimeout(() => {
-              window.location.reload()
-            }, 1000)
-          }
-        }
-        
-        return instance
+        instance = await whatsappService.getInstanceByName(instanceName)
       } catch (error) {
-        return null
+        instance = null
       }
+
+      // Se a Evolution não retornar a instância, usar o que existe localmente (sem forçar "open")
+      if (!instance) {
+        return {
+          instanceName,
+          status: localInstance?.status || 'disconnected',
+          owner: null,
+          profileName: null
+        }
+      }
+
+      // Se detectou que conectou (status = 'open'), sincronizar cache e banco
+      if (instance.status === 'open') {
+        const wasAlreadyOpen = localInstance?.status === 'open'
+
+        await whatsappService.saveInstanceToProfile({
+          instanceName: instance.instanceName,
+          instanceId: instance.instanceId,
+          status: 'open'
+        })
+
+        try {
+          await whatsappDbService.saveInstance({
+            instance_name: instance.instanceName,
+            instance_id: instance.instanceId,
+            status: 'open',
+            connected_at: new Date().toISOString(),
+            profile_name: instance.profileName,
+            profile_picture_url: instance.profilePictureUrl
+          })
+          console.log('[useWhatsAppStatus] Status atualizado no banco de dados: open')
+        } catch (dbError) {
+          console.error('[useWhatsAppStatus] Erro ao atualizar banco:', dbError)
+        }
+
+        // Só recarregar se você estava em outro status antes (evitar loop)
+        if (shouldPoll && !wasAlreadyOpen) {
+          setTimeout(() => {
+            window.location.reload()
+          }, 1000)
+        }
+      }
+
+      return instance
     },
     enabled: !!instanceName,
     refetchInterval: shouldPoll ? (data: any) => {

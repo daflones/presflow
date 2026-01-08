@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { loadEnv } from 'vite'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const backendPort = env.PORT || '3001'
+  const backendTarget = env.VITE_BACKEND_URL || env.BACKEND_URL || `http://localhost:${backendPort}`
+
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -63,10 +69,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: backendTarget,
         changeOrigin: true,
       }
     }
+  }
   }
 })
 

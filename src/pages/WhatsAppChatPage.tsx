@@ -336,139 +336,273 @@ export default function WhatsAppChatPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [mediaPreview, setMediaPreview] = useState<WhatsAppMessage | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isFetchingChatsRef = useRef(false)
+  const isFetchingMessagesRef = useRef(false)
+  const chatsRef = useRef<WhatsAppChat[]>([])
+  const messagesRef = useRef<WhatsAppMessage[]>([])
+  const selectedChatIdRef = useRef<string | null>(null)
+  const messagesRequestTokenRef = useRef(0)
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
+
+  // Neste modo a tela é "fonte de verdade = Evolution".
+  // Persistir em Supabase exige `chat_id` UUID real. Como aqui usamos um `id` sintético,
+  // deixamos persistência desligada para não quebrar o carregamento (erro 22P02).
+  const persistToSupabase = false
 
   const instanceName = instance?.instanceName
 
+  useEffect(() => {
+    chatsRef.current = chats
+  }, [chats])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    selectedChatIdRef.current = selectedChat?.id || null
+    // Ao trocar de chat, limpar imediatamente para não mostrar histórico do chat anterior
+    setMessages([])
+    // Invalida respostas pendentes do chat anterior
+    messagesRequestTokenRef.current += 1
+  }, [selectedChat?.id])
+
   // Load chats
   const loadChats = useCallback(async () => {
-    if (!instanceName) return
+    if (!instanceName) {
+      setChats([])
+      setSelectedChat(null)
+      setMessages([])
+      setIsLoading(false)
+      return
+    }
+
+    if (isFetchingChatsRef.current) return
+    isFetchingChatsRef.current = true
     
     try {
-      // Sempre sincronizar com a Evolution (fonte de verdade) e persistir no banco.
-      // Depois, renderizar a partir do banco para manter consistência e cache.
-      try {
-        const apiResponse = await evolutionApi.findChats(instanceName)
-        const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
+      // Só mostrar spinner grande no primeiro carregamento
+      const shouldShowSpinner = chatsRef.current.length === 0
+      if (shouldShowSpinner) setIsLoading(true)
 
-        for (const apiChat of apiChats) {
-          // Evolution API retorna o JID em diferentes campos
-          // Prioridade: remoteJid > id (se contém @) > owner > jid
-          let remoteJid = ''
+      // Fonte de verdade: Evolution API (v2: POST /chat/findChats/{instance})
+      const apiResponse = await evolutionApi.findChats(instanceName)
+      const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
+      console.log('[WhatsAppChat] Evolution findChats:', { instanceName, count: apiChats.length })
 
-          if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
-            remoteJid = apiChat.remoteJid
-          } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
-            remoteJid = apiChat.id
-          } else if (apiChat.owner && apiChat.owner.includes('@')) {
-            remoteJid = apiChat.owner
-          } else if (apiChat.jid && apiChat.jid.includes('@')) {
-            remoteJid = apiChat.jid
-          } else if (apiChat.chatId && apiChat.chatId.includes('@')) {
-            remoteJid = apiChat.chatId
-          }
+      const nowIso = new Date().toISOString()
+      const mappedChats: WhatsAppChat[] = []
 
-          if (!remoteJid) continue
+      for (const apiChat of apiChats) {
+        let remoteJid = ''
 
-          // Get profile picture (best-effort)
-          let profilePicUrl = ''
-          try {
-            const profilePic = await evolutionApi.fetchProfilePictureUrl(instanceName, remoteJid)
-            profilePicUrl = profilePic.profilePictureUrl || ''
-          } catch (e) {
-            // ignore
-          }
+        if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
+          remoteJid = apiChat.remoteJid
+        } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
+          remoteJid = apiChat.id
+        } else if (apiChat.owner && apiChat.owner.includes('@')) {
+          remoteJid = apiChat.owner
+        } else if (apiChat.jid && apiChat.jid.includes('@')) {
+          remoteJid = apiChat.jid
+        } else if (apiChat.chatId && apiChat.chatId.includes('@')) {
+          remoteJid = apiChat.chatId
+        }
 
-          try {
-            await whatsappMessagesService.createOrUpdateChat({
+        if (!remoteJid) continue
+
+        const isGroup = remoteJid.includes('@g.us')
+        if (isGroup) continue
+
+        // Evitar chamadas lentas em massa: preferir URL vinda no próprio chat (quando existir)
+        const profilePicUrl = apiChat.profilePicUrl || apiChat.profilePictureUrl || ''
+
+        const chat: WhatsAppChat = {
+          id: `${instanceName}:${remoteJid}`,
+          church_id: 'evolution',
+          instance_name: instanceName,
+          remote_jid: remoteJid,
+          contact_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName || apiChat.name || apiChat.subject,
+          contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
+          profile_picture_url: profilePicUrl,
+          is_group: false,
+          unread_count: apiChat.unreadCount || apiChat.unread || 0,
+          last_message_at: apiChat.lastMessage?.messageTimestamp
+            ? new Date(apiChat.lastMessage.messageTimestamp * 1000).toISOString()
+            : undefined,
+          last_message_preview:
+            apiChat.lastMessage?.message?.conversation ||
+            apiChat.lastMessage?.message?.extendedTextMessage?.text ||
+            '',
+          is_archived: !!apiChat.archived,
+          is_pinned: !!apiChat.pinned,
+          created_at: nowIso,
+          updated_at: nowIso,
+        }
+
+        mappedChats.push(chat)
+
+        // Persistência opcional (desligada por padrão)
+        if (persistToSupabase) {
+          whatsappMessagesService
+            .createOrUpdateChat({
               instance_name: instanceName,
               remote_jid: remoteJid,
-              contact_name: apiChat.name || apiChat.subject || apiChat.pushName,
-              contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
-              profile_picture_url: profilePicUrl,
-              is_group: remoteJid.includes('@g.us')
+              contact_name: chat.contact_name,
+              contact_push_name: chat.contact_push_name,
+              profile_picture_url: chat.profile_picture_url,
+              is_group: false,
             })
-          } catch (chatError) {
-            console.log('Erro ao salvar chat:', chatError)
-          }
+            .catch((chatError) => {
+              console.log('Erro ao salvar chat:', chatError)
+            })
         }
-      } catch (apiError) {
-        console.log('Erro ao carregar chats da API:', apiError)
       }
 
-      const dbChats = await whatsappMessagesService.getChats(instanceName)
-      setChats(dbChats)
+      setChats(mappedChats)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
       toast.error('Erro ao carregar conversas')
     } finally {
       setIsLoading(false)
+      isFetchingChatsRef.current = false
     }
   }, [instanceName])
 
   // Load messages for selected chat
   const loadMessages = useCallback(async (chat: WhatsAppChat) => {
     if (!instanceName) return
+
+    const requestToken = messagesRequestTokenRef.current
+    isFetchingMessagesRef.current = true
+    // Se o chat mudou antes do start, não busca
+    if (selectedChatIdRef.current && selectedChatIdRef.current !== chat.id) {
+      isFetchingMessagesRef.current = false
+      return
+    }
     
     try {
-      // Sempre sincronizar mensagens da Evolution (fonte de verdade) e persistir.
-      // A função createMessage é idempotente (evita duplicados), então podemos chamar em polling.
-      try {
-        const apiResponse = await evolutionApi.findMessages(instanceName, {
-          where: {
-            key: {
-              remoteJid: chat.remote_jid
-            }
-          },
-          limit: 100
-        })
+      const apiResponse = await evolutionApi.findMessages(instanceName, {
+        where: {
+          key: {
+            remoteJid: chat.remote_jid
+          }
+        },
+        limit: 100
+      })
 
-        const apiMessages = Array.isArray(apiResponse)
-          ? apiResponse
-          : (apiResponse as any)?.messages || (apiResponse as any)?.data || []
+      const apiMessages = Array.isArray(apiResponse)
+        ? apiResponse
+        : (apiResponse as any)?.messages?.records || (apiResponse as any)?.messages || (apiResponse as any)?.data || []
 
-        if (Array.isArray(apiMessages)) {
-          for (const msg of apiMessages) {
-            if (!msg?.key?.id) continue
+      console.log('[WhatsAppChat] Evolution findMessages:', {
+        instanceName,
+        remoteJid: chat.remote_jid,
+        count: Array.isArray(apiMessages) ? apiMessages.length : 0
+      })
 
-            const messageType = getMessageType(msg)
-            const textContent = extractTextContent(msg)
+      const nowIso = new Date().toISOString()
+      const mappedMessages: WhatsAppMessage[] = []
 
-            await whatsappMessagesService.createMessage({
-              chat_id: chat.id,
-              instance_name: instanceName,
-              message_id: msg.key.id,
-              remote_jid: msg.key.remoteJid,
-              from_me: msg.key.fromMe,
-              sender_jid: msg.key.participant,
-              sender_name: msg.pushName,
-              message_type: messageType,
-              text_content: textContent,
-              caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption,
-              media_mimetype: msg.message?.imageMessage?.mimetype || msg.message?.audioMessage?.mimetype || msg.message?.videoMessage?.mimetype || msg.message?.documentMessage?.mimetype,
-              media_filename: msg.message?.documentMessage?.fileName,
-              message_timestamp: new Date((msg.messageTimestamp || Date.now() / 1000) * 1000).toISOString()
-            })
+      if (Array.isArray(apiMessages)) {
+        for (const msg of apiMessages) {
+          if (!msg?.key?.id) continue
+
+          const messageType = getMessageType(msg)
+          const textContent = extractTextContent(msg)
+          const timestampIso = new Date((msg.messageTimestamp || Date.now() / 1000) * 1000).toISOString()
+
+          const m: WhatsAppMessage = {
+            id: `${chat.id}:${msg.key.id}`,
+            church_id: 'evolution',
+            chat_id: chat.id,
+            instance_name: instanceName,
+            message_id: msg.key.id,
+            remote_jid: msg.key.remoteJid,
+            from_me: !!msg.key.fromMe,
+            sender_jid: msg.key.participant,
+            sender_name: msg.pushName,
+            message_type: messageType,
+            text_content: textContent,
+            caption: msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption,
+            media_url: undefined,
+            media_mimetype: msg.message?.imageMessage?.mimetype || msg.message?.audioMessage?.mimetype || msg.message?.videoMessage?.mimetype || msg.message?.documentMessage?.mimetype,
+            media_filename: msg.message?.documentMessage?.fileName,
+            media_base64: undefined,
+            thumbnail_base64: undefined,
+            latitude: undefined,
+            longitude: undefined,
+            location_name: undefined,
+            location_address: undefined,
+            vcard: undefined,
+            status: 'sent',
+            is_edited: false,
+            is_deleted: false,
+            is_forwarded: false,
+            quoted_message_id: undefined,
+            quoted_message_preview: undefined,
+            reaction_emoji: undefined,
+            reaction_to_message_id: undefined,
+            message_timestamp: timestampIso,
+            created_at: nowIso,
+            updated_at: nowIso,
+          }
+
+          mappedMessages.push(m)
+
+          // Persistência opcional (desligada por padrão)
+          if (persistToSupabase) {
+            whatsappMessagesService
+              .createMessage({
+                chat_id: chat.id,
+                instance_name: instanceName,
+                message_id: msg.key.id,
+                remote_jid: msg.key.remoteJid,
+                from_me: !!msg.key.fromMe,
+                sender_jid: msg.key.participant,
+                sender_name: msg.pushName,
+                message_type: messageType,
+                text_content: textContent,
+                caption: m.caption,
+                media_mimetype: m.media_mimetype,
+                media_filename: m.media_filename,
+                message_timestamp: timestampIso,
+              })
+              .catch(() => {})
           }
         }
-      } catch (apiError) {
-        console.log('Não foi possível sincronizar mensagens da API:', apiError)
       }
 
-      const dbMessages = await whatsappMessagesService.getMessages(chat.id)
-      setMessages(dbMessages)
-      
-      // Mark as read
-      await whatsappMessagesService.updateChatUnreadCount(chat.id, 0)
-      
-      // Scroll to bottom
+      // Só aplicar resultado se ainda estivermos no mesmo chat e a requisição não foi invalidada
+      if (requestToken !== messagesRequestTokenRef.current) return
+      if (selectedChatIdRef.current !== chat.id) return
+
+      // Mesclar apenas dentro do MESMO chat (para evitar piscar após envio)
+      const existing = messagesRef.current
+      const byId = new Map<string, WhatsAppMessage>()
+      for (const m of existing) byId.set(m.id, m)
+      for (const m of mappedMessages) byId.set(m.id, m)
+      const merged = Array.from(byId.values()).sort((a, b) => {
+        return new Date(a.message_timestamp).getTime() - new Date(b.message_timestamp).getTime()
+      })
+      setMessages(merged)
+
+      if (persistToSupabase) {
+        await whatsappMessagesService.updateChatUnreadCount(chat.id, 0)
+      }
+
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error)
+    } finally {
+      isFetchingMessagesRef.current = false
     }
   }, [instanceName])
 
@@ -499,31 +633,66 @@ export default function WhatsAppChatPage() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat || !instanceName) return
     
+    const textToSend = newMessage.trim()
+
     console.log('[WhatsAppChat] Sending message to:', selectedChat.remote_jid)
     console.log('[WhatsAppChat] Selected chat:', selectedChat)
+
+    // UX: limpar imediatamente
+    setNewMessage('')
+
+    // Mensagem otimista
+    const nowIso = new Date().toISOString()
+    const optimisticId = `local_${Date.now()}`
+    const optimisticMsg: WhatsAppMessage = {
+      id: `${selectedChat.id}:${optimisticId}`,
+      church_id: 'evolution',
+      chat_id: selectedChat.id,
+      instance_name: instanceName,
+      message_id: optimisticId,
+      remote_jid: selectedChat.remote_jid,
+      from_me: true,
+      sender_jid: undefined,
+      sender_name: undefined,
+      message_type: 'text',
+      text_content: textToSend,
+      caption: undefined,
+      media_url: undefined,
+      media_mimetype: undefined,
+      media_filename: undefined,
+      media_size: undefined,
+      media_duration: undefined,
+      media_base64: undefined,
+      thumbnail_base64: undefined,
+      latitude: undefined,
+      longitude: undefined,
+      location_name: undefined,
+      location_address: undefined,
+      vcard: undefined,
+      status: 'sent',
+      is_edited: false,
+      is_deleted: false,
+      is_forwarded: false,
+      quoted_message_id: undefined,
+      quoted_message_preview: undefined,
+      reaction_emoji: undefined,
+      reaction_to_message_id: undefined,
+      message_timestamp: nowIso,
+      created_at: nowIso,
+      updated_at: nowIso,
+    }
+    setMessages(prev => [...prev, optimisticMsg])
     
     setIsSending(true)
     try {
       // Send via Evolution API - use remote_jid directly (already in correct format)
-      const result = await evolutionApi.sendText(instanceName, {
+      await evolutionApi.sendText(instanceName, {
         number: selectedChat.remote_jid,
-        text: newMessage
+        text: textToSend
       })
-      
-      // Save to database
-      const savedMessage = await whatsappMessagesService.createMessage({
-        chat_id: selectedChat.id,
-        instance_name: instanceName,
-        message_id: result.key?.id || `local_${Date.now()}`,
-        remote_jid: selectedChat.remote_jid,
-        from_me: true,
-        message_type: 'text',
-        text_content: newMessage,
-        message_timestamp: new Date().toISOString()
-      })
-      
-      setMessages(prev => [...prev, savedMessage])
-      setNewMessage('')
+
+      // Atualizar histórico a partir da Evolution (sem depender de Supabase)
+      await loadMessages(selectedChat)
       
       // Scroll to bottom
       setTimeout(() => {
@@ -532,51 +701,6 @@ export default function WhatsAppChatPage() {
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error)
       toast.error('Erro ao enviar mensagem')
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  // Send media
-  const handleSendMedia = async (file: File, type: 'image' | 'video' | 'document' | 'audio') => {
-    if (!selectedChat || !instanceName) return
-    
-    setIsSending(true)
-    try {
-      // Convert to base64
-      const base64 = await fileToBase64(file)
-      
-      // Send via Evolution API
-      const result = await evolutionApi.sendMedia(instanceName, {
-        number: selectedChat.remote_jid,
-        mediatype: type,
-        mimetype: file.type,
-        fileName: file.name,
-        media: base64
-      })
-      
-      // Save to database
-      const savedMessage = await whatsappMessagesService.createMessage({
-        chat_id: selectedChat.id,
-        instance_name: instanceName,
-        message_id: result.key?.id || `local_${Date.now()}`,
-        remote_jid: selectedChat.remote_jid,
-        from_me: true,
-        message_type: type,
-        media_mimetype: file.type,
-        media_filename: file.name,
-        media_size: file.size,
-        media_base64: base64.split(',')[1],
-        message_timestamp: new Date().toISOString()
-      })
-      
-      setMessages(prev => [...prev, savedMessage])
-      setShowAttachMenu(false)
-      
-      toast.success('Mídia enviada com sucesso!')
-    } catch (error) {
-      console.error('Erro ao enviar mídia:', error)
-      toast.error('Erro ao enviar mídia')
     } finally {
       setIsSending(false)
     }
@@ -591,16 +715,98 @@ export default function WhatsAppChatPage() {
     })
   }
 
+  // Send media
+  const handleSendMedia = async (file: File, type: 'image' | 'video' | 'document' | 'audio') => {
+    if (!selectedChat || !instanceName) return
+
+    setIsSending(true)
+    try {
+      const base64DataUrl = await fileToBase64(file)
+
+      if (type === 'audio') {
+        await evolutionApi.sendAudio(instanceName, {
+          number: selectedChat.remote_jid,
+          audio: base64DataUrl,
+          encoding: true,
+        })
+      } else {
+        await evolutionApi.sendMedia(instanceName, {
+          number: selectedChat.remote_jid,
+          mediatype: type,
+          mimetype: file.type,
+          fileName: file.name,
+          media: base64DataUrl,
+        })
+      }
+
+      await loadMessages(selectedChat)
+      setShowAttachMenu(false)
+      toast.success('Mídia enviada com sucesso!')
+
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (error) {
+      console.error('Erro ao enviar mídia:', error)
+      toast.error('Erro ao enviar mídia')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
+
     let type: 'image' | 'video' | 'document' | 'audio' = 'document'
     if (file.type.startsWith('image/')) type = 'image'
     else if (file.type.startsWith('video/')) type = 'video'
     else if (file.type.startsWith('audio/')) type = 'audio'
-    
+
     handleSendMedia(file, type)
+    e.target.value = ''
+  }
+
+  const handleToggleRecording = async () => {
+    if (!selectedChat || !instanceName) return
+
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (evt) => {
+        if (evt.data && evt.data.size > 0) {
+          audioChunksRef.current.push(evt.data)
+        }
+      }
+
+      recorder.onstop = async () => {
+        setIsRecording(false)
+        stream.getTracks().forEach((t) => t.stop())
+
+        try {
+          const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+          const file = new File([blob], `audio_${Date.now()}.webm`, { type: blob.type })
+          await handleSendMedia(file, 'audio')
+        } catch (err) {
+          console.error('Erro ao enviar áudio gravado:', err)
+          toast.error('Erro ao enviar áudio')
+        }
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Erro ao acessar microfone:', err)
+      toast.error('Permita acesso ao microfone para gravar áudio')
+    }
   }
 
   // Effects
@@ -613,7 +819,7 @@ export default function WhatsAppChatPage() {
     if (!instanceName) return
     const interval = setInterval(() => {
       loadChats()
-    }, 10000)
+    }, 30000)
     return () => clearInterval(interval)
   }, [instanceName, loadChats])
 
@@ -835,8 +1041,12 @@ export default function WhatsAppChatPage() {
                     <Send className="w-6 h-6" />
                   </button>
                 ) : (
-                  <button className="p-2 hover:bg-gray-200 rounded-full">
-                    <Mic className="w-6 h-6 text-gray-600" />
+                  <button
+                    onClick={handleToggleRecording}
+                    disabled={isSending}
+                    className={`p-2 rounded-full ${isRecording ? 'bg-red-100 hover:bg-red-200' : 'hover:bg-gray-200'} disabled:opacity-50`}
+                  >
+                    <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-gray-600'}`} />
                   </button>
                 )}
               </div>

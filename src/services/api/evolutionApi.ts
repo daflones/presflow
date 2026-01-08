@@ -168,17 +168,27 @@ class EvolutionApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
     const url = `${this.baseUrl}${cleanEndpoint}`
+
+    const controller = new AbortController()
+    const timeoutMs = 15000
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
     
-    const response = await fetch(url, {
-      ...options,
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.apiKey ? { apikey: this.apiKey } : {}),
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    })
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...options,
+        mode: 'cors',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.apiKey ? { apikey: this.apiKey } : {}),
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
 
     if (!response.ok) {
       const error = await response.text()
@@ -187,6 +197,15 @@ class EvolutionApiService {
     }
 
     return response.json()
+  }
+
+  private normalizeBase64(input: string): string {
+    if (!input) return input
+    // Accept both pure base64 and Data URL formats
+    if (input.startsWith('data:') && input.includes(',')) {
+      return input.split(',')[1] || ''
+    }
+    return input
   }
 
   // =====================================================
@@ -232,7 +251,7 @@ class EvolutionApiService {
         mimetype: options.mimetype,
         caption: options.caption || '',
         fileName: options.fileName,
-        media: options.media,
+        media: this.normalizeBase64(options.media),
         delay: options.delay || 1200
       })
     })
@@ -247,7 +266,7 @@ class EvolutionApiService {
       method: 'POST',
       body: JSON.stringify({
         number: this.formatNumber(options.number),
-        audio: options.audio,
+        audio: this.normalizeBase64(options.audio),
         delay: options.delay || 1200,
         encoding: options.encoding !== false
       })

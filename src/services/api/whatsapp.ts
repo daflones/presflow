@@ -339,7 +339,43 @@ class WhatsAppService {
     instanceId: string | null
     connectedAt: string | null
   } | null> {
-    // Primeiro tentar localStorage
+    // Preferir banco de dados como fonte de verdade (suporta troca de browser/dispositivo)
+    try {
+      const { whatsappDbService } = await import('../supabase')
+      const dbInstance = await whatsappDbService.getInstance()
+      
+      if (dbInstance && dbInstance.instance_name) {
+        // Se possível, verificar status real na Evolution
+        let resolvedStatus: any = 'open'
+        let resolvedInstanceId = ''
+        try {
+          const evo = await this.getInstanceByName(dbInstance.instance_name)
+          if (evo) {
+            resolvedStatus = evo.status || resolvedStatus
+            resolvedInstanceId = evo.instanceId || resolvedInstanceId
+          }
+        } catch (e) {
+          // Ignorar erro e seguir com o que temos no banco
+        }
+
+        await this.saveInstanceToProfile({
+          instanceName: dbInstance.instance_name,
+          instanceId: resolvedInstanceId,
+          status: resolvedStatus,
+        })
+
+        return {
+          instanceName: dbInstance.instance_name,
+          status: resolvedStatus,
+          instanceId: resolvedInstanceId,
+          connectedAt: dbInstance.connected_at || null
+        }
+      }
+    } catch (error) {
+      console.error('[WhatsApp] Erro ao buscar instância do banco:', error)
+    }
+
+    // Fallback: tentar localStorage (cache)
     const existingData = localStorage.getItem('whatsapp_instance')
     if (existingData) {
       const instances = JSON.parse(existingData)
@@ -353,31 +389,7 @@ class WhatsAppService {
         }
       }
     }
-    
-    // Se não encontrou no localStorage, buscar no banco de dados
-    try {
-      const { whatsappDbService } = await import('../supabase')
-      const dbInstance = await whatsappDbService.getInstance()
-      
-      if (dbInstance && dbInstance.instance_name) {
-        // Salvar no localStorage para próximas consultas
-        await this.saveInstanceToProfile({
-          instanceName: dbInstance.instance_name,
-          instanceId: '', // Não temos instance_id no banco
-          status: 'open' // Assumir conectado se está no banco
-        })
-        
-        return {
-          instanceName: dbInstance.instance_name,
-          status: 'open',
-          instanceId: '',
-          connectedAt: dbInstance.connected_at || null
-        }
-      }
-    } catch (error) {
-      console.error('[WhatsApp] Erro ao buscar instância do banco:', error)
-    }
-    
+
     return null
   }
 
