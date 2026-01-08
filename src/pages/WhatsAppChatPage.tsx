@@ -458,10 +458,13 @@ export default function WhatsAppChatPage() {
   const [drawColor, setDrawColor] = useState('#16a34a')
   const [drawSize, setDrawSize] = useState(4)
   const [textToAdd, setTextToAdd] = useState('')
+  const [textBoxPos, setTextBoxPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.1 })
+  const [isDraggingText, setIsDraggingText] = useState(false)
   const [editedImageFile, setEditedImageFile] = useState<File | null>(null)
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const drawCtxRef = useRef<CanvasRenderingContext2D | null>(null)
   const isDrawingRef = useRef(false)
+  const editorStageRef = useRef<HTMLDivElement | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -500,6 +503,7 @@ export default function WhatsAppChatPage() {
     setZoom(1)
     setCroppedAreaPixels(null)
     setTextToAdd('')
+    setTextBoxPos({ x: 0.5, y: 0.1 })
     return () => URL.revokeObjectURL(url)
   }, [pendingMedia])
 
@@ -515,6 +519,53 @@ export default function WhatsAppChatPage() {
     ctx.lineCap = 'round'
   }, [isImageEditing, imageEditorMode])
 
+  useEffect(() => {
+    if (!isImageEditing) return
+    const stage = editorStageRef.current
+    const canvas = drawCanvasRef.current
+    if (!stage || !canvas) return
+
+    const resize = () => {
+      const rect = stage.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const nextW = Math.max(1, Math.floor(rect.width * dpr))
+      const nextH = Math.max(1, Math.floor(rect.height * dpr))
+      if (canvas.width === nextW && canvas.height === nextH) return
+
+      // preservar desenho atual
+      const prev = document.createElement('canvas')
+      prev.width = canvas.width
+      prev.height = canvas.height
+      const prevCtx = prev.getContext('2d')
+      if (prevCtx) prevCtx.drawImage(canvas, 0, 0)
+
+      canvas.width = nextW
+      canvas.height = nextH
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      drawCtxRef.current = ctx
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+
+      // reescalar o desenho anterior
+      if (prev.width > 0 && prev.height > 0) {
+        ctx.drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, canvas.width, canvas.height)
+      }
+    }
+
+    resize()
+
+    const ro = new ResizeObserver(() => resize())
+    ro.observe(stage)
+    window.addEventListener('resize', resize)
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', resize)
+    }
+  }, [isImageEditing])
+
   const clearDrawLayer = () => {
     const canvas = drawCanvasRef.current
     const ctx = drawCtxRef.current
@@ -525,8 +576,10 @@ export default function WhatsAppChatPage() {
   const getPoint = (evt: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = evt.currentTarget
     const rect = canvas.getBoundingClientRect()
-    const x = evt.clientX - rect.left
-    const y = evt.clientY - rect.top
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const x = (evt.clientX - rect.left) * scaleX
+    const y = (evt.clientY - rect.top) * scaleY
     return { x, y }
   }
 
@@ -534,6 +587,7 @@ export default function WhatsAppChatPage() {
     const ctx = drawCtxRef.current
     if (!ctx) return
     isDrawingRef.current = true
+    evt.currentTarget.setPointerCapture(evt.pointerId)
     const { x, y } = getPoint(evt)
     ctx.strokeStyle = drawColor
     ctx.lineWidth = drawSize
@@ -552,6 +606,29 @@ export default function WhatsAppChatPage() {
 
   const handleDrawPointerUp = () => {
     isDrawingRef.current = false
+  }
+
+  const handleTextPointerDown = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (imageEditorMode !== 'text') return
+    setIsDraggingText(true)
+    evt.currentTarget.setPointerCapture(evt.pointerId)
+  }
+
+  const handleTextPointerMove = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingText) return
+    const stage = editorStageRef.current
+    if (!stage) return
+    const rect = stage.getBoundingClientRect()
+    const x = (evt.clientX - rect.left) / rect.width
+    const y = (evt.clientY - rect.top) / rect.height
+    setTextBoxPos({
+      x: Math.min(0.95, Math.max(0.05, x)),
+      y: Math.min(0.95, Math.max(0.05, y)),
+    })
+  }
+
+  const handleTextPointerUp = () => {
+    setIsDraggingText(false)
   }
 
   useEffect(() => {
@@ -1109,7 +1186,7 @@ export default function WhatsAppChatPage() {
     // Aplicar camada de desenho (se existir)
     const drawCanvas = drawCanvasRef.current
     if (drawCanvas) {
-      ctx.drawImage(drawCanvas, 0, 0, canvas.width, canvas.height)
+      ctx.drawImage(drawCanvas, 0, 0, drawCanvas.width, drawCanvas.height, 0, 0, canvas.width, canvas.height)
     }
 
     // Se existe overlay salvo em dataURL, aplicar
@@ -1121,15 +1198,17 @@ export default function WhatsAppChatPage() {
       ctx.lineWidth = 4
       ctx.textBaseline = 'middle'
       ctx.textAlign = 'center'
-      ctx.strokeText(textToAdd.trim(), canvas.width / 2, canvas.height * 0.1)
-      ctx.fillText(textToAdd.trim(), canvas.width / 2, canvas.height * 0.1)
+      const tx = canvas.width * textBoxPos.x
+      const ty = canvas.height * textBoxPos.y
+      ctx.strokeText(textToAdd.trim(), tx, ty)
+      ctx.fillText(textToAdd.trim(), tx, ty)
     }
 
     const out = canvas.toDataURL('image/jpeg', 0.92)
     const newFile = await dataUrlToFile(out, pendingMedia.file.name.replace(/\.[^/.]+$/, '') + '_edit.jpg')
     setEditedImageFile(newFile)
     setIsImageEditing(false)
-  }, [pendingMedia, imageEditorSrc, croppedAreaPixels, textToAdd])
+  }, [pendingMedia, imageEditorSrc, croppedAreaPixels, textToAdd, textBoxPos])
 
   const handleToggleRecording = async () => {
     if (!selectedChat || !instanceName) return
@@ -1598,7 +1677,7 @@ export default function WhatsAppChatPage() {
                       </div>
                     </div>
 
-                    <div className="relative w-full h-[50vh] bg-black/10 rounded overflow-hidden">
+                    <div ref={editorStageRef} className="relative w-full h-[50vh] bg-black/10 rounded overflow-hidden">
                       <Cropper
                         image={imageEditorSrc}
                         crop={crop}
@@ -1614,8 +1693,6 @@ export default function WhatsAppChatPage() {
                       {imageEditorMode === 'draw' && (
                         <canvas
                           ref={drawCanvasRef}
-                          width={1000}
-                          height={1000}
                           className="absolute inset-0 w-full h-full touch-none"
                           onPointerDown={handleDrawPointerDown}
                           onPointerMove={handleDrawPointerMove}
@@ -1623,6 +1700,34 @@ export default function WhatsAppChatPage() {
                           onPointerCancel={handleDrawPointerUp}
                           onPointerLeave={handleDrawPointerUp}
                         />
+                      )}
+                      {imageEditorMode === 'text' && (
+                        <div
+                          className="absolute left-0 top-0 w-full h-full"
+                          onPointerMove={handleTextPointerMove}
+                          onPointerUp={handleTextPointerUp}
+                          onPointerCancel={handleTextPointerUp}
+                          onPointerLeave={handleTextPointerUp}
+                        >
+                          <div
+                            onPointerDown={handleTextPointerDown}
+                            className="absolute px-2 py-1 rounded bg-black/40 text-white border border-white/30 cursor-move select-none"
+                            style={{
+                              left: `${textBoxPos.x * 100}%`,
+                              top: `${textBoxPos.y * 100}%`,
+                              transform: 'translate(-50%, -50%)',
+                              maxWidth: '90%',
+                            }}
+                            title="Arraste para mover"
+                          >
+                            <input
+                              value={textToAdd}
+                              onChange={(e) => setTextToAdd(e.target.value)}
+                              placeholder="Digite..."
+                              className="bg-transparent outline-none text-sm w-[220px] max-w-[80vw]"
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
 
@@ -1659,13 +1764,8 @@ export default function WhatsAppChatPage() {
                     )}
 
                     {imageEditorMode === 'text' && (
-                      <div className="mt-3">
-                        <input
-                          value={textToAdd}
-                          onChange={(e) => setTextToAdd(e.target.value)}
-                          placeholder="Texto na imagem (opcional)"
-                          className="w-full px-3 py-2 border rounded"
-                        />
+                      <div className="mt-3 text-sm text-gray-600">
+                        Arraste a caixa de texto na imagem para posicionar.
                       </div>
                     )}
                   </div>
