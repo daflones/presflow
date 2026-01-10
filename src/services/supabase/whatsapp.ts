@@ -22,6 +22,9 @@ export const whatsappDbService = {
     // Identificar igreja do usuário logado
     // Preferir o vínculo do perfil (users.church_id) para suportar usuários que não são owner.
     const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
     let churchId: string | null = profile?.church_id || null;
 
     // Fallback: caso não exista perfil/vínculo, tentar por owner_id.
@@ -120,6 +123,9 @@ export const whatsappDbService = {
 
     // Identificar igreja do usuário logado
     const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
     let churchId: string | null = profile?.church_id || null;
 
     // Fallback: tentar por owner_id

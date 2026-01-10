@@ -1,23 +1,16 @@
 import { supabase } from '../../lib/supabase';
 import type { Conversation, Message } from '../../types/database';
+import { getUserData } from '../../lib/user';
 
 export const conversationsService = {
   async getAll(): Promise<Conversation[]> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return [];
-
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) return [];
+    const profile = await getUserData();
+    if (!profile?.church_id) return [];
 
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
-      .eq('church_id', church.id)
+      .eq('church_id', profile.church_id)
       .order('last_message_at', { ascending: false });
 
     if (error) throw error;
@@ -53,16 +46,8 @@ export const conversationsService = {
     source?: 'whatsapp' | 'instagram';
     whatsapp_instance_id?: string;
   }): Promise<Conversation> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Usuário não autenticado');
-
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) throw new Error('Igreja não encontrada');
+    const profile = await getUserData();
+    if (!profile?.church_id) throw new Error('Igreja não encontrada');
 
     // Verificar se já existe
     const existing = await this.getByRemoteJid(input.remote_jid);
@@ -86,7 +71,7 @@ export const conversationsService = {
     const { data, error } = await supabase
       .from('conversations')
       .insert({
-        church_id: church.id,
+        church_id: profile.church_id,
         remote_jid: input.remote_jid,
         contact_name: input.contact_name,
         contact_phone: input.contact_phone,

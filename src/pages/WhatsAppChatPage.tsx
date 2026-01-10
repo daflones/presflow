@@ -30,6 +30,7 @@ import { whatsappMessagesService } from '../services/supabase/whatsappMessages'
 import type { WhatsAppChat, WhatsAppMessage } from '../services/supabase/whatsappMessages'
 import { useWhatsAppInstance } from '../hooks/useWhatsApp'
 import { toast } from 'sonner'
+import { useAuth } from '../contexts/AuthContext'
 
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -434,6 +435,7 @@ function ChatListItem({
 export default function WhatsAppChatPage() {
   const navigate = useNavigate()
   const { data: instance } = useWhatsAppInstance()
+  const { canSendWhatsapp } = useAuth()
   
   const [chats, setChats] = useState<WhatsAppChat[]>([])
   const [selectedChat, setSelectedChat] = useState<WhatsAppChat | null>(null)
@@ -1028,6 +1030,10 @@ export default function WhatsAppChatPage() {
 
   // Send message
   const handleSendMessage = async () => {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização')
+      return
+    }
     if (!newMessage.trim() || !selectedChat || !instanceName) return
     
     const textToSend = newMessage.trim()
@@ -1114,6 +1120,10 @@ export default function WhatsAppChatPage() {
 
   // Send media
   const handleSendMedia = async (file: File, type: 'image' | 'video' | 'document' | 'audio') => {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização')
+      return
+    }
     if (!selectedChat || !instanceName) return
 
     setIsSending(true)
@@ -1154,6 +1164,10 @@ export default function WhatsAppChatPage() {
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização')
+      return
+    }
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -1269,6 +1283,10 @@ export default function WhatsAppChatPage() {
   }, [pendingMedia, imageWorkingSrc, textToAdd, textBoxPos])
 
   const handleToggleRecording = async () => {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização')
+      return
+    }
     if (!selectedChat || !instanceName) return
 
     if (isRecording) {
@@ -1502,116 +1520,129 @@ export default function WhatsAppChatPage() {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-gray-50 border-t">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowAttachMenu(!showAttachMenu)}
-                    className="p-2 hover:bg-gray-200 rounded-full"
-                  >
-                    <Paperclip className="w-6 h-6 text-gray-600" />
-                  </button>
-                  
-                  {showAttachMenu && (
-                    <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg p-2 flex flex-col gap-1">
-                      <button 
-                        onClick={() => {
-                          fileInputRef.current?.click()
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
+            {canSendWhatsapp ? (
+              <div className="p-4 bg-gray-50 border-t">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAttachMenu(!showAttachMenu)}
+                      className="p-2 hover:bg-gray-200 rounded-full"
+                    >
+                      <Paperclip className="w-6 h-6 text-gray-600" />
+                    </button>
+
+                    {showAttachMenu && (
+                      <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg p-2 flex flex-col gap-1">
+                        <button
+                          onClick={() => {
+                            fileInputRef.current?.click()
+                            setShowAttachMenu(false)
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
+                        >
+                          <ImageIcon className="w-5 h-5 text-purple-500" />
+                          <span>Imagem</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            fileInputRef.current?.click()
+                            setShowAttachMenu(false)
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
+                        >
+                          <Camera className="w-5 h-5 text-pink-500" />
+                          <span>Vídeo</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            fileInputRef.current?.click()
+                            setShowAttachMenu(false)
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
+                        >
+                          <FileText className="w-5 h-5 text-blue-500" />
+                          <span>Documento</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  />
+
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder={'Digite uma mensagem...'}
+                    className="flex-1 px-4 py-2 bg-white border rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+
+                  {newMessage.trim() ? (
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={isSending}
+                      className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 disabled:opacity-50"
+                    >
+                      <Send className="w-6 h-6" />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {isRecording && (
+                        <span className="text-xs text-gray-600 tabular-nums">{formatDuration(recordingSeconds)}</span>
+                      )}
+                      {isRecording && (
+                        <button
+                          onClick={handlePauseResumeRecording}
+                          disabled={isSending}
+                          className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                          title={isRecordingPaused ? 'Retomar' : 'Pausar'}
+                        >
+                          {isRecordingPaused ? (
+                            <Play className="w-5 h-5 text-gray-600" />
+                          ) : (
+                            <Pause className="w-5 h-5 text-gray-600" />
+                          )}
+                        </button>
+                      )}
+                      {isRecording && (
+                        <button
+                          onClick={handleCancelRecording}
+                          disabled={isSending}
+                          className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                          title="Cancelar"
+                        >
+                          <Square className="w-5 h-5 text-gray-600" />
+                        </button>
+                      )}
+                      <button
+                        onClick={handleToggleRecording}
+                        disabled={isSending}
+                        className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
+                        title={isRecording ? 'Enviar áudio' : 'Gravar áudio'}
                       >
-                        <ImageIcon className="w-5 h-5 text-purple-500" />
-                        <span>Imagem</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          fileInputRef.current?.click()
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
-                      >
-                        <Camera className="w-5 h-5 text-pink-500" />
-                        <span>Vídeo</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          fileInputRef.current?.click()
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 rounded-lg"
-                      >
-                        <FileText className="w-5 h-5 text-blue-500" />
-                        <span>Documento</span>
+                        {isRecording ? (
+                          <Send className="w-6 h-6 text-green-600" />
+                        ) : (
+                          <Mic className="w-6 h-6 text-gray-600" />
+                        )}
                       </button>
                     </div>
                   )}
                 </div>
-                
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
-                />
-
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Digite uma mensagem..."
-                  className="flex-1 px-4 py-2 bg-white border rounded-full focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-
-                {newMessage.trim() ? (
-                  <button 
-                    onClick={handleSendMessage}
-                    disabled={isSending}
-                    className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 disabled:opacity-50"
-                  >
-                    <Send className="w-6 h-6" />
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {isRecording && (
-                      <span className="text-xs text-gray-600 tabular-nums">{formatDuration(recordingSeconds)}</span>
-                    )}
-                    {isRecording && (
-                      <button
-                        onClick={handlePauseResumeRecording}
-                        disabled={isSending}
-                        className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title={isRecordingPaused ? 'Retomar' : 'Pausar'}
-                      >
-                        {isRecordingPaused ? <Play className="w-5 h-5 text-gray-600" /> : <Pause className="w-5 h-5 text-gray-600" />}
-                      </button>
-                    )}
-                    {isRecording && (
-                      <button
-                        onClick={handleCancelRecording}
-                        disabled={isSending}
-                        className="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                        title="Cancelar"
-                      >
-                        <Square className="w-5 h-5 text-gray-600" />
-                      </button>
-                    )}
-                    <button
-                      onClick={handleToggleRecording}
-                      disabled={isSending}
-                      className={`p-2 rounded-full ${isRecording ? 'bg-red-100 hover:bg-red-200' : 'hover:bg-gray-200'} disabled:opacity-50`}
-                      title={isRecording ? 'Enviar áudio (parar gravação)' : 'Gravar áudio'}
-                    >
-                      <Mic className={`w-6 h-6 ${isRecording ? 'text-red-600' : 'text-gray-600'}`} />
-                    </button>
-                  </div>
-                )}
               </div>
-            </div>
+            ) : null}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-64 h-64 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
+              <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Phone className="w-24 h-24 text-gray-400" />
               </div>
               <h3 className="text-xl font-medium text-gray-700 mb-2">WhatsApp Web</h3>
@@ -1621,36 +1652,37 @@ export default function WhatsAppChatPage() {
         )}
       </div>
 
-      {/* Media Preview Modal */}
       {mediaPreview && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
           onClick={() => setMediaPreview(null)}
         >
-          <button 
+          <button
             className="absolute top-4 right-4 p-2 text-white hover:bg-white/20 rounded-full"
             onClick={() => setMediaPreview(null)}
           >
             <X className="w-8 h-8" />
           </button>
-          
+
           {mediaPreview.message_type === 'image' && (
-            <img 
-              src={mediaPreview.media_base64 
-                ? `data:${mediaPreview.media_mimetype};base64,${mediaPreview.media_base64}`
-                : mediaPreview.media_url || ''
+            <img
+              src={
+                mediaPreview.media_base64
+                  ? `data:${mediaPreview.media_mimetype};base64,${mediaPreview.media_base64}`
+                  : mediaPreview.media_url || ''
               }
               alt=""
               className="max-w-[90vw] max-h-[90vh] object-contain"
               onClick={(e) => e.stopPropagation()}
             />
           )}
-          
+
           {mediaPreview.message_type === 'video' && (
-            <video 
-              src={mediaPreview.media_base64 
-                ? `data:${mediaPreview.media_mimetype};base64,${mediaPreview.media_base64}`
-                : mediaPreview.media_url || ''
+            <video
+              src={
+                mediaPreview.media_base64
+                  ? `data:${mediaPreview.media_mimetype};base64,${mediaPreview.media_base64}`
+                  : mediaPreview.media_url || ''
               }
               controls
               autoPlay
@@ -1658,11 +1690,9 @@ export default function WhatsAppChatPage() {
               onClick={(e) => e.stopPropagation()}
             />
           )}
+
           {(mediaPreview.message_type === 'document' || mediaPreview.message_type === 'audio') && (
-            <div
-              className="bg-white rounded-lg p-6 max-w-[90vw]"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="bg-white rounded-lg p-6 max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-medium truncate">{mediaPreview.media_filename || 'Arquivo'}</p>

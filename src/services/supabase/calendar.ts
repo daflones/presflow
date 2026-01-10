@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { CalendarEvent } from '../../types/database';
+import { getUserData } from '../../lib/user';
 
 export type CreateEventInput = {
   title: string;
@@ -18,21 +19,13 @@ export type UpdateEventInput = Partial<CreateEventInput>;
 
 export const calendarService = {
   async getAll(): Promise<CalendarEvent[]> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return [];
-
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) return [];
+    const profile = await getUserData();
+    if (!profile?.church_id) return [];
 
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .eq('church_id', church.id)
+      .eq('church_id', profile.church_id)
       .order('start_at', { ascending: true });
 
     if (error) throw error;
@@ -51,21 +44,13 @@ export const calendarService = {
   },
 
   async getByDateRange(startDate: string, endDate: string): Promise<CalendarEvent[]> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return [];
-
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) return [];
+    const profile = await getUserData();
+    if (!profile?.church_id) return [];
 
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .eq('church_id', church.id)
+      .eq('church_id', profile.church_id)
       .gte('start_at', startDate)
       .lte('start_at', endDate)
       .order('start_at', { ascending: true });
@@ -75,22 +60,17 @@ export const calendarService = {
   },
 
   async create(input: CreateEventInput): Promise<CalendarEvent> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Usuário não autenticado');
-
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) throw new Error('Igreja não encontrada');
+    const profile = await getUserData();
+    if (!profile?.church_id) throw new Error('Igreja não encontrada');
+    if (String(profile.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
 
     const { data, error } = await supabase
       .from('calendar_events')
       .insert({
-        church_id: church.id,
-        created_by: userData.user.id,
+        church_id: profile.church_id,
+        created_by: profile.auth_id,
         title: input.title,
         description: input.description,
         location: input.location,
@@ -112,6 +92,11 @@ export const calendarService = {
   },
 
   async update(id: string, input: UpdateEventInput): Promise<CalendarEvent> {
+    const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
+
     const { data, error } = await supabase
       .from('calendar_events')
       .update({
@@ -127,6 +112,11 @@ export const calendarService = {
   },
 
   async delete(id: string): Promise<void> {
+    const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
+
     const { error } = await supabase
       .from('calendar_events')
       .delete()

@@ -11,6 +11,10 @@ export interface UserProfile {
 
 let userProfileCache: UserProfile | null = null;
 
+export function clearUserDataCache() {
+  userProfileCache = null;
+}
+
 export async function getUserData(): Promise<UserProfile | null> {
   if (userProfileCache) {
     return userProfileCache;
@@ -20,6 +24,27 @@ export async function getUserData(): Promise<UserProfile | null> {
 
   if (!user) {
     return null;
+  }
+
+  // Tentar buscar perfil do funcionário em public.users (se existir)
+  const { data: employeeProfile, error: employeeError } = await supabase
+    .from('users')
+    .select('id,auth_id,church_id,name,email,role')
+    .eq('auth_id', user.id)
+    .maybeSingle();
+
+  if (!employeeError && employeeProfile?.church_id) {
+    const profile: UserProfile = {
+      id: employeeProfile.id,
+      auth_id: employeeProfile.auth_id,
+      church_id: employeeProfile.church_id,
+      name: employeeProfile.name || '',
+      email: employeeProfile.email || user.email || '',
+      role: employeeProfile.role || '',
+    };
+
+    userProfileCache = profile;
+    return profile;
   }
 
   // Este projeto não possui tabela `public.users` no Supabase.

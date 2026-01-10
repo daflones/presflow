@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { MessageSquare, Send, ChevronDown, Phone, Search, RefreshCw, Image, Mic, FileText, Download } from 'lucide-react';
 import { whatsappDbService } from '../services/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 
 type MessageContent = {
   conversation?: string;
@@ -188,6 +190,7 @@ function MediaRenderer({
 }
 
 export function ConversationsPage() {
+  const { canSendWhatsapp } = useAuth();
   const [instances, setInstances] = useState<Instance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -380,6 +383,10 @@ export function ConversationsPage() {
   }
 
   async function sendMessage() {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização');
+      return;
+    }
     if (!selectedInstance || !selectedChat || !newMessage.trim()) return;
     
     setIsSending(true);
@@ -506,6 +513,10 @@ export function ConversationsPage() {
   }
 
   async function sendMedia(file: File, type: 'image' | 'audio' | 'document') {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização');
+      return;
+    }
     if (!selectedInstance || !selectedChat) return;
     
     setIsSending(true);
@@ -584,6 +595,10 @@ export function ConversationsPage() {
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio' | 'document') {
+    if (!canSendWhatsapp) {
+      toast.error('Somente visualização');
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       sendMedia(file, type);
@@ -843,92 +858,94 @@ export function ConversationsPage() {
               </div>
 
               {/* Input de Mensagem */}
-              <div className="p-4 border-t border-gray-200/50 bg-white/50">
-                {/* Inputs de arquivo ocultos */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileSelect(e, 'image')}
-                />
-                <input
-                  ref={audioInputRef}
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => handleFileSelect(e, 'audio')}
-                />
-                <input
-                  ref={docInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-                  className="hidden"
-                  onChange={(e) => handleFileSelect(e, 'document')}
-                />
-
-                <div className="flex items-center gap-2">
-                  {/* Botão de Anexo */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowAttachMenu(!showAttachMenu)}
-                      className="p-3 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
-                      title="Anexar arquivo"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                    </button>
-
-                    {/* Menu de Anexos */}
-                    {showAttachMenu && (
-                      <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[160px] z-10">
-                        <button
-                          onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
-                        >
-                          <Image className="h-4 w-4 text-blue-500" />
-                          Imagem
-                        </button>
-                        <button
-                          onClick={() => { audioInputRef.current?.click(); setShowAttachMenu(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
-                        >
-                          <Mic className="h-4 w-4 text-green-500" />
-                          Áudio
-                        </button>
-                        <button
-                          onClick={() => { docInputRef.current?.click(); setShowAttachMenu(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
-                        >
-                          <FileText className="h-4 w-4 text-orange-500" />
-                          Documento
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
+              {canSendWhatsapp ? (
+                <div className="p-4 border-t border-gray-200/50 bg-white/50">
+                  {/* Inputs de arquivo ocultos */}
                   <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    placeholder="Digite sua mensagem..."
-                    className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(e, 'image')}
                   />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || isSending}
-                    className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30"
-                  >
-                    {isSending ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </button>
+                  <input
+                    ref={audioInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(e, 'audio')}
+                  />
+                  <input
+                    ref={docInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(e, 'document')}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    {/* Botão de Anexo */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAttachMenu(!showAttachMenu)}
+                        className="p-3 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                        title="Anexar arquivo"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                      </button>
+
+                      {/* Menu de Anexos */}
+                      {showAttachMenu && (
+                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[160px] z-10">
+                          <button
+                            onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
+                          >
+                            <Image className="h-4 w-4 text-blue-500" />
+                            Imagem
+                          </button>
+                          <button
+                            onClick={() => { audioInputRef.current?.click(); setShowAttachMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
+                          >
+                            <Mic className="h-4 w-4 text-green-500" />
+                            Áudio
+                          </button>
+                          <button
+                            onClick={() => { docInputRef.current?.click(); setShowAttachMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm text-gray-700"
+                          >
+                            <FileText className="h-4 w-4 text-orange-500" />
+                            Documento
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                      placeholder={'Digite sua mensagem...'}
+                      className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || isSending}
+                      className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30"
+                    >
+                      {isSending ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        <Send className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500">

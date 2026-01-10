@@ -4,6 +4,8 @@
  * https://doc.evolution-api.com/v1/api-reference
  */
 
+import { supabase } from '../../lib/supabase'
+
 // =====================================================
 // TYPES
 // =====================================================
@@ -169,6 +171,15 @@ class EvolutionApiService {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
     const url = `${this.baseUrl}${cleanEndpoint}`
 
+    const authHeaders: Record<string, string> = {}
+    if (this.baseUrl.startsWith('/api')) {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (token) {
+        authHeaders.Authorization = `Bearer ${token}`
+      }
+    }
+
     const controller = new AbortController()
     const timeoutMs = 15000
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -183,6 +194,7 @@ class EvolutionApiService {
           'Content-Type': 'application/json',
           ...(this.apiKey ? { apikey: this.apiKey } : {}),
           'Accept': 'application/json',
+          ...authHeaders,
           ...options.headers,
         },
       })

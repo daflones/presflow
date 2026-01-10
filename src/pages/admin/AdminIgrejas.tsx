@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Church, Search, Eye, Edit, Users, Plus, X, Shield, FolderOpen, Smartphone, MessageCircle, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Church, Search, Eye, Edit, Users, Plus, X, Shield, FolderOpen, Smartphone, MessageCircle, Trash2, UserPlus } from 'lucide-react';
 import { adminService } from '../../services/supabase/admin';
 import type { Church as ChurchType } from '../../types/database';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { useCreateChurchInstance, useDeleteChurchInstance } from '../../hooks/useWhatsAppChurch';
+import { useAuth } from '../../contexts/AuthContext';
 
 function formatDate(dateString?: string): string {
   if (!dateString) return '-';
@@ -15,7 +16,15 @@ function formatDate(dateString?: string): string {
   });
 }
 
+type CreateUserForm = {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+};
+
 export function AdminIgrejas() {
+  const { session } = useAuth();
   const [churches, setChurches] = useState<ChurchType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +37,13 @@ export function AdminIgrejas() {
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showInstanceModal, setShowInstanceModal] = useState(false);
+  const [showUsersModal, setShowUsersModal] = useState(false);
+  const [usersModalLoading, setUsersModalLoading] = useState(false);
+  const [usersModalError, setUsersModalError] = useState<string | null>(null);
+  const [churchUsers, setChurchUsers] = useState<
+    Array<{ id: string; auth_id: string; name: string; email: string; role: string; is_active: boolean; created_at: string; updated_at: string }>
+  >([]);
+  const [createUserForm, setCreateUserForm] = useState<CreateUserForm>({ name: '', email: '', password: '', role: 'consulta' });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -56,6 +72,18 @@ export function AdminIgrejas() {
 
   const createInstance = useCreateChurchInstance();
   const deleteInstance = useDeleteChurchInstance();
+
+  const accessToken = session?.access_token;
+
+  const roleLabel = useMemo(() => {
+    return (role: string) => {
+      const r = String(role || '').toLowerCase();
+      if (r === 'admin') return 'Admin';
+      if (r === 'manutencao') return 'Manutenção';
+      if (r === 'consulta') return 'Consulta';
+      return role;
+    };
+  }, []);
 
   useEffect(() => {
     loadChurches();
@@ -97,6 +125,75 @@ export function AdminIgrejas() {
       phoneNumber: church.phone || ''
     });
     setShowInstanceModal(true);
+  };
+
+  const openUsersModal = async (church: ChurchType) => {
+    setSelectedChurch(church);
+    setUsersModalError(null);
+    setChurchUsers([]);
+    setCreateUserForm({ name: '', email: '', password: '', role: 'consulta' });
+    setShowUsersModal(true);
+    await loadChurchUsers(church.id);
+  };
+
+  const loadChurchUsers = async (churchId: string) => {
+    if (!accessToken) return;
+    setUsersModalLoading(true);
+    setUsersModalError(null);
+    try {
+      const res = await fetch(`/api/auth/list-users?churchId=${encodeURIComponent(churchId)}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Falha ao carregar usuários');
+      }
+
+      setChurchUsers((data?.users || []) as any);
+    } catch (e: any) {
+      setUsersModalError(e?.message || 'Erro ao carregar usuários');
+    } finally {
+      setUsersModalLoading(false);
+    }
+  };
+
+  const onCreateChurchUser = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!accessToken || !selectedChurch?.id) return;
+
+    setUsersModalLoading(true);
+    setUsersModalError(null);
+    try {
+      const res = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          churchId: selectedChurch.id,
+          userName: createUserForm.name,
+          email: createUserForm.email,
+          password: createUserForm.password,
+          role: createUserForm.role,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Falha ao criar usuário');
+      }
+
+      setCreateUserForm({ name: '', email: '', password: '', role: 'consulta' });
+      await loadChurchUsers(selectedChurch.id);
+    } catch (e: any) {
+      setUsersModalError(e?.message || 'Erro ao criar usuário');
+    } finally {
+      setUsersModalLoading(false);
+    }
   };
 
   const handleCreateInstance = async () => {
@@ -162,7 +259,7 @@ export function AdminIgrejas() {
     setShowFilesModal(true);
   };
 
-  const handleEditChurch = async (e: React.FormEvent) => {
+  const handleEditChurch = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedChurch) return;
 
@@ -180,7 +277,7 @@ export function AdminIgrejas() {
     }
   };
 
-  const handleAddClient = async (e: React.FormEvent) => {
+  const handleAddClient = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedChurch) return;
 
@@ -248,7 +345,7 @@ export function AdminIgrejas() {
       .trim();
   };
 
-  async function handleCreateChurch(e: React.FormEvent) {
+  async function handleCreateChurch(e: FormEvent) {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim() || !formData.userName.trim() || !formData.userPassword.trim()) {
       toast.error('Nome da igreja, email, nome do usuário e senha são obrigatórios');
@@ -437,31 +534,26 @@ export function AdminIgrejas() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    {church.owner_id && churchOwners[church.owner_id] ? (
-                      <button
-                        onClick={() => toggleManagerRole(church)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                          churchOwners[church.owner_id].isManager
-                            ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                        }`}
-                        title={churchOwners[church.owner_id].isManager ? 'Remover permissão de manager' : 'Conceder permissão de manager'}
-                      >
-                        <Shield className="h-3 w-3" />
-                        {churchOwners[church.owner_id].isManager ? 'Manager' : 'Usuário'}
-                      </button>
-                    ) : (
-                      <span className="text-gray-500 text-sm">-</span>
-                    )}
-                  </td>
                   <td className="px-4 py-3 text-sm text-gray-300">{formatDate(church.created_at)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center juconfst-ia?chuich=d gap-1">
+                    <div className="flex items-center justify-end gap-1">
+                      {church.owner_id && churchOwners[church.owner_id] && (
+                        <button
+                          onClick={() => toggleManagerRole(church)}
+                          className={`p-2 rounded-lg hover:bg-gray-600 transition-colors ${
+                            churchOwners[church.owner_id].isManager
+                              ? 'text-purple-400 hover:text-purple-300'
+                              : 'text-gray-400 hover:text-purple-400'
+                          }`}
+                          title={churchOwners[church.owner_id].isManager ? 'Remover permissão de manager' : 'Conceder permissão de manager'}
+                        >
+                          <Shield className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => openDetailsModal(church)}
                         className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-white"
-                        title="Ver detalhes"
+                        title="Visualizar detalhes"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -486,6 +578,14 @@ export function AdminIgrejas() {
                       >
                         <FolderOpen className="h-4 w-4" />
                       </button>
+                      <button
+                        onClick={() => void openUsersModal(church)}
+                        className="p-2 rounded-lg hover:bg-gray-600 text-gray-400 hover:text-purple-400"
+                        title="Usuários"
+                        disabled={!accessToken}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -494,6 +594,147 @@ export function AdminIgrejas() {
           </table>
         )}
       </div>
+
+      {showUsersModal && selectedChurch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl m-4 border border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold text-white">Usuários - {selectedChurch.name}</h2>
+                <p className="text-xs text-gray-400">Crie e visualize usuários desta igreja.</p>
+              </div>
+              <button
+                onClick={() => setShowUsersModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-700 text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3">
+              <div className="p-4 border-b lg:border-b-0 lg:border-r border-gray-700">
+                {usersModalError && (
+                  <div className="mb-4 rounded-lg border border-red-800/50 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                    {usersModalError}
+                  </div>
+                )}
+
+                <form className="space-y-3" onSubmit={onCreateChurchUser}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Nome</label>
+                    <input
+                      type="text"
+                      value={createUserForm.name}
+                      onChange={(e) => setCreateUserForm((s) => ({ ...s, name: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      disabled={usersModalLoading}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={createUserForm.email}
+                      onChange={(e) => setCreateUserForm((s) => ({ ...s, email: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      disabled={usersModalLoading}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Senha</label>
+                    <input
+                      type="password"
+                      value={createUserForm.password}
+                      onChange={(e) => setCreateUserForm((s) => ({ ...s, password: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      disabled={usersModalLoading}
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Cargo</label>
+                    <select
+                      value={createUserForm.role}
+                      onChange={(e) => setCreateUserForm((s) => ({ ...s, role: e.target.value }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                      disabled={usersModalLoading}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="manutencao">Manutenção</option>
+                      <option value="consulta">Consulta</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={usersModalLoading || !accessToken}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      {usersModalLoading ? 'Salvando...' : 'Criar usuário'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="p-4 lg:col-span-2">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-semibold text-white">Usuários cadastrados</div>
+                  <button
+                    type="button"
+                    onClick={() => void loadChurchUsers(selectedChurch.id)}
+                    className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+                    disabled={usersModalLoading || !accessToken}
+                  >
+                    Atualizar
+                  </button>
+                </div>
+
+                {usersModalLoading && churchUsers.length === 0 ? (
+                  <div className="text-sm text-gray-400">Carregando...</div>
+                ) : churchUsers.length === 0 ? (
+                  <div className="text-sm text-gray-400">Nenhum usuário encontrado.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-left text-gray-400">
+                        <tr>
+                          <th className="py-2 pr-4">Nome</th>
+                          <th className="py-2 pr-4">Email</th>
+                          <th className="py-2 pr-4">Cargo</th>
+                          <th className="py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-200">
+                        {churchUsers.map((u) => (
+                          <tr key={u.id} className="border-t border-gray-700">
+                            <td className="py-2 pr-4 font-medium">{u.name}</td>
+                            <td className="py-2 pr-4">{u.email}</td>
+                            <td className="py-2 pr-4">{roleLabel(u.role)}</td>
+                            <td className="py-2">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                  u.is_active ? 'bg-green-500/20 text-green-300' : 'bg-gray-700 text-gray-300'
+                                }`}
+                              >
+                                {u.is_active ? 'Ativo' : 'Inativo'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Form Modal */}
       {showCreateForm && (

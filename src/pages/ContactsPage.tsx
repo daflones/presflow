@@ -6,6 +6,8 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDropp
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 
 type Client = DbClient;
 
@@ -75,8 +77,8 @@ function KanbanColumn({
   );
 }
 
-function KanbanCard({ client, onEdit, onView }: { client: Client; onEdit: () => void; onDelete?: () => void; onView: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: client.id });
+function KanbanCard({ client, onEdit, onView, readOnly }: { client: Client; onEdit: () => void; onDelete?: () => void; onView: () => void; readOnly: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: client.id, disabled: readOnly });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -90,7 +92,7 @@ function KanbanCard({ client, onEdit, onView }: { client: Client; onEdit: () => 
       style={style}
       {...attributes}
       {...listeners}
-      className="rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-shadow cursor-move"
+      className={`rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-shadow ${readOnly ? 'cursor-default' : 'cursor-move'}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -151,6 +153,7 @@ function KanbanCard({ client, onEdit, onView }: { client: Client; onEdit: () => 
 }
 
 export function ContactsPage() {
+  const { canEditClients } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [query, setQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -237,6 +240,10 @@ export function ContactsPage() {
   }, [clients, query]);
 
   function openCreate() {
+    if (!canEditClients) {
+      toast.error('Somente visualização');
+      return;
+    }
     setEditingClientId(null);
     setFormName('');
     setFormPhone('');
@@ -253,6 +260,10 @@ export function ContactsPage() {
   }
 
   function openEdit(client: Client) {
+    if (!canEditClients) {
+      toast.error('Somente visualização');
+      return;
+    }
     setEditingClientId(client.id);
     setFormName(client.name);
     setFormPhone(client.whatsapp || client.phone || '');
@@ -269,6 +280,10 @@ export function ContactsPage() {
   }
 
   async function submitForm() {
+    if (!canEditClients) {
+      toast.error('Somente visualização');
+      return;
+    }
     const name = formName.trim();
     if (!name) return;
 
@@ -313,6 +328,10 @@ export function ContactsPage() {
   }
 
   async function removeClient(id: string) {
+    if (!canEditClients) {
+      toast.error('Somente visualização');
+      return;
+    }
     const current = clients.find((c) => c.id === id);
     const ok = window.confirm(`Apagar o cliente "${current?.name ?? 'selecionado'}"?`);
     if (!ok) return;
@@ -332,6 +351,10 @@ export function ContactsPage() {
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    if (!canEditClients) {
+      toast.error('Somente visualização');
+      return;
+    }
     const { active, over } = event;
     setActiveId(null);
 
@@ -385,7 +408,8 @@ export function ContactsPage() {
 
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          disabled={!canEditClients}
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="h-4 w-4" />
           Novo cliente
@@ -452,6 +476,7 @@ export function ContactsPage() {
                         onEdit={() => openEdit(client)}
                         onDelete={() => removeClient(client.id)}
                         onView={() => setSelectedClientId(client.id)}
+                        readOnly={!canEditClients}
                       />
                     ))}
                   </KanbanColumn>

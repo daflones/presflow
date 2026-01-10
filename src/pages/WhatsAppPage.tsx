@@ -23,8 +23,11 @@ import {
   useWhatsAppQRCode,
   useDeleteWhatsAppInstance
 } from '../hooks/useWhatsApp'
+import { useAuth } from '../contexts/AuthContext'
+import { toast } from 'sonner'
 
 export default function WhatsAppPage() {
+  const { canManageConnections } = useAuth()
   const [instanceName, setInstanceName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -61,6 +64,10 @@ export default function WhatsAppPage() {
   }, [instanceName])
 
   const handleCreateInstance = async () => {
+    if (!canManageConnections) {
+      toast.error('Somente visualização')
+      return
+    }
     if (!instanceName.trim() || !phoneNumber.trim()) return
     
     try {
@@ -77,6 +84,10 @@ export default function WhatsAppPage() {
   }
 
   const handleDelete = async () => {
+    if (!canManageConnections) {
+      toast.error('Somente visualização')
+      return
+    }
     if (!instance?.instanceName) return
     if (!confirm('Tem certeza que deseja remover completamente esta instância? Esta ação não pode ser desfeita.')) return
     
@@ -146,14 +157,16 @@ export default function WhatsAppPage() {
                 <p className="text-gray-500 mb-8 max-w-md mx-auto">
                   Crie sua primeira conexão do WhatsApp para começar a enviar mensagens para seus contatos
                 </p>
-                <Button 
-                  onClick={() => setShowCreateForm(true)} 
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg font-medium"
-                  size="lg"
-                >
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Criar Conexão
-                </Button>
+                {canManageConnections ? (
+                  <Button
+                    onClick={() => setShowCreateForm(true)}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg font-medium"
+                    size="lg"
+                  >
+                    <MessageCircle className="w-5 h-5 mr-2" />
+                    Criar Conexão
+                  </Button>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-6">
@@ -188,7 +201,7 @@ export default function WhatsAppPage() {
                 <div className="flex gap-3 pt-4">
                   <Button 
                     onClick={handleCreateInstance}
-                    disabled={createInstance.isPending}
+                    disabled={createInstance.isPending || !canManageConnections}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-medium"
                   >
                     {createInstance.isPending ? (
@@ -228,18 +241,20 @@ export default function WhatsAppPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusBadge(currentStatus)}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={deleteInstance.isPending}
-                  >
-                    {deleteInstance.isPending ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </Button>
+                  {canManageConnections ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDelete}
+                      disabled={deleteInstance.isPending}
+                    >
+                      {deleteInstance.isPending ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </CardHeader>

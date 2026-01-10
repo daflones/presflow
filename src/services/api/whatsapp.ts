@@ -1,4 +1,5 @@
 // Serviço para integração com Evolution API
+import { supabase } from '../../lib/supabase'
 export interface WhatsAppInstance {
   instanceName: string
   instanceId: string
@@ -61,6 +62,15 @@ class WhatsAppService {
     
     console.log('Fazendo requisição para:', url)
     
+    const authHeaders: Record<string, string> = {}
+    if (this.baseUrl.startsWith('/api')) {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (token) {
+        authHeaders.Authorization = `Bearer ${token}`
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
       mode: 'cors',
@@ -68,6 +78,7 @@ class WhatsAppService {
         'Content-Type': 'application/json',
         ...(this.apiKey ? { apikey: this.apiKey } : {}),
         'Accept': 'application/json',
+        ...authHeaders,
         ...options.headers,
       },
     })

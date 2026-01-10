@@ -9,6 +9,8 @@ import listPlugin from '@fullcalendar/list';
 import type { DateSelectArg, EventClickArg, EventInput, EventDropArg } from '@fullcalendar/core';
 import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { CalendarPlus, Pencil, Trash2, X, UserRound, Search } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 
 type CalendarEvent = {
   id: string;
@@ -60,6 +62,7 @@ function toLocalInputValue(iso: string) {
 }
 
 export function CalendarPage() {
+  const { canEditCalendar } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [_isLoading, setIsLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
@@ -133,6 +136,10 @@ export function CalendarPage() {
   }, [events]);
 
   function openCreateFromSelect(arg: DateSelectArg) {
+    if (!canEditCalendar) {
+      toast.error('Somente visualização');
+      return;
+    }
     setEditingEventId(null);
     setFormTitle('');
     setFormAllDay(arg.allDay);
@@ -159,6 +166,10 @@ export function CalendarPage() {
   }
 
   function openEditFromClick(arg: EventClickArg) {
+    if (!canEditCalendar) {
+      toast.error('Somente visualização');
+      return;
+    }
     const found = events.find((e) => e.id === arg.event.id);
     if (!found) return;
     setEditingEventId(found.id);
@@ -180,7 +191,11 @@ export function CalendarPage() {
     setEditingEventId(null);
   }
 
-  async function submitEvent() {
+  async function saveEvent() {
+    if (!canEditCalendar) {
+      toast.error('Somente visualização');
+      return;
+    }
     const title = formTitle.trim();
     if (!title) return;
     if (!formStart) return;
@@ -226,6 +241,10 @@ export function CalendarPage() {
   }
 
   async function removeEvent(id: string) {
+    if (!canEditCalendar) {
+      toast.error('Somente visualização');
+      return;
+    }
     const current = events.find((e) => e.id === id);
     const ok = window.confirm(`Apagar o evento "${current?.title ?? 'selecionado'}"?`);
     if (!ok) return;
@@ -241,6 +260,11 @@ export function CalendarPage() {
   }
 
   async function handleEventDrop(arg: EventDropArg) {
+    if (!canEditCalendar) {
+      toast.error('Somente visualização');
+      arg.revert();
+      return;
+    }
     const eventId = arg.event.id;
     const newStart = arg.event.start?.toISOString();
     const newEnd = arg.event.end?.toISOString();
@@ -285,7 +309,8 @@ export function CalendarPage() {
               view: null as unknown as any,
             });
           }}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          disabled={!canEditCalendar}
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <CalendarPlus className="h-4 w-4" />
           Novo evento
@@ -386,11 +411,11 @@ export function CalendarPage() {
           }}
           height="auto"
           locale={ptBrLocale}
-          selectable
+          selectable={canEditCalendar}
           selectMirror
           dayMaxEvents={3}
           nowIndicator
-          editable
+          editable={canEditCalendar}
           droppable
           eventDrop={handleEventDrop}
           events={fcEvents}
@@ -604,7 +629,7 @@ export function CalendarPage() {
                 </button>
                 <button
                   disabled={!formTitle.trim() || !formStart}
-                  onClick={submitEvent}
+                  onClick={saveEvent}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
                   {editingEventId ? 'Salvar alterações' : 'Criar evento'}

@@ -20,7 +20,7 @@ const navigationItems: NavigationItem[] = [
 
 export function TopNavigation() {
   const location = useLocation();
-  const { church, isManager, signOut } = useAuth();
+  const { church, isManager, signOut, canManageChurchUsers } = useAuth();
 
   return (
     <header className="bg-gray-900/80 backdrop-blur-xl border-b border-gray-700/50 shadow-lg">
@@ -78,6 +78,20 @@ export function TopNavigation() {
               >
                 <Shield className="h-4 w-4" />
                 <span>Admin</span>
+              </Link>
+            )}
+
+            {canManageChurchUsers && (
+              <Link
+                to="/usuarios"
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
+                  location.pathname === '/usuarios'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Usuários</span>
               </Link>
             )}
           </nav>

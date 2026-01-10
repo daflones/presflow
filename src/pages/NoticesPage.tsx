@@ -38,7 +38,7 @@ const prioridadeConfig: Record<TicketPrioridade, { label: string; color: string;
 };
 
 export function NoticesPage() {
-  const { church } = useAuth();
+  const { church, isReadOnly } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +102,7 @@ export function NoticesPage() {
   };
 
   const handleCreateTicket = async () => {
+    if (isReadOnly) return;
     if (!church?.id || !formData.nome || !formData.telefone || !formData.motivo) return;
 
     try {
@@ -129,6 +130,7 @@ export function NoticesPage() {
   };
 
   const handleSendMessage = async () => {
+    if (isReadOnly) return;
     if (!selectedTicket || !newMessage.trim() || !church?.id) return;
 
     try {
@@ -151,6 +153,7 @@ export function NoticesPage() {
   };
 
   const handleUpdateStatus = async (ticketId: string, status: TicketStatus) => {
+    if (isReadOnly) return;
     try {
       await supportTicketsService.updateStatus(ticketId, status);
       loadTickets();
@@ -163,6 +166,7 @@ export function NoticesPage() {
   };
 
   const handleDeleteTicket = async (ticketId: string) => {
+    if (isReadOnly) return;
     if (!confirm('Tem certeza que deseja excluir este ticket?')) return;
     
     try {
@@ -207,16 +211,18 @@ export function NoticesPage() {
           <h1 className="text-2xl font-bold text-white">Intenções e Avisos</h1>
           <p className="text-sm text-gray-400">Gerencie os tickets de suporte e pedidos</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={loadTickets}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Ticket
-          </Button>
-        </div>
+        {!isReadOnly ? (
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={loadTickets}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Atualizar
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Ticket
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Stats Cards */}
@@ -317,7 +323,9 @@ export function NoticesPage() {
           <div className="col-span-2 text-center py-12">
             <Bell className="w-12 h-12 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">Nenhum ticket encontrado</p>
-            <p className="text-gray-500 text-sm mt-2">Clique em "Novo Ticket" para criar o primeiro</p>
+            {!isReadOnly ? (
+              <p className="text-gray-500 text-sm mt-2">Clique em "Novo Ticket" para criar o primeiro</p>
+            ) : null}
           </div>
         ) : (
           tickets.map((ticket) => (
@@ -359,28 +367,30 @@ export function NoticesPage() {
                     <Calendar className="w-3 h-3" />
                     {formatDate(ticket.created_at)}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(`https://wa.me/${ticket.telefone.replace(/\D/g, '')}`, '_blank');
-                      }}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTicket(ticket.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </Button>
-                  </div>
+                  {!isReadOnly ? (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`https://wa.me/${ticket.telefone.replace(/\D/g, '')}`, '_blank');
+                        }}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTicket(ticket.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -389,7 +399,7 @@ export function NoticesPage() {
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
+      {!isReadOnly && showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-lg">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -500,17 +510,19 @@ export function NoticesPage() {
                 <p className="text-sm text-gray-400">{formatPhone(selectedTicket.telefone)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <select
-                  value={selectedTicket.status}
-                  onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value as TicketStatus)}
-                  className="px-3 py-1 rounded-lg border border-gray-600 bg-gray-700/50 text-white text-sm"
-                >
-                  <option value="pendente">Pendente</option>
-                  <option value="em_andamento">Em Andamento</option>
-                  <option value="aguardando_resposta">Aguardando Resposta</option>
-                  <option value="resolvido">Resolvido</option>
-                  <option value="cancelado">Cancelado</option>
-                </select>
+                {!isReadOnly ? (
+                  <select
+                    value={selectedTicket.status}
+                    onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value as TicketStatus)}
+                    className="px-3 py-1 rounded-lg border border-gray-600 bg-gray-700/50 text-white text-sm"
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="em_andamento">Em Andamento</option>
+                    <option value="aguardando_resposta">Aguardando Resposta</option>
+                    <option value="resolvido">Resolvido</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                ) : null}
                 <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)}>
                   <X className="w-4 h-4" />
                 </Button>
@@ -543,34 +555,36 @@ export function NoticesPage() {
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => window.open(`https://wa.me/${selectedTicket.telefone.replace(/\D/g, '')}`, '_blank')}
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  WhatsApp
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => window.open(`tel:${selectedTicket.telefone}`, '_blank')}
-                >
-                  <Phone className="w-4 h-4 mr-2" />
-                  Ligar
-                </Button>
-                {selectedTicket.email && (
+              {!isReadOnly ? (
+                <div className="flex gap-2">
                   <Button 
                     variant="outline" 
                     className="flex-1"
-                    onClick={() => window.open(`mailto:${selectedTicket.email}`, '_blank')}
+                    onClick={() => window.open(`https://wa.me/${selectedTicket.telefone.replace(/\D/g, '')}`, '_blank')}
                   >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Email
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    WhatsApp
                   </Button>
-                )}
-              </div>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => window.open(`tel:${selectedTicket.telefone}`, '_blank')}
+                  >
+                    <Phone className="w-4 h-4 mr-2" />
+                    Ligar
+                  </Button>
+                  {selectedTicket.email && (
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => window.open(`mailto:${selectedTicket.email}`, '_blank')}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Email
+                    </Button>
+                  )}
+                </div>
+              ) : null}
 
               {/* Messages */}
               <div className="space-y-3">
@@ -598,19 +612,21 @@ export function NoticesPage() {
             </CardContent>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-700/50">
-              <div className="flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Digite uma nota ou mensagem..."
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <Button onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
+            {!isReadOnly ? (
+              <div className="p-4 border-t border-gray-700/50">
+                <div className="flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Digite uma nota ou mensagem..."
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                  />
+                  <Button onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
+                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </Card>
         </div>
       )}

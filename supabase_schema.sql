@@ -1,781 +1,770 @@
--- ============================================
--- PRESTFLOW - SCHEMA PARA IGREJAS (SEM TABELA USERS)
--- Supabase SQL completo com RLS
--- ============================================
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
--- Habilitar extensões necessárias
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ============================================
--- 1. TABELA DE IGREJAS (TENANT PRINCIPAL)
--- ============================================
-CREATE TABLE IF NOT EXISTS churches (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, -- Referência direta ao Supabase Auth
-  name VARCHAR(255) NOT NULL,
-  slug VARCHAR(100) UNIQUE NOT NULL,
-  cnpj VARCHAR(18),
-  email VARCHAR(255),
-  phone VARCHAR(20),
-  address TEXT,
-  city VARCHAR(100),
-  state VARCHAR(2),
-  zip_code VARCHAR(10),
-  logo_url TEXT,
-  website VARCHAR(255),
-  description TEXT,
-  
-  -- Configurações gerais
-  timezone VARCHAR(50) DEFAULT 'America/Sao_Paulo',
-  language VARCHAR(10) DEFAULT 'pt-BR',
-  
-  -- Plano e assinatura
-  plan VARCHAR(50) DEFAULT 'free', -- free, starter, pro, enterprise
-  plan_expires_at TIMESTAMPTZ,
-  
-  -- WhatsApp Instance
-  instance VARCHAR(255), -- Nome da instância WhatsApp conectada
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  is_active BOOLEAN DEFAULT true
+CREATE TABLE public.activity_logs (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  user_id uuid,
+  action character varying NOT NULL,
+  entity_type character varying,
+  entity_id uuid,
+  description text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  ip_address inet,
+  user_agent text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT activity_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT activity_logs_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT activity_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
-
--- Índices
-CREATE INDEX idx_churches_slug ON churches(slug);
-CREATE INDEX idx_churches_owner_id ON churches(owner_id);
-CREATE INDEX idx_churches_is_active ON churches(is_active);
-CREATE INDEX idx_churches_instance ON churches(instance);
-
--- ============================================
--- 2. TABELA DE CONFIGURAÇÕES DE IA
--- ============================================
-CREATE TABLE IF NOT EXISTS ai_configs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  
-  -- Nome e Tom de Fala
-  agent_name VARCHAR(100) DEFAULT 'Iara',
-  tone_of_voice VARCHAR(20) DEFAULT 'amigavel', -- amigavel, formal, profissional
-  text_size VARCHAR(20) DEFAULT 'curto', -- curto, medio, longo
-  use_emojis BOOLEAN DEFAULT false,
-  
-  -- Configurações de Agendamento
-  send_documents BOOLEAN DEFAULT false,
-  auto_scheduling BOOLEAN DEFAULT false,
-  
-  -- Campos de Qualificação (obrigatórios)
-  qualification_fields JSONB DEFAULT '{
-    "nome": true,
-    "telefone": true,
-    "email": true,
-    "interesse": true,
-    "motivacao": true,
-    "expectativa": true,
-    "tipoEvento": true
-  }'::jsonb,
-  
-  -- Campos Opcionais
-  optional_fields JSONB DEFAULT '{
-    "nomeIgreja": false,
-    "endereco": false,
-    "segmento": false,
-    "volumeMensal": false
-  }'::jsonb,
-  
-  -- Horários de Funcionamento
-  schedule JSONB DEFAULT '{
-    "segunda": {"enabled": true, "startTime": "08:00", "endTime": "18:00"},
-    "terca": {"enabled": true, "startTime": "08:00", "endTime": "18:00"},
-    "quarta": {"enabled": true, "startTime": "08:00", "endTime": "18:00"},
-    "quinta": {"enabled": true, "startTime": "08:00", "endTime": "18:00"},
-    "sexta": {"enabled": true, "startTime": "08:00", "endTime": "18:00"},
-    "sabado": {"enabled": false, "startTime": "08:00", "endTime": "12:00"},
-    "domingo": {"enabled": false, "startTime": "08:00", "endTime": "12:00"}
-  }'::jsonb,
-  
-  -- Tempo de Resposta e Mensagem de Ausência
-  response_time INTEGER DEFAULT 2, -- segundos
-  absence_message TEXT DEFAULT 'No momento estou fora do horário de atendimento. Deixe sua mensagem que retornarei assim que possível.',
-  
-  -- Informações da Igreja
-  about_church TEXT,
-  competitive_diff TEXT,
-  portfolio TEXT,
-  main_clients TEXT,
-  best_sellers TEXT,
-  
-  -- Diretrizes para IA
-  ai_guidelines TEXT,
-  ai_restrictions TEXT,
-  
-  -- Estratégias Comerciais
-  sales_strategies TEXT,
-  common_objections TEXT,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  UNIQUE(church_id)
+CREATE TABLE public.ai_configs (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  agent_name character varying DEFAULT 'Iara'::character varying,
+  tone_of_voice character varying DEFAULT 'amigavel'::character varying,
+  text_size character varying DEFAULT 'curto'::character varying,
+  use_emojis boolean DEFAULT false,
+  send_documents boolean DEFAULT false,
+  auto_scheduling boolean DEFAULT false,
+  qualification_fields jsonb DEFAULT '{"nome": true, "email": true, "segmento": true, "telefone": true, "interesse": true, "motivacao": true, "expectativa": true, "nome_igreja": true, "tipo_evento": true, "volume_mensal": true}'::jsonb,
+  business_hours jsonb DEFAULT '{"friday": {"enabled": true, "endTime": "18:00", "startTime": "09:00"}, "monday": {"enabled": true, "endTime": "18:00", "startTime": "09:00"}, "sunday": {"enabled": false, "endTime": "13:00", "startTime": "09:00"}, "tuesday": {"enabled": true, "endTime": "18:00", "startTime": "09:00"}, "saturday": {"enabled": false, "endTime": "13:00", "startTime": "09:00"}, "thursday": {"enabled": true, "endTime": "18:00", "startTime": "09:00"}, "wednesday": {"enabled": true, "endTime": "18:00", "startTime": "09:00"}}'::jsonb,
+  outside_hours_message text DEFAULT 'Desculpe, estamos fora do horário de atendimento. Retornaremos em breve!'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  agent_prompt text,
+  informacoes_adicionais text,
+  perguntas_frequentes text,
+  principais_eventos text,
+  documentacao_necessaria text,
+  localizacao_igreja text,
+  informacao_historica text,
+  google_maps_link text,
+  espacos_disponiveis text,
+  info_casamento jsonb DEFAULT '{"lugares": "", "valores": "", "horarios": "", "documentacao": "", "prazo_entrega": ""}'::jsonb,
+  exige_sinal boolean DEFAULT false,
+  regras_sinal text,
+  info_batizados jsonb DEFAULT '{"lugares": "", "valores": "", "horarios": "", "documentacao": "", "prazo_entrega": ""}'::jsonb,
+  cursos text,
+  sessao_fotos text,
+  regras_hospedagem text,
+  link_visitacao text,
+  guia_turistico text,
+  projetos_sociais_empresas text,
+  projetos_sociais_comunidade text,
+  regras_especificas text,
+  hospedagem_disponivel boolean DEFAULT false,
+  menu_principal text DEFAULT ''::text,
+  agent_gender character varying DEFAULT 'feminino'::character varying,
+  greeting_message text DEFAULT ''::text,
+  error_message text DEFAULT 'Desculpe, não consegui processar sua solicitação. Por favor, tente novamente ou entre em contato conosco.'::text,
+  phone_landline character varying DEFAULT ''::character varying,
+  phone_whatsapp character varying DEFAULT ''::character varying,
+  email_main character varying DEFAULT ''::character varying,
+  email_secretary character varying DEFAULT ''::character varying,
+  email_documents character varying DEFAULT ''::character varying,
+  contact_general text DEFAULT ''::text,
+  allow_scheduling_lent boolean DEFAULT true,
+  allow_scheduling_jubilee boolean DEFAULT true,
+  blocked_dates jsonb DEFAULT '[]'::jsonb,
+  max_simultaneous_events integer DEFAULT 1,
+  donation_text text DEFAULT ''::text,
+  prayer_text text DEFAULT ''::text,
+  confirmation_text text DEFAULT 'Seu agendamento foi confirmado com sucesso! Em breve você receberá mais informações.'::text,
+  unavailability_text text DEFAULT 'Infelizmente não temos horários disponíveis para a data solicitada. Por favor, escolha outra data ou entre em contato conosco.'::text,
+  post_scheduling_text text DEFAULT ''::text,
+  imagens_batismos jsonb DEFAULT '[]'::jsonb,
+  imagens_casamentos jsonb DEFAULT '[]'::jsonb,
+  imagens_espacos jsonb DEFAULT '[]'::jsonb,
+  imagens_igreja jsonb DEFAULT '[]'::jsonb,
+  imagens_acomodacoes text,
+  CONSTRAINT ai_configs_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_configs_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
 );
-
--- Índices
-CREATE INDEX idx_ai_configs_church_id ON ai_configs(church_id);
-
--- ============================================
--- 3. TABELA DE EVENTOS DO CALENDÁRIO
--- ============================================
-CREATE TABLE IF NOT EXISTS calendar_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- Referência direta ao auth.users
-  
-  -- Dados do evento
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  location VARCHAR(255),
-  notes TEXT,
-  
-  -- Datas
-  start_at TIMESTAMPTZ NOT NULL,
-  end_at TIMESTAMPTZ,
-  all_day BOOLEAN DEFAULT false,
-  
-  -- Recorrência
-  is_recurring BOOLEAN DEFAULT false,
-  recurrence_rule TEXT,
-  recurrence_end_at TIMESTAMPTZ,
-  parent_event_id UUID REFERENCES calendar_events(id) ON DELETE CASCADE,
-  
-  -- Visual
-  color VARCHAR(20) DEFAULT '#3b82f6',
-  
-  -- Tipo de evento
-  event_type VARCHAR(50) DEFAULT 'general',
-  
-  -- Participantes/Convidados
-  attendees JSONB DEFAULT '[]'::jsonb,
-  
-  -- Notificações
-  reminders JSONB DEFAULT '[]'::jsonb,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.ai_prompts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  name character varying NOT NULL,
+  description text,
+  prompt_type character varying DEFAULT 'system'::character varying,
+  content text NOT NULL,
+  variables jsonb DEFAULT '[]'::jsonb,
+  is_active boolean DEFAULT true,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ai_prompts_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_prompts_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT ai_prompts_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
-
--- Índices
-CREATE INDEX idx_calendar_events_church_id ON calendar_events(church_id);
-CREATE INDEX idx_calendar_events_start_at ON calendar_events(start_at);
-CREATE INDEX idx_calendar_events_end_at ON calendar_events(end_at);
-CREATE INDEX idx_calendar_events_created_by ON calendar_events(created_by);
-
--- ============================================
--- 4. TABELA DE CLIENTES (CRM) - SEM LOGIN
--- ============================================
-CREATE TABLE IF NOT EXISTS clients (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  
-  -- Dados básicos
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255),
-  phone VARCHAR(20),
-  whatsapp VARCHAR(20), -- Número do WhatsApp (pode ser diferente do phone)
-  remote_jid VARCHAR(100), -- ID remoto do WhatsApp (número@s.whatsapp.net)
-  
-  -- Status e Categoria
-  status VARCHAR(20) DEFAULT 'lead', -- lead, ativo, inativo
-  category VARCHAR(50) DEFAULT 'sem-categoria', -- eventos, casamentos, festas, compromissos, sem-categoria
-  
-  -- Tags para segmentação
-  tags TEXT[] DEFAULT '{}',
-  
-  -- Informações adicionais
-  notes TEXT,
-  
-  -- Endereço
-  address TEXT,
-  city VARCHAR(100),
-  state VARCHAR(2),
-  zip_code VARCHAR(10),
-  
-  -- Dados de qualificação
-  interest VARCHAR(255),
-  motivation TEXT,
-  expectation TEXT,
-  event_type VARCHAR(100),
-  church_name VARCHAR(255),
-  segment VARCHAR(100),
-  monthly_volume VARCHAR(50),
-  
-  -- Origem do lead
-  source VARCHAR(50), -- whatsapp, instagram, site, indicacao, etc
-  source_details TEXT,
-  
-  -- Responsável (referência ao auth.users)
-  assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Datas importantes
-  last_contact_at TIMESTAMPTZ,
-  next_followup_at TIMESTAMPTZ,
-  converted_at TIMESTAMPTZ,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.arquivos_ia (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  nome_original character varying,
+  categoria character varying,
+  subcategoria character varying,
+  descricao text,
+  status character varying DEFAULT 'ativo'::character varying,
+  disponivel_ia boolean DEFAULT true,
+  processado_ia boolean DEFAULT false,
+  instrucoes_ia text,
+  contexto_uso text,
+  palavras_chave ARRAY,
+  prioridade integer DEFAULT 0,
+  url text,
+  bucket_name character varying,
+  caminho_storage text,
+  tipo_mime character varying,
+  extensao character varying,
+  tamanho bigint,
+  visibilidade character varying DEFAULT 'privado'::character varying,
+  versao integer DEFAULT 1,
+  visualizacoes integer DEFAULT 0,
+  downloads integer DEFAULT 0,
+  ultima_utilizacao_ia timestamp with time zone,
+  cliente_id uuid,
+  produto_id uuid,
+  proposta_id uuid,
+  contrato_id uuid,
+  arquivo_pai_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  deleted_at timestamp with time zone,
+  CONSTRAINT arquivos_ia_pkey PRIMARY KEY (id),
+  CONSTRAINT arquivos_ia_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT arquivos_ia_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.clients(id),
+  CONSTRAINT arquivos_ia_arquivo_pai_id_fkey FOREIGN KEY (arquivo_pai_id) REFERENCES public.arquivos_ia(id)
 );
-
--- Índices
-CREATE INDEX idx_clients_church_id ON clients(church_id);
-CREATE INDEX idx_clients_status ON clients(status);
-CREATE INDEX idx_clients_category ON clients(category);
-CREATE INDEX idx_clients_email ON clients(email);
-CREATE INDEX idx_clients_phone ON clients(phone);
-CREATE INDEX idx_clients_whatsapp ON clients(whatsapp);
-CREATE INDEX idx_clients_remote_jid ON clients(remote_jid);
-CREATE INDEX idx_clients_assigned_to ON clients(assigned_to);
-CREATE INDEX idx_clients_tags ON clients USING GIN(tags);
-
--- ============================================
--- 5. TABELA DE INSTÂNCIAS WHATSAPP
--- ============================================
-CREATE TABLE IF NOT EXISTS whatsapp_instances (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  
-  -- Dados da instância Evolution API
-  instance_name VARCHAR(100) NOT NULL,
-  instance_id VARCHAR(255),
-  api_key VARCHAR(255),
-  
-  -- Número conectado
-  phone_number VARCHAR(20),
-  profile_name VARCHAR(255),
-  profile_pic_url TEXT,
-  
-  -- Status
-  status VARCHAR(20) DEFAULT 'disconnected', -- disconnected, connecting, open
-  
-  -- Webhook
-  webhook_url TEXT,
-  webhook_events TEXT[] DEFAULT '{}',
-  
-  -- Configurações
-  settings JSONB DEFAULT '{
-    "reject_call": false,
-    "groups_ignore": true,
-    "always_online": false,
-    "read_messages": false,
-    "read_status": false
-  }'::jsonb,
-  
-  -- Datas
-  connected_at TIMESTAMPTZ,
-  disconnected_at TIMESTAMPTZ,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  UNIQUE(church_id, instance_name)
+CREATE TABLE public.calendar_events (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  title character varying NOT NULL,
+  description text,
+  event_type character varying DEFAULT 'meeting'::character varying,
+  start_at timestamp with time zone NOT NULL,
+  end_at timestamp with time zone NOT NULL,
+  all_day boolean DEFAULT false,
+  location character varying,
+  attendees ARRAY,
+  reminder_minutes integer DEFAULT 30,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  cliente_id uuid,
+  color text,
+  reminders text,
+  notes text,
+  CONSTRAINT calendar_events_pkey PRIMARY KEY (id),
+  CONSTRAINT calendar_events_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT calendar_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT calendar_events_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.clients(id)
 );
-
--- Índices
-CREATE INDEX idx_whatsapp_instances_church_id ON whatsapp_instances(church_id);
-CREATE INDEX idx_whatsapp_instances_status ON whatsapp_instances(status);
-CREATE INDEX idx_whatsapp_instances_instance_name ON whatsapp_instances(instance_name);
-
--- ============================================
--- 6. TABELA DE CONVERSAS (CHATS)
--- ============================================
-CREATE TABLE IF NOT EXISTS conversations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  whatsapp_instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
-  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
-  
-  -- Identificação do contato
-  remote_jid VARCHAR(100) NOT NULL,
-  contact_name VARCHAR(255),
-  contact_phone VARCHAR(20),
-  contact_pic_url TEXT,
-  is_group BOOLEAN DEFAULT false,
-  
-  -- Origem
-  source VARCHAR(20) DEFAULT 'whatsapp',
-  
-  -- Status da conversa
-  status VARCHAR(20) DEFAULT 'open',
-  
-  -- Atribuição (referência ao auth.users)
-  assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Contadores
-  unread_count INTEGER DEFAULT 0,
-  
-  -- Última mensagem
-  last_message_text TEXT,
-  last_message_at TIMESTAMPTZ,
-  last_message_from_me BOOLEAN DEFAULT false,
-  
-  -- Tags
-  tags TEXT[] DEFAULT '{}',
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  UNIQUE(church_id, remote_jid, source)
+CREATE TABLE public.church_accommodations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  codigo character varying,
+  tipo character varying NOT NULL DEFAULT 'individual'::character varying,
+  capacidade_maxima integer NOT NULL DEFAULT 1,
+  quantidade_disponivel integer NOT NULL DEFAULT 1,
+  descricao text,
+  possui_banheiro boolean DEFAULT false,
+  possui_banheiro_privativo boolean DEFAULT false,
+  possui_roupa_cama boolean DEFAULT true,
+  possui_toalhas boolean DEFAULT false,
+  possui_ar_condicionado boolean DEFAULT false,
+  possui_ventilador boolean DEFAULT false,
+  possui_tv boolean DEFAULT false,
+  possui_wifi boolean DEFAULT true,
+  possui_frigobar boolean DEFAULT false,
+  comodidades_extras jsonb DEFAULT '[]'::jsonb,
+  valor_noite_override numeric,
+  fotos jsonb DEFAULT '[]'::jsonb,
+  ativo boolean DEFAULT true,
+  em_manutencao boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT church_accommodations_pkey PRIMARY KEY (id),
+  CONSTRAINT church_accommodations_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
 );
-
--- Índices
-CREATE INDEX idx_conversations_church_id ON conversations(church_id);
-CREATE INDEX idx_conversations_whatsapp_instance_id ON conversations(whatsapp_instance_id);
-CREATE INDEX idx_conversations_client_id ON conversations(client_id);
-CREATE INDEX idx_conversations_remote_jid ON conversations(remote_jid);
-CREATE INDEX idx_conversations_status ON conversations(status);
-CREATE INDEX idx_conversations_assigned_to ON conversations(assigned_to);
-CREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at DESC);
-CREATE INDEX idx_conversations_tags ON conversations USING GIN(tags);
-
--- ============================================
--- 7. TABELA DE MENSAGENS
--- ============================================
-CREATE TABLE IF NOT EXISTS messages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  
-  -- Identificação da mensagem
-  message_id VARCHAR(100),
-  
-  -- Remetente
-  from_me BOOLEAN DEFAULT false,
-  sender_jid VARCHAR(100),
-  sender_name VARCHAR(255),
-  
-  -- Conteúdo
-  message_type VARCHAR(20) DEFAULT 'text',
-  content TEXT,
-  caption TEXT,
-  
-  -- Mídia
-  media_url TEXT,
-  media_mimetype VARCHAR(100),
-  media_filename VARCHAR(255),
-  media_size INTEGER,
-  media_duration INTEGER,
-  media_base64 TEXT,
-  
-  -- Localização
-  location_latitude DECIMAL(10, 8),
-  location_longitude DECIMAL(11, 8),
-  location_name VARCHAR(255),
-  location_address TEXT,
-  
-  -- Contato
-  contact_vcard TEXT,
-  
-  -- Status
-  status VARCHAR(20) DEFAULT 'sent',
-  
-  -- Resposta/Citação
-  quoted_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
-  
-  -- Reações
-  reactions JSONB DEFAULT '[]'::jsonb,
-  
-  -- Metadados
-  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  received_at TIMESTAMPTZ DEFAULT NOW(),
-  is_deleted BOOLEAN DEFAULT false
+CREATE TABLE public.church_hosting_config (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL UNIQUE,
+  hospedagem_ativa boolean DEFAULT false,
+  descricao text,
+  publico_permitido jsonb DEFAULT '["romeiros", "retiros", "eventos"]'::jsonb,
+  idade_minima integer DEFAULT 0,
+  permite_criancas boolean DEFAULT true,
+  permite_animais boolean DEFAULT false,
+  acessibilidade text,
+  dias_funcionamento jsonb DEFAULT '["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]'::jsonb,
+  horario_checkin character varying DEFAULT '14:00'::character varying,
+  horario_checkout character varying DEFAULT '12:00'::character varying,
+  estadia_minima integer DEFAULT 1,
+  estadia_maxima integer DEFAULT 30,
+  permite_estender_estadia boolean DEFAULT true,
+  datas_bloqueadas jsonb DEFAULT '[]'::jsonb,
+  bloqueio_por_evento boolean DEFAULT true,
+  valor_por_noite numeric,
+  valor_por_pessoa boolean DEFAULT false,
+  taxa_limpeza numeric,
+  exige_sinal boolean DEFAULT false,
+  valor_sinal numeric,
+  percentual_sinal integer,
+  prazo_pagamento_sinal integer,
+  politica_cancelamento text,
+  formas_pagamento jsonb DEFAULT '["pix", "dinheiro", "transferencia"]'::jsonb,
+  dados_obrigatorios jsonb DEFAULT '["nome", "cpf", "telefone", "email"]'::jsonb,
+  exige_documento boolean DEFAULT true,
+  tipos_documento jsonb DEFAULT '["rg", "cnh", "passaporte"]'::jsonb,
+  ficha_hospede_link text,
+  envio_documentos_por jsonb DEFAULT '["upload", "email"]'::jsonb,
+  ia_nivel_automacao character varying DEFAULT 'informar'::character varying,
+  usa_agendamento_ia boolean DEFAULT false,
+  precisa_confirmacao_humana boolean DEFAULT true,
+  mensagem_confirmacao_reserva text,
+  mensagem_indisponibilidade text,
+  regras_hospedagem text,
+  termos_responsabilidade text,
+  orientacoes_hospede text,
+  politica_silencio text,
+  informacoes_gerais text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT church_hosting_config_pkey PRIMARY KEY (id),
+  CONSTRAINT church_hosting_config_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
 );
-
--- Índices
-CREATE INDEX idx_messages_church_id ON messages(church_id);
-CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX idx_messages_message_id ON messages(message_id);
-CREATE INDEX idx_messages_timestamp ON messages(timestamp DESC);
-CREATE INDEX idx_messages_message_type ON messages(message_type);
-CREATE INDEX idx_messages_from_me ON messages(from_me);
-
--- ============================================
--- 8. TABELA DE PROMPTS DE IA
--- ============================================
-CREATE TABLE IF NOT EXISTS ai_prompts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Dados do prompt
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  prompt_text TEXT NOT NULL,
-  
-  -- Categoria
-  category VARCHAR(50) DEFAULT 'general',
-  
-  -- Variáveis disponíveis
-  variables JSONB DEFAULT '[]'::jsonb,
-  
-  -- Status
-  is_active BOOLEAN DEFAULT true,
-  is_default BOOLEAN DEFAULT false,
-  
-  -- Estatísticas
-  usage_count INTEGER DEFAULT 0,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.church_services (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  slug character varying NOT NULL,
+  tipo character varying NOT NULL DEFAULT 'cerimonia'::character varying,
+  ativo boolean DEFAULT true,
+  ordem integer DEFAULT 0,
+  descricao_curta text,
+  descricao_completa text,
+  icone character varying,
+  etapas jsonb DEFAULT '[]'::jsonb,
+  dias_permitidos jsonb DEFAULT '["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]'::jsonb,
+  horarios_permitidos jsonb DEFAULT '[]'::jsonb,
+  documentos_exigidos jsonb DEFAULT '[]'::jsonb,
+  valor numeric,
+  valor_variavel boolean DEFAULT false,
+  valor_minimo numeric,
+  valor_maximo numeric,
+  forma_pagamento jsonb DEFAULT '["pix", "dinheiro", "transferencia"]'::jsonb,
+  exige_sinal boolean DEFAULT false,
+  valor_sinal numeric,
+  percentual_sinal integer,
+  prazo_pagamento_sinal integer,
+  regras text,
+  restricoes text,
+  prazo_minimo_agendamento integer DEFAULT 30,
+  prazo_maximo_agendamento integer DEFAULT 365,
+  duracao_media_minutos integer,
+  capacidade_maxima integer,
+  usa_agendamento boolean DEFAULT false,
+  usa_tool_verificar_agendamento boolean DEFAULT false,
+  usa_tool_realizar_agendamento boolean DEFAULT false,
+  precisa_confirmacao_humana boolean DEFAULT true,
+  mensagem_confirmacao text,
+  mensagem_indisponibilidade text,
+  mensagem_pos_agendamento text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT church_services_pkey PRIMARY KEY (id),
+  CONSTRAINT church_services_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
 );
-
--- Índices
-CREATE INDEX idx_ai_prompts_church_id ON ai_prompts(church_id);
-CREATE INDEX idx_ai_prompts_category ON ai_prompts(category);
-CREATE INDEX idx_ai_prompts_is_active ON ai_prompts(is_active);
-
--- ============================================
--- 9. TABELA DE ARQUIVOS/DOCUMENTOS
--- ============================================
-CREATE TABLE IF NOT EXISTS files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  uploaded_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Dados do arquivo
-  name VARCHAR(255) NOT NULL,
-  original_name VARCHAR(255),
-  description TEXT,
-  
-  -- Tipo e tamanho
-  mime_type VARCHAR(100),
-  size INTEGER,
-  
-  -- Armazenamento
-  storage_path TEXT NOT NULL,
-  public_url TEXT,
-  
-  -- Categorização
-  category VARCHAR(50) DEFAULT 'general',
-  tags TEXT[] DEFAULT '{}',
-  
-  -- Uso pela IA
-  is_ai_available BOOLEAN DEFAULT false,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.churches (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  owner_id uuid NOT NULL,
+  name character varying NOT NULL,
+  slug character varying NOT NULL,
+  cnpj character varying,
+  email character varying,
+  phone character varying,
+  address text,
+  city character varying,
+  state character varying,
+  zip_code character varying,
+  logo_url text,
+  website character varying,
+  description text,
+  timezone character varying DEFAULT 'America/Sao_Paulo'::character varying,
+  language character varying DEFAULT 'pt-BR'::character varying,
+  plan character varying DEFAULT 'free'::character varying,
+  plan_expires_at timestamp with time zone,
+  instance character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  instance_connected_at timestamp with time zone,
+  role text,
+  instagram character varying,
+  facebook character varying,
+  tokens_count text,
+  total_tokens text,
+  CONSTRAINT churches_pkey PRIMARY KEY (id),
+  CONSTRAINT churches_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id)
 );
-
--- Índices
-CREATE INDEX idx_files_church_id ON files(church_id);
-CREATE INDEX idx_files_category ON files(category);
-CREATE INDEX idx_files_is_ai_available ON files(is_ai_available);
-CREATE INDEX idx_files_tags ON files USING GIN(tags);
-
--- ============================================
--- 10. TABELA DE AVISOS/NOTIFICAÇÕES
--- ============================================
-CREATE TABLE IF NOT EXISTS notices (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Dados do aviso
-  title VARCHAR(255) NOT NULL,
-  content TEXT NOT NULL,
-  
-  -- Tipo e prioridade
-  type VARCHAR(50) DEFAULT 'info',
-  priority INTEGER DEFAULT 0,
-  
-  -- Período de exibição
-  start_at TIMESTAMPTZ DEFAULT NOW(),
-  end_at TIMESTAMPTZ,
-  
-  -- Status
-  is_active BOOLEAN DEFAULT true,
-  is_pinned BOOLEAN DEFAULT false,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.clients (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  name character varying NOT NULL,
+  email character varying,
+  phone character varying,
+  whatsapp character varying,
+  remote_jid character varying,
+  status character varying DEFAULT 'lead'::character varying,
+  category character varying DEFAULT 'sem-categoria'::character varying,
+  tags ARRAY DEFAULT '{}'::text[],
+  notes text,
+  address text,
+  city character varying,
+  state character varying,
+  zip_code character varying,
+  interest character varying,
+  motivation text,
+  expectation text,
+  event_type character varying,
+  source character varying,
+  source_details text,
+  assigned_to uuid,
+  last_contact_at timestamp with time zone,
+  next_followup_at timestamp with time zone,
+  converted_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  ultima_mensagem timestamp with time zone,
+  origem character varying,
+  instancia character varying,
+  ultima_conversa text,
+  atendimento_ia text,
+  CONSTRAINT clients_pkey PRIMARY KEY (id),
+  CONSTRAINT clients_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT clients_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES auth.users(id)
 );
-
--- Índices
-CREATE INDEX idx_notices_church_id ON notices(church_id);
-CREATE INDEX idx_notices_is_active ON notices(is_active);
-CREATE INDEX idx_notices_start_at ON notices(start_at);
-CREATE INDEX idx_notices_end_at ON notices(end_at);
-
--- ============================================
--- 11. TABELA DE LOGS DE ATIVIDADE
--- ============================================
-CREATE TABLE IF NOT EXISTS activity_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  church_id UUID NOT NULL REFERENCES churches(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  
-  -- Ação
-  action VARCHAR(100) NOT NULL,
-  entity_type VARCHAR(50),
-  entity_id UUID,
-  
-  -- Detalhes
-  details JSONB,
-  ip_address INET,
-  user_agent TEXT,
-  
-  -- Metadados
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE public.conversations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  client_id uuid,
+  whatsapp_instance_id uuid,
+  remote_jid character varying NOT NULL,
+  contact_name character varying,
+  status character varying DEFAULT 'active'::character varying,
+  last_message_at timestamp with time zone,
+  last_message_preview text,
+  unread_count integer DEFAULT 0,
+  assigned_to uuid,
+  tags ARRAY DEFAULT '{}'::text[],
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT conversations_pkey PRIMARY KEY (id),
+  CONSTRAINT conversations_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT conversations_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT conversations_whatsapp_instance_id_fkey FOREIGN KEY (whatsapp_instance_id) REFERENCES public.whatsapp_instances(id),
+  CONSTRAINT conversations_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES auth.users(id)
 );
-
--- Índices
-CREATE INDEX idx_activity_logs_church_id ON activity_logs(church_id);
-CREATE INDEX idx_activity_logs_user_id ON activity_logs(user_id);
-CREATE INDEX idx_activity_logs_action ON activity_logs(action);
-CREATE INDEX idx_activity_logs_entity_type ON activity_logs(entity_type);
-CREATE INDEX idx_activity_logs_created_at ON activity_logs(created_at DESC);
-
--- ============================================
--- FUNÇÕES AUXILIARES
--- ============================================
-
--- Função para obter church_id do usuário autenticado
-CREATE OR REPLACE FUNCTION get_user_church_id()
-RETURNS UUID AS $$
-  SELECT id FROM churches WHERE owner_id = auth.uid() LIMIT 1;
-$$ LANGUAGE SQL SECURITY DEFINER STABLE;
-
--- Função para verificar se usuário é dono da igreja
-CREATE OR REPLACE FUNCTION is_church_owner(p_church_id UUID)
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM churches 
-    WHERE id = p_church_id 
-    AND owner_id = auth.uid()
-  );
-$$ LANGUAGE SQL SECURITY DEFINER STABLE;
-
--- Função para atualizar updated_at automaticamente
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Função para gerar slug
-CREATE OR REPLACE FUNCTION generate_slug(input_name TEXT)
-RETURNS TEXT AS $$
-DECLARE
-  result TEXT;
-BEGIN
-  result := translate(input_name, 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', 'aaaaaeeeeiiiioooooouuuucAAAAAEEEEIIIIOOOOOUUUUC');
-  result := regexp_replace(result, '[^a-zA-Z0-9 -]', '', 'g');
-  result := regexp_replace(result, ' +', '-', 'g');
-  result := lower(result);
-  result := regexp_replace(result, '-+', '-', 'g');
-  result := trim(both '-' from result);
-  RETURN result;
-END;
-$$ LANGUAGE plpgsql;
-
--- ============================================
--- TRIGGERS PARA updated_at
--- ============================================
-CREATE TRIGGER update_churches_updated_at BEFORE UPDATE ON churches 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_ai_configs_updated_at BEFORE UPDATE ON ai_configs 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_calendar_events_updated_at BEFORE UPDATE ON calendar_events 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON clients 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_whatsapp_instances_updated_at BEFORE UPDATE ON whatsapp_instances 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_ai_prompts_updated_at BEFORE UPDATE ON ai_prompts 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_files_updated_at BEFORE UPDATE ON files 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_notices_updated_at BEFORE UPDATE ON notices 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ============================================
--- TRIGGER PARA CRIAR IGREJA AUTOMATICAMENTE
--- ============================================
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-DECLARE
-  church_name TEXT;
-  base_slug TEXT;
-  final_slug TEXT;
-  slug_counter INTEGER := 0;
-BEGIN
-  church_name := NEW.raw_user_meta_data->>'church_name';
-  
-  IF church_name IS NULL OR church_name = '' THEN
-    RETURN NEW;
-  END IF;
-  
-  base_slug := generate_slug(church_name);
-  final_slug := base_slug;
-  
-  WHILE EXISTS (SELECT 1 FROM churches WHERE slug = final_slug) LOOP
-    slug_counter := slug_counter + 1;
-    final_slug := base_slug || '-' || slug_counter;
-  END LOOP;
-  
-  INSERT INTO churches (owner_id, name, slug, email, plan, is_active)
-  VALUES (NEW.id, church_name, final_slug, NEW.email, 'free', true);
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-
--- ============================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- ============================================
-
-ALTER TABLE churches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_configs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE whatsapp_instances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_prompts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
-
--- POLÍTICAS - CHURCHES
-CREATE POLICY "Users can view their own church" ON churches
-  FOR SELECT USING (owner_id = auth.uid());
-
-CREATE POLICY "Users can update their own church" ON churches
-  FOR UPDATE USING (owner_id = auth.uid());
-
--- POLÍTICAS - AI_CONFIGS
-CREATE POLICY "Users can view their church AI config" ON ai_configs
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church AI config" ON ai_configs
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - CALENDAR_EVENTS
-CREATE POLICY "Users can view their church events" ON calendar_events
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church events" ON calendar_events
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - CLIENTS
-CREATE POLICY "Users can view their church clients" ON clients
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church clients" ON clients
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - WHATSAPP_INSTANCES
-CREATE POLICY "Users can view their church WhatsApp instances" ON whatsapp_instances
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church WhatsApp instances" ON whatsapp_instances
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - CONVERSATIONS
-CREATE POLICY "Users can view their church conversations" ON conversations
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church conversations" ON conversations
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - MESSAGES
-CREATE POLICY "Users can view their church messages" ON messages
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can create messages" ON messages
-  FOR INSERT WITH CHECK (is_church_owner(church_id));
-
--- POLÍTICAS - AI_PROMPTS
-CREATE POLICY "Users can view their church prompts" ON ai_prompts
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church prompts" ON ai_prompts
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - FILES
-CREATE POLICY "Users can view their church files" ON files
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church files" ON files
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - NOTICES
-CREATE POLICY "Users can view their church notices" ON notices
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can manage their church notices" ON notices
-  FOR ALL USING (is_church_owner(church_id));
-
--- POLÍTICAS - ACTIVITY_LOGS
-CREATE POLICY "Users can view their church activity logs" ON activity_logs
-  FOR SELECT USING (is_church_owner(church_id));
-
-CREATE POLICY "Users can create activity logs" ON activity_logs
-  FOR INSERT WITH CHECK (is_church_owner(church_id));
-
--- ============================================
--- VIEWS ÚTEIS
--- ============================================
-
-CREATE OR REPLACE VIEW conversations_with_last_message AS
-SELECT 
-  c.*,
-  m.content as last_message_content,
-  m.message_type as last_message_type,
-  m.timestamp as last_message_timestamp
-FROM conversations c
-LEFT JOIN LATERAL (
-  SELECT content, message_type, timestamp
-  FROM messages
-  WHERE conversation_id = c.id
-  ORDER BY timestamp DESC
-  LIMIT 1
-) m ON true;
-
-CREATE OR REPLACE VIEW client_stats AS
-SELECT 
-  church_id,
-  COUNT(*) as total_clients,
-  COUNT(*) FILTER (WHERE status = 'lead') as total_leads,
-  COUNT(*) FILTER (WHERE status = 'ativo') as total_active,
-  COUNT(*) FILTER (WHERE status = 'inativo') as total_inactive,
-  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as new_last_30_days
-FROM clients
-GROUP BY church_id;
-
--- ============================================
--- FIM DO SCHEMA
--- ============================================
+CREATE TABLE public.files (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  name character varying NOT NULL,
+  file_type character varying,
+  file_size bigint,
+  storage_path text NOT NULL,
+  public_url text,
+  mime_type character varying,
+  related_to_type character varying,
+  related_to_id uuid,
+  uploaded_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT files_pkey PRIMARY KEY (id),
+  CONSTRAINT files_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT files_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.hosting_reservations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  accommodation_id uuid,
+  client_id uuid,
+  data_checkin date NOT NULL,
+  data_checkout date NOT NULL,
+  hospede_nome character varying NOT NULL,
+  hospede_cpf character varying,
+  hospede_rg character varying,
+  hospede_telefone character varying,
+  hospede_email character varying,
+  hospede_endereco text,
+  hospede_data_nascimento date,
+  quantidade_hospedes integer DEFAULT 1,
+  acompanhantes jsonb DEFAULT '[]'::jsonb,
+  valor_total numeric,
+  valor_sinal_pago numeric,
+  valor_restante numeric,
+  status character varying DEFAULT 'pendente'::character varying,
+  pagamento_status character varying DEFAULT 'pendente'::character varying,
+  forma_pagamento character varying,
+  observacoes text,
+  motivo_visita text,
+  origem character varying DEFAULT 'manual'::character varying,
+  atendido_por uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hosting_reservations_pkey PRIMARY KEY (id),
+  CONSTRAINT hosting_reservations_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT hosting_reservations_accommodation_id_fkey FOREIGN KEY (accommodation_id) REFERENCES public.church_accommodations(id),
+  CONSTRAINT hosting_reservations_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT hosting_reservations_atendido_por_fkey FOREIGN KEY (atendido_por) REFERENCES auth.users(id)
+);
+CREATE TABLE public.messages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  conversation_id uuid NOT NULL,
+  message_id character varying,
+  remote_jid character varying NOT NULL,
+  direction character varying NOT NULL,
+  content_type character varying DEFAULT 'text'::character varying,
+  content text,
+  media_url text,
+  media_mime_type character varying,
+  status character varying DEFAULT 'sent'::character varying,
+  timestamp timestamp with time zone NOT NULL,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT messages_pkey PRIMARY KEY (id),
+  CONSTRAINT messages_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
+);
+CREATE TABLE public.notices (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  title character varying NOT NULL,
+  message text NOT NULL,
+  type character varying DEFAULT 'info'::character varying,
+  priority character varying DEFAULT 'normal'::character varying,
+  target_audience character varying DEFAULT 'all'::character varying,
+  start_date timestamp with time zone,
+  end_date timestamp with time zone,
+  is_active boolean DEFAULT true,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notices_pkey PRIMARY KEY (id),
+  CONSTRAINT notices_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT notices_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.service_appointments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  service_id uuid NOT NULL,
+  client_id uuid,
+  data_agendamento date NOT NULL,
+  hora_inicio time without time zone,
+  hora_fim time without time zone,
+  solicitante_nome character varying NOT NULL,
+  solicitante_telefone character varying,
+  solicitante_email character varying,
+  solicitante_cpf character varying,
+  detalhes jsonb DEFAULT '{}'::jsonb,
+  documentos_entregues jsonb DEFAULT '[]'::jsonb,
+  documentos_pendentes jsonb DEFAULT '[]'::jsonb,
+  valor_total numeric,
+  valor_sinal_pago numeric,
+  valor_restante numeric,
+  status character varying DEFAULT 'solicitado'::character varying,
+  pagamento_status character varying DEFAULT 'pendente'::character varying,
+  forma_pagamento character varying,
+  observacoes text,
+  origem character varying DEFAULT 'manual'::character varying,
+  atendido_por uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT service_appointments_pkey PRIMARY KEY (id),
+  CONSTRAINT service_appointments_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT service_appointments_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.church_services(id),
+  CONSTRAINT service_appointments_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT service_appointments_atendido_por_fkey FOREIGN KEY (atendido_por) REFERENCES auth.users(id)
+);
+CREATE TABLE public.support_ticket_categories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  descricao text,
+  cor character varying DEFAULT '#8B5CF6'::character varying,
+  icone character varying,
+  ativo boolean DEFAULT true,
+  ordem integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT support_ticket_categories_pkey PRIMARY KEY (id),
+  CONSTRAINT support_ticket_categories_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.support_ticket_messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  ticket_id uuid NOT NULL,
+  church_id uuid NOT NULL,
+  tipo character varying NOT NULL,
+  conteudo text NOT NULL,
+  autor_id uuid,
+  autor_nome character varying,
+  autor_tipo character varying DEFAULT 'atendente'::character varying,
+  whatsapp_message_id character varying,
+  whatsapp_status character varying,
+  anexos jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT support_ticket_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT support_ticket_messages_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.support_tickets(id),
+  CONSTRAINT support_ticket_messages_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT support_ticket_messages_autor_id_fkey FOREIGN KEY (autor_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.support_ticket_reasons (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  descricao text,
+  categoria_id uuid,
+  prioridade_padrao character varying DEFAULT 'normal'::character varying,
+  ativo boolean DEFAULT true,
+  ordem integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT support_ticket_reasons_pkey PRIMARY KEY (id),
+  CONSTRAINT support_ticket_reasons_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT support_ticket_reasons_categoria_id_fkey FOREIGN KEY (categoria_id) REFERENCES public.support_ticket_categories(id)
+);
+CREATE TABLE public.support_tickets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  telefone character varying NOT NULL,
+  email character varying,
+  motivo character varying NOT NULL,
+  categoria character varying,
+  assunto character varying,
+  observacao text,
+  prioridade character varying DEFAULT 'normal'::character varying,
+  status character varying DEFAULT 'pendente'::character varying,
+  data_criacao timestamp with time zone DEFAULT now(),
+  data_atualizacao timestamp with time zone DEFAULT now(),
+  data_resolucao timestamp with time zone,
+  responsavel_id uuid,
+  responsavel_nome character varying,
+  origem character varying DEFAULT 'manual'::character varying,
+  conversa_id uuid,
+  tags ARRAY,
+  anexos jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT support_tickets_pkey PRIMARY KEY (id),
+  CONSTRAINT support_tickets_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT support_tickets_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  auth_id uuid NOT NULL UNIQUE,
+  church_id uuid NOT NULL,
+  name character varying NOT NULL,
+  email character varying NOT NULL,
+  role character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_auth_id_fkey FOREIGN KEY (auth_id) REFERENCES auth.users(id),
+  CONSTRAINT users_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.visitation_followup_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  response_id uuid NOT NULL,
+  church_id uuid NOT NULL,
+  tipo character varying NOT NULL,
+  descricao text NOT NULL,
+  resultado character varying,
+  responsavel_id uuid,
+  responsavel_nome character varying,
+  data_contato timestamp with time zone DEFAULT now(),
+  proxima_acao text,
+  data_proxima_acao date,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT visitation_followup_history_pkey PRIMARY KEY (id),
+  CONSTRAINT visitation_followup_history_response_id_fkey FOREIGN KEY (response_id) REFERENCES public.visitation_form_responses(id),
+  CONSTRAINT visitation_followup_history_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT visitation_followup_history_responsavel_id_fkey FOREIGN KEY (responsavel_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.visitation_form_config (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL UNIQUE,
+  titulo character varying NOT NULL DEFAULT 'Formulário de Visitação'::character varying,
+  descricao text,
+  ativo boolean DEFAULT true,
+  cor_primaria character varying DEFAULT '#8B5CF6'::character varying,
+  logo_url text,
+  mensagem_boas_vindas text,
+  mensagem_agradecimento text DEFAULT 'Obrigado por preencher o formulário! Em breve entraremos em contato.'::text,
+  campos_config jsonb DEFAULT '{"cep": {"ativo": false, "label": "CEP", "obrigatorio": false}, "nome": {"ativo": true, "label": "Nome completo", "obrigatorio": true}, "email": {"ativo": true, "label": "E-mail", "obrigatorio": false}, "bairro": {"ativo": false, "label": "Bairro", "obrigatorio": false}, "cidade": {"ativo": false, "label": "Cidade", "obrigatorio": false}, "estado": {"ativo": false, "label": "Estado", "obrigatorio": false}, "endereco": {"ativo": false, "label": "Endereço", "obrigatorio": false}, "telefone": {"ativo": true, "label": "Telefone/WhatsApp", "obrigatorio": true}, "observacoes": {"ativo": false, "label": "Observações", "obrigatorio": false}, "qual_igreja": {"ativo": false, "label": "Qual igreja?", "obrigatorio": false}, "como_conheceu": {"ativo": true, "label": "Como conheceu nossa igreja?", "obrigatorio": false}, "motivo_visita": {"ativo": true, "label": "Motivo da visita", "obrigatorio": false}, "pedido_oracao": {"ativo": true, "label": "Pedido de oração", "obrigatorio": false}, "data_nascimento": {"ativo": false, "label": "Data de nascimento", "obrigatorio": false}, "ja_frequenta_igreja": {"ativo": false, "label": "Já frequenta alguma igreja?", "obrigatorio": false}, "deseja_receber_visita": {"ativo": true, "label": "Deseja receber visita?", "obrigatorio": false}, "melhor_horario_contato": {"ativo": false, "label": "Melhor horário para contato", "obrigatorio": false}}'::jsonb,
+  campos_personalizados jsonb DEFAULT '[]'::jsonb,
+  opcoes_como_conheceu jsonb DEFAULT '["Indicação de amigo/familiar", "Redes sociais", "Passou em frente", "Evento", "Busca na internet", "Outro"]'::jsonb,
+  opcoes_motivo_visita jsonb DEFAULT '["Primeira visita", "Conhecer a igreja", "Buscar orientação espiritual", "Participar de evento", "Acompanhar familiar/amigo", "Outro"]'::jsonb,
+  notificar_email boolean DEFAULT true,
+  emails_notificacao ARRAY,
+  notificar_whatsapp boolean DEFAULT false,
+  slug character varying UNIQUE,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT visitation_form_config_pkey PRIMARY KEY (id),
+  CONSTRAINT visitation_form_config_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.visitation_form_responses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  form_config_id uuid NOT NULL,
+  nome character varying NOT NULL,
+  email character varying,
+  telefone character varying,
+  data_nascimento date,
+  endereco text,
+  bairro character varying,
+  cidade character varying,
+  estado character varying,
+  cep character varying,
+  como_conheceu character varying,
+  motivo_visita character varying,
+  pedido_oracao text,
+  ja_frequenta_igreja boolean,
+  qual_igreja character varying,
+  deseja_receber_visita boolean,
+  melhor_horario_contato character varying,
+  observacoes text,
+  campos_personalizados_respostas jsonb DEFAULT '{}'::jsonb,
+  data_visita date DEFAULT CURRENT_DATE,
+  ip_address character varying,
+  user_agent text,
+  status character varying DEFAULT 'novo'::character varying,
+  notas_acompanhamento text,
+  responsavel_acompanhamento uuid,
+  data_ultimo_contato timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT visitation_form_responses_pkey PRIMARY KEY (id),
+  CONSTRAINT visitation_form_responses_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT visitation_form_responses_form_config_id_fkey FOREIGN KEY (form_config_id) REFERENCES public.visitation_form_config(id),
+  CONSTRAINT visitation_form_responses_responsavel_acompanhamento_fkey FOREIGN KEY (responsavel_acompanhamento) REFERENCES auth.users(id)
+);
+CREATE TABLE public.whatsapp_chats (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  instance_name character varying NOT NULL,
+  remote_jid character varying NOT NULL,
+  contact_name character varying,
+  contact_push_name character varying,
+  profile_picture_url text,
+  is_group boolean DEFAULT false,
+  unread_count integer DEFAULT 0,
+  last_message_at timestamp with time zone,
+  last_message_preview text,
+  is_archived boolean DEFAULT false,
+  is_pinned boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT whatsapp_chats_pkey PRIMARY KEY (id),
+  CONSTRAINT whatsapp_chats_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.whatsapp_contacts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  instance_name character varying NOT NULL,
+  jid character varying NOT NULL,
+  phone_number character varying,
+  name character varying,
+  push_name character varying,
+  profile_picture_url text,
+  profile_status text,
+  is_business boolean DEFAULT false,
+  is_blocked boolean DEFAULT false,
+  last_seen timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT whatsapp_contacts_pkey PRIMARY KEY (id),
+  CONSTRAINT whatsapp_contacts_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.whatsapp_instances (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  church_id uuid NOT NULL,
+  instance_name character varying NOT NULL UNIQUE,
+  instance_id character varying,
+  phone_number character varying,
+  status character varying DEFAULT 'disconnected'::character varying,
+  qr_code text,
+  connected_at timestamp with time zone,
+  disconnected_at timestamp with time zone,
+  settings jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  CONSTRAINT whatsapp_instances_pkey PRIMARY KEY (id),
+  CONSTRAINT whatsapp_instances_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id)
+);
+CREATE TABLE public.whatsapp_media (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  message_id uuid,
+  media_key character varying,
+  media_type character varying NOT NULL,
+  mimetype character varying,
+  filename character varying,
+  file_size integer,
+  duration integer,
+  width integer,
+  height integer,
+  url text,
+  storage_path text,
+  base64_data text,
+  thumbnail_base64 text,
+  is_downloaded boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT whatsapp_media_pkey PRIMARY KEY (id),
+  CONSTRAINT whatsapp_media_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT whatsapp_media_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.whatsapp_messages(id)
+);
+CREATE TABLE public.whatsapp_messages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  church_id uuid NOT NULL,
+  chat_id uuid NOT NULL,
+  instance_name character varying NOT NULL,
+  message_id character varying NOT NULL,
+  remote_jid character varying NOT NULL,
+  from_me boolean NOT NULL,
+  sender_jid character varying,
+  sender_name character varying,
+  message_type character varying NOT NULL,
+  text_content text,
+  caption text,
+  media_url text,
+  media_mimetype character varying,
+  media_filename character varying,
+  media_size integer,
+  media_duration integer,
+  media_base64 text,
+  thumbnail_base64 text,
+  latitude numeric,
+  longitude numeric,
+  location_name character varying,
+  location_address text,
+  vcard text,
+  status character varying DEFAULT 'sent'::character varying,
+  is_edited boolean DEFAULT false,
+  is_deleted boolean DEFAULT false,
+  is_forwarded boolean DEFAULT false,
+  quoted_message_id character varying,
+  quoted_message_preview text,
+  reaction_emoji character varying,
+  reaction_to_message_id character varying,
+  message_timestamp timestamp with time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT whatsapp_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT whatsapp_messages_church_id_fkey FOREIGN KEY (church_id) REFERENCES public.churches(id),
+  CONSTRAINT whatsapp_messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.whatsapp_chats(id)
+);

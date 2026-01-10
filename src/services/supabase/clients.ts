@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { Client, ClientStatus, ClientCategory } from '../../types/database';
+import { getUserData } from '../../lib/user';
 
 export type CreateClientInput = {
   name: string;
@@ -20,22 +21,13 @@ export type UpdateClientInput = Partial<CreateClientInput>;
 
 export const clientsService = {
   async getAll(): Promise<Client[]> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return [];
-
-    // Buscar church_id do usuário
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) return [];
+    const profile = await getUserData();
+    if (!profile?.church_id) return [];
 
     const { data, error } = await supabase
       .from('clients')
       .select('*')
-      .eq('church_id', church.id)
+      .eq('church_id', profile.church_id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -62,22 +54,16 @@ export const clientsService = {
   },
 
   async create(input: CreateClientInput): Promise<Client> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('Usuário não autenticado');
-
-    // Buscar church_id diretamente da tabela churches pelo owner_id
-    const { data: church } = await supabase
-      .from('churches')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .single();
-
-    if (!church) throw new Error('Igreja não encontrada');
+    const profile = await getUserData();
+    if (!profile?.church_id) throw new Error('Igreja não encontrada');
+    if (String(profile.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
 
     const { data, error } = await supabase
       .from('clients')
       .insert({
-        church_id: church.id,
+        church_id: profile.church_id,
         name: input.name,
         email: input.email,
         phone: input.phone || input.whatsapp,
@@ -99,6 +85,11 @@ export const clientsService = {
   },
 
   async update(id: string, input: UpdateClientInput): Promise<Client> {
+    const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
+
     const { data, error } = await supabase
       .from('clients')
       .update({
@@ -116,6 +107,11 @@ export const clientsService = {
   },
 
   async delete(id: string): Promise<void> {
+    const profile = await getUserData();
+    if (String(profile?.role || '').toLowerCase() === 'consulta') {
+      throw new Error('Somente visualização');
+    }
+
     const { error } = await supabase
       .from('clients')
       .delete()

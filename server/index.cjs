@@ -67,6 +67,86 @@ async function supabaseAuthAdmin(endpoint, options = {}) {
   return data;
 }
 
+async function supabaseAuthUser(accessToken) {
+  const fetch = (await import('node-fetch')).default;
+  const url = `${SUPABASE_URL}/auth/v1/user`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'Supabase user token invalid');
+  }
+  return data;
+}
+
+function getBearerToken(req) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (!authHeader || typeof authHeader !== 'string') return null;
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
+async function isReadOnlyUser(accessToken) {
+  try {
+    const callerAuthUser = await supabaseAuthUser(accessToken);
+    const callerAuthId = callerAuthUser?.id;
+    if (!callerAuthId) return false;
+
+    const profiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=role,is_active`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+
+    const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+    if (!profile?.is_active) return false;
+
+    return String(profile.role || '').toLowerCase() === 'consulta';
+  } catch {
+    return false;
+  }
+}
+
+async function isPlatformManager(callerAuthId) {
+  const isManagerRole = (roleValue) => {
+    const role = String(roleValue || '').toLowerCase().trim();
+    return role === 'manager' || role === 'gerencia';
+  };
+
+  // 1) Manager pelo fato de ser owner de alguma igreja com role=manager
+  const ownedChurches = await supabaseRequest(`churches?owner_id=eq.${callerAuthId}&select=id,role`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+
+  if (Array.isArray(ownedChurches) && ownedChurches.some((c) => isManagerRole(c?.role))) {
+    return true;
+  }
+
+  // 2) Manager pelo fato de ser funcionário ativo em uma igreja cujo role=manager
+  const callerProfiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=church_id,is_active`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+
+  const callerProfile = Array.isArray(callerProfiles) ? callerProfiles[0] : callerProfiles;
+  if (!callerProfile?.is_active || !callerProfile?.church_id) return false;
+
+  const church = await supabaseRequest(`churches?id=eq.${callerProfile.church_id}&select=role`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+  const churchRow = Array.isArray(church) ? church[0] : church;
+
+  return isManagerRole(churchRow?.role);
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -85,6 +165,22 @@ app.use('/api/evolution', async (req, res) => {
 
     const method = req.method.toUpperCase();
     const shouldSendBody = !['GET', 'HEAD'].includes(method);
+
+    const isWriteAction =
+      upstreamPath.startsWith('/message/send') ||
+      upstreamPath.startsWith('/instance/create') ||
+      upstreamPath.startsWith('/instance/delete') ||
+      upstreamPath.startsWith('/instance/logout');
+
+    if (isWriteAction) {
+      const accessToken = getBearerToken(req);
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Token de autenticação ausente' });
+      }
+      if (await isReadOnlyUser(accessToken)) {
+        return res.status(403).json({ error: 'Somente visualização' });
+      }
+    }
 
     const upstreamResponse = await fetchAPI(upstreamUrl, {
       method,
@@ -108,6 +204,75 @@ app.use('/api/evolution', async (req, res) => {
     return res.status(status).send(text);
   } catch (error) {
     console.error('Erro no proxy Evolution:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
+app.get('/api/auth/list-users', async (req, res) => {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase não configurado');
+      return res.status(500).json({ error: 'Servidor não configurado corretamente' });
+    }
+
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+
+    const callerAuthUser = await supabaseAuthUser(accessToken);
+    const callerAuthId = callerAuthUser?.id;
+    if (!callerAuthId) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const churchId = req.query.churchId;
+    if (!churchId) {
+      return res.status(400).json({ error: 'churchId é obrigatório' });
+    }
+
+    const platformManager = await isPlatformManager(callerAuthId);
+    console.log('[list-users] callerAuthId:', callerAuthId, 'platformManager:', platformManager, 'churchId:', churchId);
+    if (platformManager) {
+      const usersData = await supabaseRequest(`users?church_id=eq.${churchId}&select=id,auth_id,name,email,role,is_active,created_at,updated_at&order=created_at.desc`, {
+        method: 'GET',
+        prefer: 'return=representation',
+      });
+
+      return res.json({ success: true, users: usersData || [] });
+    }
+
+    const ownedChurch = await supabaseRequest(`churches?id=eq.${churchId}&owner_id=eq.${callerAuthId}&select=id`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+    const isOwner = Array.isArray(ownedChurch) && ownedChurch.length > 0;
+
+    if (!isOwner) {
+      const callerProfiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=role,church_id,is_active`, {
+        method: 'GET',
+        prefer: 'return=representation',
+      });
+      const callerProfile = Array.isArray(callerProfiles) ? callerProfiles[0] : callerProfiles;
+
+      if (!callerProfile?.is_active || callerProfile.church_id !== churchId) {
+        return res.status(403).json({ error: 'Sem permissão' });
+      }
+
+      const callerRole = String(callerProfile.role || '').toLowerCase();
+      if (!['admin'].includes(callerRole)) {
+        return res.status(403).json({ error: 'Apenas Admin pode listar usuários' });
+      }
+    }
+
+    const usersData = await supabaseRequest(`users?church_id=eq.${churchId}&select=id,auth_id,name,email,role,is_active,created_at,updated_at&order=created_at.desc`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+
+    res.json({ success: true, users: usersData || [] });
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error);
     res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
@@ -136,6 +301,11 @@ app.post('/api/instance/create', async (req, res) => {
   try {
     console.log('=== CRIAÇÃO DE INSTÂNCIA ===');
     console.log('Recebendo requisição para criar instância:', req.body);
+
+    const accessToken = getBearerToken(req);
+    if (accessToken && (await isReadOnlyUser(accessToken))) {
+      return res.status(403).json({ error: 'Somente visualização' });
+    }
     
     const { instanceName, phoneNumber, number } = req.body;
     const resolvedNumber = phoneNumber || number;
@@ -655,6 +825,7 @@ app.post('/api/auth/register', async (req, res) => {
     const churchData = await supabaseRequest('churches', {
       method: 'POST',
       body: JSON.stringify({
+        owner_id: authData.id,
         name: churchName,
         slug: slug,
         email: email,
@@ -666,27 +837,10 @@ app.post('/api/auth/register', async (req, res) => {
     const church = Array.isArray(churchData) ? churchData[0] : churchData;
     console.log('Igreja criada:', church.id);
 
-    // 3. Criar perfil do usuário
-    const userData = await supabaseRequest('users', {
-      method: 'POST',
-      body: JSON.stringify({
-        auth_id: authData.id,
-        church_id: church.id,
-        name: userName,
-        email: email,
-        role: 'owner',
-        is_active: true
-      })
-    });
-
-    const user = Array.isArray(userData) ? userData[0] : userData;
-    console.log('Perfil criado:', user.id);
-
     res.json({
       success: true,
       message: 'Cadastro realizado com sucesso!',
       user: {
-        id: user.id,
         auth_id: authData.id,
         email: email,
         name: userName
@@ -714,10 +868,64 @@ app.post('/api/auth/create-user', async (req, res) => {
       return res.status(500).json({ error: 'Servidor não configurado corretamente' });
     }
 
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+
+    const callerAuthUser = await supabaseAuthUser(accessToken);
+    const callerAuthId = callerAuthUser?.id;
+    if (!callerAuthId) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
     const { churchId, userName, email, password, role } = req.body;
 
     if (!churchId || !userName || !email || !password || !role) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    }
+
+    const normalizedRole = String(role).toLowerCase();
+    const allowedRoles = ['admin', 'manutencao', 'consulta'];
+    if (!allowedRoles.includes(normalizedRole)) {
+      return res.status(400).json({ error: 'Role inválida. Use: admin, manutencao, consulta' });
+    }
+
+    const platformManager = await isPlatformManager(callerAuthId);
+    console.log('[create-user] callerAuthId:', callerAuthId, 'platformManager:', platformManager, 'targetChurchId:', churchId);
+    if (!platformManager) {
+
+
+    const ownedChurch = await supabaseRequest(`churches?id=eq.${churchId}&owner_id=eq.${callerAuthId}&select=id`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+    const isOwner = Array.isArray(ownedChurch) && ownedChurch.length > 0;
+
+    if (!isOwner) {
+      const callerProfiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=role,church_id,is_active`, {
+        method: 'GET',
+        prefer: 'return=representation',
+      });
+      const callerProfile = Array.isArray(callerProfiles) ? callerProfiles[0] : callerProfiles;
+
+      if (!callerProfile?.is_active) {
+        return res.status(403).json({ error: 'Usuário sem acesso' });
+      }
+
+      if (callerProfile.church_id !== churchId) {
+        return res.status(403).json({ error: 'Você não tem permissão para criar usuários nesta igreja' });
+      }
+
+      const callerRole = String(callerProfile.role || '').toLowerCase();
+      if (!['admin'].includes(callerRole)) {
+        return res.status(403).json({ error: 'Apenas Admin pode criar acessos' });
+      }
+
+      if (normalizedRole === 'admin') {
+        return res.status(403).json({ error: 'Admin não pode criar outro Admin' });
+      }
+    }
     }
 
     console.log('Criando usuário no Auth:', email);
@@ -745,7 +953,7 @@ app.post('/api/auth/create-user', async (req, res) => {
         church_id: churchId,
         name: userName,
         email: email,
-        role: role,
+        role: normalizedRole,
         is_active: true
       })
     });
@@ -761,7 +969,7 @@ app.post('/api/auth/create-user', async (req, res) => {
         auth_id: authData.id,
         email: email,
         name: userName,
-        role: role
+        role: normalizedRole
       }
     });
 
