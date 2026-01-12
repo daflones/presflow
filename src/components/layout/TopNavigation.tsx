@@ -15,7 +15,7 @@ const navigationItems: NavigationItem[] = [
   { name: 'Conversas', href: '/conversas', icon: Phone },
   { name: 'Contatos / CRM', href: '/contatos', icon: Users },
   { name: 'Calendário', href: '/calendario', icon: Calendar },
-  { name: 'Intenções e Avisos', href: '/avisos', icon: Bell },
+  { name: 'Intenções de Missas / Avisos', href: '/avisos', icon: Bell },
 ];
 
 export function TopNavigation() {

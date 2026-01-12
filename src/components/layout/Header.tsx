@@ -19,7 +19,7 @@ const navItems = [
   { href: '/conversas', label: 'Conversas', icon: MessageSquare, isPill: true },
   { href: '/contatos', label: 'Contatos / CRM', icon: Contact },
   { href: '/calendario', label: 'Calendário', icon: Calendar },
-  { href: '/avisos', label: 'Intenções e Avisos', icon: BellDot },
+  { href: '/avisos', label: 'Intenções de Missas / Avisos', icon: BellDot },
 ];
 
 export function Header() {

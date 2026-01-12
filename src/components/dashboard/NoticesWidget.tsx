@@ -44,7 +44,7 @@ export function NoticesWidget() {
           <div className="p-2 bg-yellow-500/20 rounded-lg">
             <Bell className="w-5 h-5 text-yellow-400" />
           </div>
-          <h2 className="font-semibold text-white">Intenções e Avisos</h2>
+          <h2 className="font-semibold text-white">Intenções de Missas / Avisos</h2>
         </div>
         <Link to="/avisos" className="text-sm text-purple-400 hover:text-purple-300 transition-colors">Ver Todos</Link>
       </div>
