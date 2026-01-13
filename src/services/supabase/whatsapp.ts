@@ -44,26 +44,92 @@ export const whatsappDbService = {
 
     console.log('[whatsappDb.saveInstance] Salvando instância para church:', churchId, data);
 
-    // Preparar dados para atualização
-    const updateData: Record<string, any> = {
-      instance: data.instance_name,
-      updated_at: new Date().toISOString(),
-    };
+    const nowIso = new Date().toISOString();
 
-    // Se o status for 'open' e tiver connected_at, salvar a data de conexão
-    if (data.status === 'open' && data.connected_at) {
-      updateData.instance_connected_at = data.connected_at;
+    const { data: existingByName, error: existingByNameError } = await supabase
+      .from('whatsapp_instances')
+      .select('id,church_id')
+      .eq('instance_name', data.instance_name)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingByNameError) {
+      console.error('[whatsappDb.saveInstance] Erro ao buscar whatsapp_instances por instance_name:', existingByNameError);
+      throw existingByNameError;
     }
 
-    // Atualizar a tabela churches com o nome da instância
-    const { error: updateError } = await supabase
-      .from('churches')
-      .update(updateData)
-      .eq('id', churchId);
+    if (existingByName?.id && existingByName?.church_id && existingByName.church_id !== churchId) {
+      throw new Error('Instância já vinculada a outra igreja');
+    }
 
-    if (updateError) {
-      console.error('[whatsappDb.saveInstance] Erro ao atualizar igreja:', updateError);
-      throw updateError;
+    const { data: existing, error: existingError } = await supabase
+      .from('whatsapp_instances')
+      .select('id')
+      .eq('church_id', churchId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('[whatsappDb.saveInstance] Erro ao buscar whatsapp_instances:', existingError);
+      throw existingError;
+    }
+
+    const payload: Record<string, any> = {
+      church_id: churchId,
+      instance_name: data.instance_name,
+      instance_id: data.instance_id || null,
+      phone_number: data.phone_number || null,
+      status: data.status || null,
+      updated_at: nowIso,
+      is_active: true,
+    };
+
+    if (data.status === 'open') {
+      payload.connected_at = data.connected_at || nowIso;
+      payload.disconnected_at = null;
+    } else if (data.status === 'disconnected' || data.status === 'close') {
+      payload.disconnected_at = nowIso;
+    }
+
+    const targetId = existingByName?.id || existing?.id;
+
+    const { error: upsertError } = targetId
+      ? await supabase
+          .from('whatsapp_instances')
+          .update(payload)
+          .eq('id', targetId)
+      : await supabase.from('whatsapp_instances').insert(payload);
+
+    if (upsertError) {
+      const errAny: any = upsertError as any;
+      if (errAny?.code === '23505') {
+        const { data: conflictRow } = await supabase
+          .from('whatsapp_instances')
+          .select('id,church_id')
+          .eq('instance_name', data.instance_name)
+          .limit(1)
+          .maybeSingle();
+
+        if (conflictRow?.church_id && conflictRow.church_id !== churchId) {
+          throw new Error('Instância já vinculada a outra igreja');
+        }
+
+        if (conflictRow?.id) {
+          const { error: conflictUpdateError } = await supabase
+            .from('whatsapp_instances')
+            .update(payload)
+            .eq('id', conflictRow.id);
+
+          if (!conflictUpdateError) {
+            console.log('[whatsappDb.saveInstance] Instância salva com sucesso');
+            return;
+          }
+        }
+      }
+      console.error('[whatsappDb.saveInstance] Erro ao salvar whatsapp_instances:', upsertError);
+      throw upsertError;
     }
 
     console.log('[whatsappDb.saveInstance] Instância salva com sucesso');
@@ -95,22 +161,28 @@ export const whatsappDbService = {
       churchId = church.id;
     }
 
-    // Buscar church com o campo instance e instance_connected_at
-    const { data: church, error } = await supabase
-      .from('churches')
-      .select('instance, instance_connected_at')
-      .eq('id', churchId)
-      .single();
+    const { data: inst, error } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_name, connected_at, status, is_active')
+      .eq('church_id', churchId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (error || !church) {
-      console.log('[whatsappDb.getInstance] Igreja não encontrada ou erro:', error);
+    if (error || !inst) {
+      console.log('[whatsappDb.getInstance] Instância não encontrada ou erro:', error);
       return { instance_name: null, connected_at: null };
     }
 
-    console.log('[whatsappDb.getInstance] Instância encontrada:', church.instance, 'connected_at:', church.instance_connected_at);
-    return { 
-      instance_name: church.instance || null,
-      connected_at: church.instance_connected_at || null
+    const status = String(inst.status || '').toLowerCase();
+    const connectedAt = inst.connected_at ? String(inst.connected_at) : null;
+    const isConnected = status === 'open' && !!connectedAt;
+
+    console.log('[whatsappDb.getInstance] Instância encontrada:', inst.instance_name, 'connected_at:', connectedAt);
+    return {
+      instance_name: isConnected ? (inst.instance_name || null) : null,
+      connected_at: connectedAt,
     };
   },
 
@@ -144,19 +216,36 @@ export const whatsappDbService = {
 
     console.log('[whatsappDb.clearInstance] Limpando instância para church:', churchId);
 
-    // Limpar os campos instance e instance_connected_at na tabela churches
-    const { error: updateError } = await supabase
-      .from('churches')
-      .update({
-        instance: null,
-        instance_connected_at: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', churchId);
+    const nowIso = new Date().toISOString();
+    const { data: existing, error: existingError } = await supabase
+      .from('whatsapp_instances')
+      .select('id')
+      .eq('church_id', churchId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('[whatsappDb.clearInstance] Erro ao limpar instância:', updateError);
-      throw updateError;
+    if (existingError) {
+      console.error('[whatsappDb.clearInstance] Erro ao buscar whatsapp_instances:', existingError);
+      throw existingError;
+    }
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from('whatsapp_instances')
+        .update({
+          status: 'disconnected',
+          disconnected_at: nowIso,
+          is_active: false,
+          updated_at: nowIso,
+        })
+        .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('[whatsappDb.clearInstance] Erro ao limpar whatsapp_instances:', updateError);
+        throw updateError;
+      }
     }
 
     console.log('[whatsappDb.clearInstance] Instância removida com sucesso');

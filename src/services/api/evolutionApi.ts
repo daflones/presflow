@@ -159,11 +159,10 @@ class EvolutionApiService {
   private apiKey: string
 
   constructor() {
-    // Em produção (HTTPS), não podemos chamar a Evolution API via HTTP direto do browser (Mixed Content).
-    // Então usamos o backend como proxy (mesma origem) em /api/evolution.
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    this.baseUrl = isHttps ? '/api/evolution' : (import.meta.env.VITE_EVOLUTION_API_URL || '')
-    this.apiKey = isHttps ? '' : (import.meta.env.VITE_EVOLUTION_API_KEY || '')
+    // Para evitar vazamento entre igrejas, sempre usar o backend como proxy (mesma origem) em /api.
+    // Nunca chamar Evolution API direto do browser.
+    this.baseUrl = '/api'
+    this.apiKey = ''
     this.baseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl
   }
 
@@ -172,12 +171,10 @@ class EvolutionApiService {
     const url = `${this.baseUrl}${cleanEndpoint}`
 
     const authHeaders: Record<string, string> = {}
-    if (this.baseUrl.startsWith('/api')) {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (token) {
-        authHeaders.Authorization = `Bearer ${token}`
-      }
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) {
+      authHeaders.Authorization = `Bearer ${token}`
     }
 
     const controller = new AbortController()
@@ -192,10 +189,10 @@ class EvolutionApiService {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          ...(this.apiKey ? { apikey: this.apiKey } : {}),
           'Accept': 'application/json',
+          ...(this.apiKey ? { apikey: this.apiKey } : {}),
           ...authHeaders,
-          ...options.headers,
+          ...(options.headers || {}),
         },
       })
     } finally {

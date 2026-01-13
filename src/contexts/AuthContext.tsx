@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { Church } from '../types/database';
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [church, setChurch] = useState<Church | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastAuthUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string, accessToken: string): Promise<UserProfile | null> => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -142,12 +143,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user && session.access_token) {
+          if (lastAuthUserIdRef.current !== session.user.id) {
+            clearUserDataCache();
+            lastAuthUserIdRef.current = session.user.id;
+          }
           const profileData = await fetchProfile(session.user.id, session.access_token);
           setProfile(profileData);
 
-          let churchData = await fetchChurchByOwnerId(session.user.id, session.access_token);
-          if (!churchData && profileData?.church_id) {
+          let churchData: Church | null = null;
+          if (profileData?.church_id) {
             churchData = await fetchChurchById(profileData.church_id, session.access_token);
+          }
+          if (!churchData) {
+            churchData = await fetchChurchByOwnerId(session.user.id, session.access_token);
           }
 
           setChurch(churchData);
@@ -166,18 +174,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user && session.access_token) {
+        if (lastAuthUserIdRef.current !== session.user.id) {
+          clearUserDataCache();
+          lastAuthUserIdRef.current = session.user.id;
+        }
         const profileData = await fetchProfile(session.user.id, session.access_token);
         setProfile(profileData);
 
-        let churchData = await fetchChurchByOwnerId(session.user.id, session.access_token);
-        if (!churchData && profileData?.church_id) {
+        let churchData: Church | null = null;
+        if (profileData?.church_id) {
           churchData = await fetchChurchById(profileData.church_id, session.access_token);
+        }
+        if (!churchData) {
+          churchData = await fetchChurchByOwnerId(session.user.id, session.access_token);
         }
 
         setChurch(churchData);
       } else {
         setChurch(null);
         setProfile(null);
+        lastAuthUserIdRef.current = null;
       }
       setLoading(false);
     });

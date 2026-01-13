@@ -128,12 +128,27 @@ async function getAllowedInstanceName(accessToken) {
   const churchId = await getUserChurchId(accessToken);
   if (!churchId) return null;
 
-  const church = await supabaseRequest(`churches?id=eq.${churchId}&select=instance`, {
-    method: 'GET',
-    prefer: 'return=representation',
-  });
-  const churchRow = Array.isArray(church) ? church[0] : church;
-  return churchRow?.instance || null;
+  // Preferir tabela whatsapp_instances como fonte de verdade.
+  try {
+    const inst = await supabaseRequest(
+      `whatsapp_instances?church_id=eq.${churchId}&is_active=eq.true&select=instance_name,status,connected_at&order=created_at.desc&limit=1`,
+      {
+        method: 'GET',
+        prefer: 'return=representation',
+      },
+    );
+    const row = Array.isArray(inst) ? inst[0] : inst;
+    const status = String(row?.status || '').toLowerCase();
+    const connectedAt = row?.connected_at || null;
+    const isConnected = status === 'open' && !!connectedAt;
+    if (row?.instance_name && isConnected) {
+      return row.instance_name;
+    }
+  } catch {
+    // ignore e tentar fallback
+  }
+
+  return null;
 }
 
 async function ensureInstanceAccess(req, res, next) {

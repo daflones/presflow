@@ -1,5 +1,6 @@
 // Serviço para integração com Evolution API
 import { supabase } from '../../lib/supabase'
+import { getUserData } from '../../lib/user'
 export interface WhatsAppInstance {
   instanceName: string
   instanceId: string
@@ -38,13 +39,18 @@ class WhatsAppService {
   private apiKey: string
   private webhookUrl: string
 
+  private async getCacheKey(): Promise<string> {
+    const profile = await getUserData()
+    const churchId = profile?.church_id || 'unknown'
+    return `whatsapp_instance:${churchId}`
+  }
+
   constructor() {
     // Obter configurações do ambiente
-    // Em produção (HTTPS), não podemos chamar a Evolution API via HTTP direto do browser (Mixed Content).
-    // Então usamos o backend como proxy (mesma origem) em /api.
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    this.baseUrl = isHttps ? '/api' : (import.meta.env.VITE_EVOLUTION_API_URL || '')
-    this.apiKey = isHttps ? '' : (import.meta.env.VITE_EVOLUTION_API_KEY || '')
+    // Para evitar vazamento entre igrejas, sempre usar o backend como proxy (mesma origem) em /api.
+    // Nunca chamar Evolution API direto do browser.
+    this.baseUrl = '/api'
+    this.apiKey = ''
     this.webhookUrl = import.meta.env.VITE_WEBHOOK_URL || ''
     
     // Remover barra final da URL se existir
@@ -63,12 +69,10 @@ class WhatsAppService {
     console.log('Fazendo requisição para:', url)
     
     const authHeaders: Record<string, string> = {}
-    if (this.baseUrl.startsWith('/api')) {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (token) {
-        authHeaders.Authorization = `Bearer ${token}`
-      }
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) {
+      authHeaders.Authorization = `Bearer ${token}`
     }
 
     const response = await fetch(url, {
@@ -329,7 +333,8 @@ class WhatsAppService {
     status: string
     apikey?: string
   }): Promise<void> {
-    const existingData = localStorage.getItem('whatsapp_instance')
+    const cacheKey = await this.getCacheKey()
+    const existingData = localStorage.getItem(cacheKey)
     const instances = existingData ? JSON.parse(existingData) : []
     
     // Adicionar ou atualizar instância
@@ -340,7 +345,7 @@ class WhatsAppService {
       instances.push(instanceData)
     }
     
-    localStorage.setItem('whatsapp_instance', JSON.stringify(instances))
+    localStorage.setItem(cacheKey, JSON.stringify(instances))
   }
 
   // Buscar dados da instância do localStorage ou banco de dados
@@ -387,7 +392,8 @@ class WhatsAppService {
     }
 
     // Fallback: tentar localStorage (cache)
-    const existingData = localStorage.getItem('whatsapp_instance')
+    const cacheKey = await this.getCacheKey()
+    const existingData = localStorage.getItem(cacheKey)
     if (existingData) {
       const instances = JSON.parse(existingData)
       if (instances.length > 0) {
@@ -406,7 +412,16 @@ class WhatsAppService {
 
   // Limpar dados da instância do localStorage
   async clearInstanceFromProfile(): Promise<void> {
-    localStorage.removeItem('whatsapp_instance')
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('whatsapp_instance:')) {
+        keysToRemove.push(key)
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key)
+    }
   }
 
   /**
