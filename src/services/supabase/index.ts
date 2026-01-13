@@ -9,6 +9,7 @@ export { arquivosIAService } from './arquivosIA';
 export { adminService } from './admin';
 export { churchProfileService } from './churchProfile';
 export { churchServicesService } from './churchServices';
+export { serviceAppointmentsService } from './serviceAppointments';
 export { hostingConfigService, accommodationsService, hostingReservationsService } from './hostingService';
 export { storageService } from './storageService';
 export type { BucketType, ImageCategory, UploadResult, ImageItem } from './storageService';

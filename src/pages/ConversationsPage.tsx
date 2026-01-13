@@ -3,6 +3,7 @@ import { MessageSquare, Send, ChevronDown, Phone, Search, RefreshCw, Image, Mic,
 import { whatsappDbService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 
 type MessageContent = {
   conversation?: string;
@@ -207,11 +208,170 @@ export function ConversationsPage() {
   const [mediaLoading, setMediaLoading] = useState<Record<string, boolean>>({});
   const [mediaCache, setMediaCache] = useState<Record<string, string>>({});
   const [connectionDate, setConnectionDate] = useState<Date | null>(null);
+  const jidAliasRef = useRef<Map<string, string>>(new Map());
+  const canonicalToJidsRef = useRef<Map<string, Set<string>>>(new Map());
+  const contactsLoadedForInstanceRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  async function getAuthHeaders(): Promise<Record<string, string>> {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function normalizeRemoteJid(input?: string): string {
+    const raw = String(input || '').trim();
+    if (!raw) return '';
+    // Respeitar exatamente o remoteJid retornado pela Evolution (ex.: @s.whatsapp.net, @lid, @g.us)
+    // Só fazemos um sanity-check mínimo: precisa ter um domínio (@...)
+    if (!raw.includes('@')) return '';
+    return raw;
+  }
+
+  function isPhoneLikeName(name?: string): boolean {
+    const n = String(name || '').trim();
+    if (!n) return true;
+    return /^[0-9()+\s-]+$/.test(n);
+  }
+
+  function extractRemoteJidFromChat(chat: any): string {
+    const primary = chat?.remoteJid || chat?.remote_jid;
+    if (typeof primary === 'string') {
+      const jid = normalizeRemoteJid(primary.trim());
+      if (jid) return jid;
+    }
+
+    const fallback = chat?.lastMessage?.key?.remoteJid || chat?.lastMessage?.key?.remote_jid;
+    if (typeof fallback === 'string') {
+      const jid = normalizeRemoteJid(fallback.trim());
+      if (jid) return jid;
+    }
+
+    return '';
+  }
+
+  function pickCanonicalJid(jids: string[]): string {
+    const normalized = jids.map((j) => normalizeRemoteJid(j)).filter(Boolean);
+    const preferPhone = normalized.find((j) => j.endsWith('@s.whatsapp.net') || j.endsWith('@c.us'));
+    if (preferPhone) return preferPhone;
+    const preferLid = normalized.find((j) => j.endsWith('@lid'));
+    if (preferLid) return preferLid;
+    return normalized[0] || '';
+  }
+
+  function extractJidsFromUnknown(input: any, acc: Set<string>, depth: number) {
+    if (!input || depth <= 0) return;
+    if (typeof input === 'string') {
+      const s = input.trim();
+      if (/@(s\.whatsapp\.net|c\.us|g\.us|lid)$/i.test(s)) {
+        const jid = normalizeRemoteJid(s);
+        if (jid) acc.add(jid);
+      }
+      return;
+    }
+    if (Array.isArray(input)) {
+      for (const v of input) extractJidsFromUnknown(v, acc, depth - 1);
+      return;
+    }
+    if (typeof input === 'object') {
+      for (const v of Object.values(input)) {
+        extractJidsFromUnknown(v, acc, depth - 1);
+      }
+    }
+  }
+
+  async function ensureContactsAliases(instanceName: string) {
+    if (contactsLoadedForInstanceRef.current === instanceName) return;
+    contactsLoadedForInstanceRef.current = instanceName;
+    jidAliasRef.current = new Map();
+    canonicalToJidsRef.current = new Map();
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/chat/findContacts/${instanceName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+      const contacts: any[] = Array.isArray(data) ? data : [];
+
+      for (const c of contacts) {
+        const set = new Set<string>();
+        extractJidsFromUnknown(c, set, 3);
+        const jids = Array.from(set);
+        if (jids.length < 2) continue;
+        const canonical = pickCanonicalJid(jids);
+        if (!canonical) continue;
+        // Guardar o conjunto completo de JIDs associados ao canônico
+        canonicalToJidsRef.current.set(canonical, new Set<string>(jids));
+        for (const jid of jids) {
+          jidAliasRef.current.set(jid, canonical);
+        }
+      }
+    } catch (e) {
+      // se falhar, seguimos sem alias (vai manter chats separados)
+    }
+  }
+
+  function getCanonicalJid(jid: string): string {
+    return jidAliasRef.current.get(jid) || jid;
+  }
+
+  function addCanonicalMapping(canonical: string, jid: string) {
+    const map = canonicalToJidsRef.current;
+    const set = map.get(canonical) || new Set<string>();
+    set.add(canonical);
+    set.add(jid);
+    map.set(canonical, set);
+  }
+
+  function dedupeChats(list: Chat[]): Chat[] {
+    const map = new Map<string, Chat>();
+
+    for (const c of list) {
+      const key = normalizeRemoteJid(c.remoteJid || c.id);
+      if (!key) continue;
+
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, { ...c, id: key, remoteJid: key });
+        continue;
+      }
+
+      const existingTime = existing.lastMessageTime || 0;
+      const currentTime = c.lastMessageTime || 0;
+      const useCurrentForLastMessage = currentTime >= existingTime;
+
+      const mergedName =
+        !isPhoneLikeName(c.name) && isPhoneLikeName(existing.name)
+          ? c.name
+          : existing.name || c.name;
+
+      map.set(key, {
+        ...existing,
+        id: key,
+        remoteJid: key,
+        name: mergedName,
+        pushName: existing.pushName || c.pushName,
+        profilePicUrl: existing.profilePicUrl || c.profilePicUrl,
+        unreadCount: (existing.unreadCount || 0) + (c.unreadCount || 0),
+        lastMessageTime: Math.max(existingTime, currentTime) || undefined,
+        lastMessage: useCurrentForLastMessage ? c.lastMessage : existing.lastMessage,
+      });
+    }
+
+    return Array.from(map.values());
+  }
 
   // Buscar data de conexão do banco de dados
   useEffect(() => {
@@ -260,19 +420,38 @@ export function ConversationsPage() {
 
   async function fetchInstances() {
     try {
-      const response = await fetch(`${API_BASE}/instance/fetchInstances`);
-      const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        const connectedInstances = data.filter(
-          (inst: any) => inst.connectionStatus === 'open'
-        );
-        setInstances(connectedInstances);
-        
-        if (connectedInstances.length > 0 && !selectedInstance) {
-          setSelectedInstance(connectedInstances[0].name);
-        }
+      const dbInstance = await whatsappDbService.getInstance();
+      const allowedInstanceName = dbInstance?.instance_name;
+
+      if (!allowedInstanceName) {
+        setInstances([]);
+        setSelectedInstance(null);
+        setChats([]);
+        setSelectedChat(null);
+        return;
       }
+
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/instance/fetchInstances`, {
+        headers: {
+          ...authHeaders,
+        },
+      });
+      const data = await response.json();
+
+      const instanceFromApi = Array.isArray(data)
+        ? data.find((inst: any) => inst?.name === allowedInstanceName)
+        : null;
+
+      const nextInstances: Instance[] = [
+        {
+          name: allowedInstanceName,
+          connectionStatus: instanceFromApi?.connectionStatus || 'open',
+        },
+      ];
+
+      setInstances(nextInstances);
+      setSelectedInstance(allowedInstanceName);
     } catch (error) {
       console.error('Erro ao buscar instâncias:', error);
     }
@@ -283,9 +462,11 @@ export function ConversationsPage() {
     
     setIsLoadingChats(true);
     try {
+      await ensureContactsAliases(selectedInstance);
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${API_BASE}/chat/findChats/${selectedInstance}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({})
       });
       
@@ -293,26 +474,30 @@ export function ConversationsPage() {
       
       if (Array.isArray(data)) {
         const formattedChats: Chat[] = data
-          .filter((chat: any) => {
-            // Filtrar grupos
-            if (!chat.id || chat.id.includes('@g.us')) return false;
-
-            return true;
-          })
-          .map((chat: any) => ({
-            id: chat.id,
-            remoteJid: chat.id,
-            name: chat.name || chat.pushName || formatPhoneNumber(chat.id),
+          .map((chat: any) => {
+            const rawJid = extractRemoteJidFromChat(chat);
+            const canonical = rawJid ? getCanonicalJid(rawJid) : '';
+            if (canonical && rawJid) addCanonicalMapping(canonical, rawJid);
+            return {
+              id: canonical,
+              remoteJid: canonical,
+              name: chat.name || chat.pushName || formatPhoneNumber(canonical),
             pushName: chat.pushName,
+            profilePicUrl: chat.profilePicUrl || chat.profilePictureUrl || chat.profile_picture_url,
             lastMessage: chat.lastMessage?.message?.conversation || 
                         chat.lastMessage?.message?.extendedTextMessage?.text || '',
             lastMessageTime: chat.lastMessage?.messageTimestamp,
             unreadCount: chat.unreadCount || 0
-          }))
+            } as Chat;
+          })
+          .filter((c: Chat) => !!c.remoteJid)
+          .filter((c: Chat) => !c.remoteJid.includes('@g.us'));
+
+        const merged = dedupeChats(formattedChats)
           .sort((a: Chat, b: Chat) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
         
-        console.log('[ConversationsPage] Chats carregados:', formattedChats.length, 'de', data.length);
-        setChats(formattedChats);
+        console.log('[ConversationsPage] Chats carregados:', merged.length, 'de', data.length);
+        setChats(merged);
       }
     } catch (error) {
       console.error('Erro ao buscar chats:', error);
@@ -326,55 +511,69 @@ export function ConversationsPage() {
     
     setIsLoadingMessages(true);
     try {
-      const response = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          remoteJid: selectedChat.remoteJid,
-          limit: 20,
-          page: page
+      const authHeaders = await getAuthHeaders();
+      const canonical = selectedChat.remoteJid;
+      const linked = canonicalToJidsRef.current.get(canonical);
+      const jids = linked ? Array.from(linked) : [canonical];
+
+      const responses = await Promise.all(
+        jids.map(async (jid) => {
+          const r = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({
+              remoteJid: jid,
+              limit: 20,
+              page: page
+            })
+          });
+          return r.json();
         })
-      });
-      
-      const data = await response.json();
-      
-      if (data.messages && Array.isArray(data.messages.records)) {
-        const newMessages: Message[] = data.messages.records.map((msg: any) => ({
-          id: msg.key?.id || msg.id || Math.random().toString(),
-          key: msg.key || { remoteJid: selectedChat.remoteJid, fromMe: false, id: msg.id },
-          message: msg.message || {},
-          messageTimestamp: msg.messageTimestamp || Date.now() / 1000,
-          pushName: msg.pushName,
-          source: 'whatsapp' as const
-        }));
-        
-        if (page === 1) {
-          setMessages(newMessages.reverse());
+      );
+
+      const allRecords: any[] = [];
+      const chunkSizes: number[] = [];
+
+      for (const d of responses) {
+        if (d?.messages && Array.isArray(d.messages.records)) {
+          allRecords.push(...d.messages.records);
+          chunkSizes.push(d.messages.records.length);
+        } else if (Array.isArray(d)) {
+          allRecords.push(...d);
+          chunkSizes.push(d.length);
+        } else if (Array.isArray(d?.messages)) {
+          allRecords.push(...d.messages);
+          chunkSizes.push(d.messages.length);
         } else {
-          setMessages(prev => [...newMessages.reverse(), ...prev]);
+          chunkSizes.push(0);
         }
-        
-        setHasMoreMessages(newMessages.length === 20);
-        setCurrentPage(page);
-      } else if (Array.isArray(data)) {
-        const newMessages: Message[] = data.map((msg: any) => ({
-          id: msg.key?.id || msg.id || Math.random().toString(),
-          key: msg.key || { remoteJid: selectedChat.remoteJid, fromMe: false, id: msg.id },
-          message: msg.message || {},
-          messageTimestamp: msg.messageTimestamp || Date.now() / 1000,
-          pushName: msg.pushName,
-          source: 'whatsapp' as const
-        }));
-        
-        if (page === 1) {
-          setMessages(newMessages.reverse());
-        } else {
-          setMessages(prev => [...newMessages.reverse(), ...prev]);
-        }
-        
-        setHasMoreMessages(newMessages.length === 20);
-        setCurrentPage(page);
       }
+
+      const dedup = new Map<string, Message>();
+      for (const msg of allRecords) {
+        const msgId = msg?.key?.id || msg?.id;
+        if (!msgId) continue;
+        if (dedup.has(String(msgId))) continue;
+        dedup.set(String(msgId), {
+          id: String(msgId),
+          key: msg.key || { remoteJid: msg?.key?.remoteJid || canonical, fromMe: false, id: String(msgId) },
+          message: msg.message || {},
+          messageTimestamp: msg.messageTimestamp || Date.now() / 1000,
+          pushName: msg.pushName,
+          source: 'whatsapp' as const
+        });
+      }
+
+      const mergedMessages = Array.from(dedup.values()).sort((a, b) => (a.messageTimestamp || 0) - (b.messageTimestamp || 0));
+
+      if (page === 1) {
+        setMessages(mergedMessages);
+      } else {
+        setMessages(prev => [...mergedMessages, ...prev]);
+      }
+
+      setHasMoreMessages(chunkSizes.some((n) => n === 20));
+      setCurrentPage(page);
     } catch (error) {
       console.error('Erro ao buscar mensagens:', error);
     } finally {
@@ -392,10 +591,11 @@ export function ConversationsPage() {
     setIsSending(true);
     try {
       const phoneNumber = selectedChat.remoteJid.replace('@s.whatsapp.net', '');
+      const authHeaders = await getAuthHeaders();
       
       const response = await fetch(`${API_BASE}/message/sendText/${selectedInstance}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           number: phoneNumber,
           text: newMessage
@@ -490,9 +690,10 @@ export function ConversationsPage() {
     setMediaLoading(prev => ({ ...prev, [cacheKey]: true }));
     
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${API_BASE}/chat/getBase64/${selectedInstance}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ message: msg.key })
       });
       
@@ -523,11 +724,12 @@ export function ConversationsPage() {
     try {
       const phoneNumber = selectedChat.remoteJid.replace('@s.whatsapp.net', '');
       const base64 = await fileToBase64(file);
+      const authHeaders = await getAuthHeaders();
       
       if (type === 'audio') {
         await fetch(`${API_BASE}/message/sendAudio/${selectedInstance}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({
             number: phoneNumber,
             audio: base64
@@ -536,7 +738,7 @@ export function ConversationsPage() {
       } else {
         await fetch(`${API_BASE}/message/sendMedia/${selectedInstance}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({
             number: phoneNumber,
             mediatype: type,

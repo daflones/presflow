@@ -59,10 +59,18 @@ async function supabaseAuthAdmin(endpoint, options = {}) {
       ...options.headers
     }
   });
-  
-  const data = await response.json();
+
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Status ${response.statusText}`);
+      throw new Error(`Supabase Auth request failed with status ${response.status}: ${errorText}`);
+    }
+    return null;
+  }
+
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data.message || data.error || data.msg || 'Supabase Auth request failed');
+    throw new Error(data?.message || data?.error || data?.msg || 'Supabase Auth request failed');
   }
   return data;
 }
@@ -91,6 +99,67 @@ function getBearerToken(req) {
   if (!authHeader || typeof authHeader !== 'string') return null;
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
   return match ? match[1] : null;
+}
+
+async function getUserChurchId(accessToken) {
+  const callerAuthUser = await supabaseAuthUser(accessToken);
+  const callerAuthId = callerAuthUser?.id;
+  if (!callerAuthId) return null;
+
+  const profiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=church_id,is_active`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+
+  const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+  if (profile?.is_active && profile?.church_id) {
+    return profile.church_id;
+  }
+
+  const ownedChurches = await supabaseRequest(`churches?owner_id=eq.${callerAuthId}&select=id`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+  const owned = Array.isArray(ownedChurches) ? ownedChurches[0] : ownedChurches;
+  return owned?.id || null;
+}
+
+async function getAllowedInstanceName(accessToken) {
+  const churchId = await getUserChurchId(accessToken);
+  if (!churchId) return null;
+
+  const church = await supabaseRequest(`churches?id=eq.${churchId}&select=instance`, {
+    method: 'GET',
+    prefer: 'return=representation',
+  });
+  const churchRow = Array.isArray(church) ? church[0] : church;
+  return churchRow?.instance || null;
+}
+
+async function ensureInstanceAccess(req, res, next) {
+  try {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+
+    const allowedInstanceName = await getAllowedInstanceName(accessToken);
+    if (!allowedInstanceName) {
+      return res.status(403).json({ error: 'Instância não configurada para esta igreja' });
+    }
+
+    req.allowedInstanceName = allowedInstanceName;
+
+    const { instanceName } = req.params || {};
+    if (instanceName && instanceName !== allowedInstanceName) {
+      return res.status(403).json({ error: 'Sem permissão para acessar esta instância' });
+    }
+
+    return next();
+  } catch (error) {
+    console.error('Erro ao validar instância:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 }
 
 async function isReadOnlyUser(accessToken) {
@@ -277,6 +346,118 @@ app.get('/api/auth/list-users', async (req, res) => {
   }
 });
 
+app.post('/api/auth/delete-user', async (req, res) => {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase não configurado');
+      return res.status(500).json({ error: 'Servidor não configurado corretamente' });
+    }
+
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+
+    const callerAuthUser = await supabaseAuthUser(accessToken);
+    const callerAuthId = callerAuthUser?.id;
+    if (!callerAuthId) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const { churchId, userId, authId } = req.body || {};
+    const targetId = userId || authId;
+    if (!churchId || !targetId) {
+      return res.status(400).json({ error: 'churchId e userId (ou authId) são obrigatórios' });
+    }
+
+    const platformManager = await isPlatformManager(callerAuthId);
+
+    const churchRows = await supabaseRequest(`churches?id=eq.${churchId}&select=id,owner_id`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+    const churchRow = Array.isArray(churchRows) ? churchRows[0] : churchRows;
+    if (!churchRow?.id) {
+      return res.status(404).json({ error: 'Igreja não encontrada' });
+    }
+
+    const ownerAuthId = churchRow.owner_id;
+    const isOwner = ownerAuthId && ownerAuthId === callerAuthId;
+
+    if (!platformManager && !isOwner) {
+      const callerProfiles = await supabaseRequest(`users?auth_id=eq.${callerAuthId}&select=role,church_id,is_active`, {
+        method: 'GET',
+        prefer: 'return=representation',
+      });
+      const callerProfile = Array.isArray(callerProfiles) ? callerProfiles[0] : callerProfiles;
+
+      if (!callerProfile?.is_active) {
+        return res.status(403).json({ error: 'Usuário sem acesso' });
+      }
+
+      if (callerProfile.church_id !== churchId) {
+        return res.status(403).json({ error: 'Sem permissão' });
+      }
+
+      const callerRole = String(callerProfile.role || '').toLowerCase();
+      if (!['admin'].includes(callerRole)) {
+        return res.status(403).json({ error: 'Apenas Admin pode excluir usuários' });
+      }
+    }
+
+    let targetProfiles = await supabaseRequest(`users?id=eq.${targetId}&select=id,auth_id,church_id,role,is_active`, {
+      method: 'GET',
+      prefer: 'return=representation',
+    });
+    let targetProfile = Array.isArray(targetProfiles) ? targetProfiles[0] : targetProfiles;
+    if (!targetProfile?.id) {
+      targetProfiles = await supabaseRequest(`users?auth_id=eq.${targetId}&select=id,auth_id,church_id,role,is_active`, {
+        method: 'GET',
+        prefer: 'return=representation',
+      });
+      targetProfile = Array.isArray(targetProfiles) ? targetProfiles[0] : targetProfiles;
+    }
+    if (!targetProfile?.id) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    if (String(targetProfile.church_id) !== String(churchId)) {
+      return res.status(403).json({ error: 'Usuário não pertence a esta igreja' });
+    }
+
+    if (String(targetProfile.auth_id) === String(callerAuthId)) {
+      return res.status(403).json({ error: 'Não é permitido excluir seu próprio usuário' });
+    }
+
+    if (ownerAuthId && String(targetProfile.auth_id) === String(ownerAuthId)) {
+      return res.status(403).json({ error: 'Não é permitido excluir o dono da igreja' });
+    }
+
+    const targetRole = String(targetProfile.role || '').toLowerCase();
+    if (!platformManager && !isOwner && targetRole === 'admin') {
+      return res.status(403).json({ error: 'Admin não pode excluir outro Admin' });
+    }
+
+    if (!targetProfile.auth_id) {
+      return res.status(400).json({ error: 'Usuário inválido (auth_id ausente)' });
+    }
+
+    await supabaseAuthAdmin(`users/${targetProfile.auth_id}`, {
+      method: 'DELETE',
+    });
+
+    await supabaseRequest(`users?id=eq.${targetProfile.id}`, {
+      method: 'DELETE',
+      prefer: 'return=minimal',
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 // Em produção, servir arquivos estáticos do build
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../dist')));
@@ -421,6 +602,16 @@ app.get('/api/instance/connect/:instanceName', async (req, res) => {
 // Endpoint para buscar instâncias
 app.get('/api/instance/fetchInstances', async (req, res) => {
   try {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+
+    const allowedInstanceName = await getAllowedInstanceName(accessToken);
+    if (!allowedInstanceName) {
+      return res.json([]);
+    }
+
     const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
@@ -434,7 +625,9 @@ app.get('/api/instance/fetchInstances', async (req, res) => {
       return res.status(response.status).json(data);
     }
 
-    res.json(data);
+    const list = Array.isArray(data) ? data : [];
+    const filtered = list.filter((inst) => inst?.name === allowedInstanceName);
+    res.json(filtered);
   } catch (error) {
     console.error('Erro ao buscar instâncias:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -442,7 +635,7 @@ app.get('/api/instance/fetchInstances', async (req, res) => {
 });
 
 // Endpoint para verificar status da instância
-app.get('/api/instance/status/:instanceName', async (req, res) => {
+app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
 
@@ -499,7 +692,7 @@ app.get('/api/instance/status/:instanceName', async (req, res) => {
 // ========== ENDPOINTS DE CHAT/CONVERSAS ==========
 
 // Endpoint para buscar todos os chats de uma instância
-app.post('/api/chat/findChats/:instanceName', async (req, res) => {
+app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
     console.log('=== BUSCANDO CHATS ===');
@@ -529,7 +722,7 @@ app.post('/api/chat/findChats/:instanceName', async (req, res) => {
 });
 
 // Endpoint para buscar mensagens de um chat específico
-app.post('/api/chat/findMessages/:instanceName', async (req, res) => {
+app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
     const { remoteJid, limit = 50, page = 1 } = req.body;
@@ -574,8 +767,36 @@ app.post('/api/chat/findMessages/:instanceName', async (req, res) => {
   }
 });
 
+// Endpoint para buscar contatos
+app.post('/api/chat/findContacts/:instanceName', ensureInstanceAccess, async (req, res) => {
+  try {
+    const { instanceName } = req.params;
+    const { where = {} } = req.body || {};
+
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/findContacts/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      },
+      body: JSON.stringify({ where })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar contatos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 // Endpoint para buscar foto de perfil
-app.post('/api/chat/fetchProfilePictureUrl/:instanceName', async (req, res) => {
+app.post('/api/chat/fetchProfilePictureUrl/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
     const { number } = req.body;
@@ -607,8 +828,16 @@ app.post('/api/chat/fetchProfilePictureUrl/:instanceName', async (req, res) => {
 });
 
 // Endpoint para enviar mensagem de texto
-app.post('/api/message/sendText/:instanceName', async (req, res) => {
+app.post('/api/message/sendText/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+    if (await isReadOnlyUser(accessToken)) {
+      return res.status(403).json({ error: 'Somente visualização' });
+    }
+
     const { instanceName } = req.params;
     const { number, text } = req.body;
 
@@ -649,8 +878,16 @@ app.post('/api/message/sendText/:instanceName', async (req, res) => {
 });
 
 // Endpoint para enviar mídia (imagem, vídeo, documento)
-app.post('/api/message/sendMedia/:instanceName', async (req, res) => {
+app.post('/api/message/sendMedia/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+    if (await isReadOnlyUser(accessToken)) {
+      return res.status(403).json({ error: 'Somente visualização' });
+    }
+
     const { instanceName } = req.params;
     const { number, mediatype, mimetype, caption, media, fileName } = req.body;
 
@@ -695,8 +932,16 @@ app.post('/api/message/sendMedia/:instanceName', async (req, res) => {
 });
 
 // Endpoint para enviar áudio
-app.post('/api/message/sendAudio/:instanceName', async (req, res) => {
+app.post('/api/message/sendAudio/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Token de autenticação ausente' });
+    }
+    if (await isReadOnlyUser(accessToken)) {
+      return res.status(403).json({ error: 'Somente visualização' });
+    }
+
     const { instanceName } = req.params;
     const { number, audio } = req.body;
 
@@ -736,7 +981,7 @@ app.post('/api/message/sendAudio/:instanceName', async (req, res) => {
 });
 
 // Endpoint para buscar mídia em base64
-app.post('/api/chat/getBase64/:instanceName', async (req, res) => {
+app.post('/api/chat/getBase64/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
     const { message } = req.body;

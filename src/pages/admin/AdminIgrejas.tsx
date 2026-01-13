@@ -24,7 +24,7 @@ type CreateUserForm = {
 };
 
 export function AdminIgrejas() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const [churches, setChurches] = useState<ChurchType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,6 +155,50 @@ export function AdminIgrejas() {
       setChurchUsers((data?.users || []) as any);
     } catch (e: any) {
       setUsersModalError(e?.message || 'Erro ao carregar usuários');
+    } finally {
+      setUsersModalLoading(false);
+    }
+  };
+
+  const onDeleteChurchUser = async (targetUser: { id: string; auth_id: string; name: string; role: string }) => {
+    if (!accessToken || !selectedChurch?.id) return;
+
+    const isSelf = !!user?.id && String(targetUser.auth_id) === String(user.id);
+    if (isSelf) {
+      setUsersModalError('Não é permitido excluir seu próprio usuário');
+      return;
+    }
+
+    if (selectedChurch?.owner_id && String(targetUser.auth_id) === String(selectedChurch.owner_id)) {
+      setUsersModalError('Não é permitido excluir o dono da igreja');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja excluir o usuário ${targetUser.name}?`)) return;
+
+    setUsersModalLoading(true);
+    setUsersModalError(null);
+    try {
+      const res = await fetch('/api/auth/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          churchId: selectedChurch.id,
+          userId: targetUser.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Falha ao excluir usuário');
+      }
+
+      await loadChurchUsers(selectedChurch.id);
+    } catch (e: any) {
+      setUsersModalError(e?.message || 'Erro ao excluir usuário');
     } finally {
       setUsersModalLoading(false);
     }
@@ -707,6 +751,7 @@ export function AdminIgrejas() {
                           <th className="py-2 pr-4">Email</th>
                           <th className="py-2 pr-4">Cargo</th>
                           <th className="py-2">Status</th>
+                          <th className="py-2 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="text-gray-200">
@@ -723,6 +768,22 @@ export function AdminIgrejas() {
                               >
                                 {u.is_active ? 'Ativo' : 'Inativo'}
                               </span>
+                            </td>
+                            <td className="py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => void onDeleteChurchUser(u)}
+                                disabled={
+                                  usersModalLoading ||
+                                  (user?.id ? String(u.auth_id) === String(user.id) : false) ||
+                                  (selectedChurch?.owner_id ? String(u.auth_id) === String(selectedChurch.owner_id) : false)
+                                }
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-transparent px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                                title="Excluir usuário"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Excluir
+                              </button>
                             </td>
                           </tr>
                         ))}

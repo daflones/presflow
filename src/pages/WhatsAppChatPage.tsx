@@ -484,6 +484,8 @@ export default function WhatsAppChatPage() {
   const audioChunksRef = useRef<BlobPart[]>([])
   const profileNameCacheRef = useRef<Map<string, string>>(new Map())
   const contactsLoadedRef = useRef(false)
+  const jidAliasRef = useRef<Map<string, string>>(new Map())
+  const canonicalToJidsRef = useRef<Map<string, Set<string>>>(new Map())
 
   // Neste modo a tela é "fonte de verdade = Evolution".
   // Persistir em Supabase exige `chat_id` UUID real. Como aqui usamos um `id` sintético,
@@ -667,6 +669,56 @@ export default function WhatsAppChatPage() {
     return ''
   }
 
+  const normalizeJid = (input: unknown): string => {
+    if (typeof input !== 'string') return ''
+    const s = input.trim()
+    if (!s) return ''
+    if (!s.includes('@')) return ''
+    return s
+  }
+
+  const pickCanonicalJid = (jids: string[]): string => {
+    const cleaned = jids.map((j) => normalizeJid(j)).filter(Boolean)
+    const preferPhone = cleaned.find((j) => j.endsWith('@s.whatsapp.net') || j.endsWith('@c.us'))
+    if (preferPhone) return preferPhone
+    const preferLid = cleaned.find((j) => j.endsWith('@lid'))
+    if (preferLid) return preferLid
+    return cleaned[0] || ''
+  }
+
+  const extractJidsFromUnknown = (input: any, acc: Set<string>, depth: number) => {
+    if (!input || depth <= 0) return
+    if (typeof input === 'string') {
+      const s = input.trim()
+      if (/@(s\.whatsapp\.net|c\.us|g\.us|lid)$/i.test(s)) {
+        const jid = normalizeJid(s)
+        if (jid) acc.add(jid)
+      }
+      return
+    }
+    if (Array.isArray(input)) {
+      for (const v of input) extractJidsFromUnknown(v, acc, depth - 1)
+      return
+    }
+    if (typeof input === 'object') {
+      for (const v of Object.values(input)) {
+        extractJidsFromUnknown(v as any, acc, depth - 1)
+      }
+    }
+  }
+
+  const getCanonicalJid = (jid: string): string => {
+    return jidAliasRef.current.get(jid) || jid
+  }
+
+  const addCanonicalMapping = (canonical: string, jid: string) => {
+    const map = canonicalToJidsRef.current
+    const set = map.get(canonical) || new Set<string>()
+    set.add(canonical)
+    set.add(jid)
+    map.set(canonical, set)
+  }
+
   useEffect(() => {
     chatsRef.current = chats
   }, [chats])
@@ -711,6 +763,8 @@ export default function WhatsAppChatPage() {
         contactsLoadedRef.current = true
         try {
           const contacts = await evolutionApi.findContacts(instanceName)
+          jidAliasRef.current = new Map()
+          canonicalToJidsRef.current = new Map()
           for (const c of contacts || []) {
             const jid = c?.id || c?.remoteJid || c?.jid
             const name = c?.pushName || c?.notify || c?.name
@@ -721,6 +775,17 @@ export default function WhatsAppChatPage() {
                 profileNameCacheRef.current.set(`${extracted}@s.whatsapp.net`, name)
                 profileNameCacheRef.current.set(`${extracted}@lid`, name)
                 profileNameCacheRef.current.set(extracted, name)
+              }
+            }
+
+            const set = new Set<string>()
+            extractJidsFromUnknown(c, set, 3)
+            const jids = Array.from(set)
+            if (jids.length >= 2) {
+              const canonical = pickCanonicalJid(jids)
+              if (canonical) {
+                canonicalToJidsRef.current.set(canonical, new Set<string>(jids))
+                for (const j of jids) jidAliasRef.current.set(j, canonical)
               }
             }
           }
@@ -735,22 +800,28 @@ export default function WhatsAppChatPage() {
       for (const apiChat of apiChats) {
         let remoteJid = ''
 
-        if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
+        const fromLast = apiChat?.lastMessage?.key?.remoteJid
+        if (fromLast && typeof fromLast === 'string' && fromLast.includes('@')) {
+          remoteJid = fromLast
+        } else if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
           remoteJid = apiChat.remoteJid
-        } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
-          remoteJid = apiChat.id
         } else if (apiChat.owner && apiChat.owner.includes('@')) {
           remoteJid = apiChat.owner
         } else if (apiChat.jid && apiChat.jid.includes('@')) {
           remoteJid = apiChat.jid
         } else if (apiChat.chatId && apiChat.chatId.includes('@')) {
           remoteJid = apiChat.chatId
+        } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
+          remoteJid = apiChat.id
         }
 
         if (!remoteJid) continue
 
         const isGroup = remoteJid.includes('@g.us')
         if (isGroup) continue
+
+        const canonicalJid = getCanonicalJid(remoteJid)
+        addCanonicalMapping(canonicalJid, remoteJid)
 
         // Evitar chamadas lentas em massa: preferir URL vinda no próprio chat (quando existir)
         const profilePicUrl = apiChat.profilePicUrl || apiChat.profilePictureUrl || ''
@@ -764,10 +835,10 @@ export default function WhatsAppChatPage() {
         const contactName = cachedName || apiChat.pushName || apiChat.notify || apiChat.verifiedName || apiChat.name || apiChat.subject
 
         const chat: WhatsAppChat = {
-          id: `${instanceName}:${remoteJid}`,
+          id: `${instanceName}:${canonicalJid}`,
           church_id: 'evolution',
           instance_name: instanceName,
-          remote_jid: remoteJid,
+          remote_jid: canonicalJid,
           contact_name: contactName,
           contact_push_name: apiChat.pushName || apiChat.notify || apiChat.verifiedName,
           profile_picture_url: profilePicUrl,
@@ -803,7 +874,28 @@ export default function WhatsAppChatPage() {
         }
       }
 
-      setChats(mappedChats)
+      const byId = new Map<string, WhatsAppChat>()
+      for (const c of mappedChats) {
+        const existing = byId.get(c.id)
+        if (!existing) {
+          byId.set(c.id, c)
+          continue
+        }
+        const existingTs = existing.last_message_at ? new Date(existing.last_message_at).getTime() : 0
+        const currentTs = c.last_message_at ? new Date(c.last_message_at).getTime() : 0
+        const useCurrent = currentTs >= existingTs
+        byId.set(c.id, {
+          ...existing,
+          contact_name: existing.contact_name || c.contact_name,
+          contact_push_name: existing.contact_push_name || c.contact_push_name,
+          profile_picture_url: existing.profile_picture_url || c.profile_picture_url,
+          unread_count: (existing.unread_count || 0) + (c.unread_count || 0),
+          last_message_at: useCurrent ? c.last_message_at : existing.last_message_at,
+          last_message_preview: useCurrent ? c.last_message_preview : existing.last_message_preview,
+        })
+      }
+
+      setChats(Array.from(byId.values()))
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
       toast.error('Erro ao carregar conversas')
@@ -826,22 +918,32 @@ export default function WhatsAppChatPage() {
     }
     
     try {
-      const apiResponse = await evolutionApi.findMessages(instanceName, {
-        where: {
-          key: {
-            remoteJid: chat.remote_jid
-          }
-        },
-        limit: 100
-      })
+      const linked = canonicalToJidsRef.current.get(chat.remote_jid)
+      const jids = linked ? Array.from(linked) : [chat.remote_jid]
 
-      const apiMessages = Array.isArray(apiResponse)
-        ? apiResponse
-        : (apiResponse as any)?.messages?.records || (apiResponse as any)?.messages || (apiResponse as any)?.data || []
+      const responses = await Promise.all(
+        jids.map(async (jid) => {
+          const r = await evolutionApi.findMessages(instanceName, {
+            where: {
+              key: {
+                remoteJid: jid
+              }
+            },
+            limit: 100
+          })
+          const arr = Array.isArray(r)
+            ? r
+            : (r as any)?.messages?.records || (r as any)?.messages || (r as any)?.data || []
+          return { jid, messages: Array.isArray(arr) ? arr : [] }
+        })
+      )
+
+      const apiMessages = responses.flatMap((x) => x.messages)
 
       console.log('[WhatsAppChat] Evolution findMessages:', {
         instanceName,
         remoteJid: chat.remote_jid,
+        jids,
         count: Array.isArray(apiMessages) ? apiMessages.length : 0
       })
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { Shield, Trash2, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 type ChurchUser = {
@@ -22,7 +22,7 @@ function roleLabel(role: string) {
 }
 
 export function UsersPage() {
-  const { session, church, canManageChurchUsers, isOwner, isChurchAdmin } = useAuth();
+  const { session, church, canManageChurchUsers, isOwner, isChurchAdmin, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<ChurchUser[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +65,50 @@ export function UsersPage() {
     if (!canManageChurchUsers) return;
     void loadUsers();
   }, [accessToken, churchId, canManageChurchUsers]);
+
+  const onDeleteUser = async (targetUser: ChurchUser) => {
+    if (!accessToken || !churchId) return;
+
+    const isSelf = !!user?.id && String(targetUser.auth_id) === String(user.id);
+    if (isSelf) {
+      setError('Não é permitido excluir seu próprio usuário');
+      return;
+    }
+
+    if (church?.owner_id && String(targetUser.auth_id) === String(church.owner_id)) {
+      setError('Não é permitido excluir o dono da igreja');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja excluir o usuário ${targetUser.name}?`)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          churchId,
+          userId: targetUser.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Falha ao excluir usuário');
+      }
+
+      await loadUsers();
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao excluir usuário');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,6 +273,7 @@ export function UsersPage() {
                           <th className="py-2">Email</th>
                           <th className="py-2">Cargo</th>
                           <th className="py-2">Status</th>
+                          <th className="py-2 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="text-gray-900">
@@ -245,6 +290,23 @@ export function UsersPage() {
                               >
                                 {u.is_active ? 'Ativo' : 'Inativo'}
                               </span>
+                            </td>
+                            <td className="py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => void onDeleteUser(u)}
+                                disabled={
+                                  loading ||
+                                  (user?.id ? String(u.auth_id) === String(user.id) : false) ||
+                                  (church?.owner_id ? String(u.auth_id) === String(church.owner_id) : false) ||
+                                  (!isOwner && String(u.role || '').toLowerCase() === 'admin')
+                                }
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                title="Excluir usuário"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Excluir
+                              </button>
                             </td>
                           </tr>
                         ))}

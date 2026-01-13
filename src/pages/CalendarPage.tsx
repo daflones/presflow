@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
-import { calendarService, clientsService } from '../services/supabase';
-import type { CalendarEvent as DbCalendarEvent, Client } from '../types/database';
+import { calendarService, clientsService, churchServicesService, serviceAppointmentsService } from '../services/supabase';
+import type { CalendarEvent as DbCalendarEvent, Client, ChurchService, ServiceAppointment } from '../types/database';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -11,9 +11,11 @@ import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { CalendarPlus, Pencil, Trash2, X, UserRound, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { getUserData } from '../lib/user';
 
 type CalendarEvent = {
   id: string;
+  kind: 'calendar_event' | 'service_appointment';
   title: string;
   start: string;
   end?: string;
@@ -22,12 +24,18 @@ type CalendarEvent = {
   notes?: string;
   color?: string;
   cliente_id?: string;
+  service_id?: string;
+  solicitante_nome?: string;
+  solicitante_telefone?: string;
+  solicitante_email?: string;
+  observacoes?: string;
 };
 
 // Converter do formato do banco para o formato local
 function dbEventToLocal(e: DbCalendarEvent): CalendarEvent {
   return {
-    id: e.id,
+    id: `ce:${e.id}`,
+    kind: 'calendar_event',
     title: e.title,
     start: e.start_at,
     end: e.end_at || undefined,
@@ -36,6 +44,52 @@ function dbEventToLocal(e: DbCalendarEvent): CalendarEvent {
     notes: e.notes || undefined,
     color: e.color,
     cliente_id: e.cliente_id || undefined,
+  };
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function toTimeValue(date: Date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function toDateValue(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function dateTimeLocalToParts(value: string): { date: string; time: string } {
+  const [d, t] = String(value || '').split('T');
+  return { date: d || '', time: (t || '').slice(0, 5) };
+}
+
+function serviceAppointmentToLocal(a: ServiceAppointment, service?: ChurchService): CalendarEvent {
+  const startDate = new Date(`${a.data_agendamento}T${a.hora_inicio || '09:00'}`);
+  const endDate = a.hora_fim
+    ? new Date(`${a.data_agendamento}T${a.hora_fim}`)
+    : service?.duracao_media_minutos
+      ? new Date(startDate.getTime() + service.duracao_media_minutos * 60 * 1000)
+      : undefined;
+
+  const titleBase = service?.nome || 'Serviço';
+  const title = a.solicitante_nome ? `${titleBase} - ${a.solicitante_nome}` : titleBase;
+
+  return {
+    id: `sa:${a.id}`,
+    kind: 'service_appointment',
+    title,
+    start: `${toDateValue(startDate)}T${toTimeValue(startDate)}`,
+    end: endDate ? `${toDateValue(endDate)}T${toTimeValue(endDate)}` : undefined,
+    allDay: false,
+    color: '#10b981',
+    service_id: a.service_id,
+    cliente_id: a.client_id || undefined,
+    solicitante_nome: a.solicitante_nome,
+    solicitante_telefone: a.solicitante_telefone,
+    solicitante_email: a.solicitante_email,
+    observacoes: a.observacoes,
+    notes: a.observacoes || undefined,
   };
 }
 
@@ -66,6 +120,7 @@ export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [_isLoading, setIsLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
+  const [services, setServices] = useState<ChurchService[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -78,6 +133,11 @@ export function CalendarPage() {
   const [formNotes, setFormNotes] = useState('');
   const [formColor, setFormColor] = useState('#3b82f6');
   const [formClienteId, setFormClienteId] = useState<string>('');
+  const [formKind, setFormKind] = useState<'calendar_event' | 'service_appointment'>('calendar_event');
+  const [formServiceId, setFormServiceId] = useState<string>('');
+  const [formSolicitanteNome, setFormSolicitanteNome] = useState('');
+  const [formSolicitanteTelefone, setFormSolicitanteTelefone] = useState('');
+  const [formSolicitanteEmail, setFormSolicitanteEmail] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
 
@@ -85,12 +145,28 @@ export function CalendarPage() {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [eventsData, clientsData] = await Promise.all([
+      const profile = await getUserData();
+      const churchId = profile?.church_id;
+
+      const [eventsData, clientsData, appointmentsData, servicesData] = await Promise.all([
         calendarService.getAll(),
         clientsService.getAll(),
+        serviceAppointmentsService.getAll(),
+        churchId ? churchServicesService.listActiveByChurch(churchId) : Promise.resolve([]),
       ]);
-      setEvents(eventsData.map(dbEventToLocal));
+
       setClients(clientsData);
+      setServices(servicesData);
+
+      const servicesById = new Map<string, ChurchService>();
+      for (const s of servicesData) servicesById.set(s.id, s);
+
+      const merged = [
+        ...eventsData.map(dbEventToLocal),
+        ...(appointmentsData || []).map((a) => serviceAppointmentToLocal(a, servicesById.get(a.service_id))),
+      ].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+      setEvents(merged);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -131,6 +207,13 @@ export function CalendarPage() {
       extendedProps: {
         location: e.location,
         notes: e.notes,
+        kind: e.kind,
+        service_id: e.service_id,
+        cliente_id: e.cliente_id,
+        solicitante_nome: e.solicitante_nome,
+        solicitante_telefone: e.solicitante_telefone,
+        solicitante_email: e.solicitante_email,
+        observacoes: e.observacoes,
       },
     }));
   }, [events]);
@@ -141,6 +224,7 @@ export function CalendarPage() {
       return;
     }
     setEditingEventId(null);
+    setFormKind('calendar_event');
     setFormTitle('');
     setFormAllDay(arg.allDay);
 
@@ -160,6 +244,10 @@ export function CalendarPage() {
     setFormNotes('');
     setFormColor('#3b82f6');
     setFormClienteId('');
+    setFormServiceId('');
+    setFormSolicitanteNome('');
+    setFormSolicitanteTelefone('');
+    setFormSolicitanteEmail('');
     setClientSearch('');
     setShowClientDropdown(false);
     setIsModalOpen(true);
@@ -173,6 +261,7 @@ export function CalendarPage() {
     const found = events.find((e) => e.id === arg.event.id);
     if (!found) return;
     setEditingEventId(found.id);
+    setFormKind(found.kind);
     setFormTitle(found.title);
     setFormAllDay(Boolean(found.allDay));
     setFormStart(toLocalInputValue(found.start));
@@ -181,6 +270,10 @@ export function CalendarPage() {
     setFormNotes(found.notes ?? '');
     setFormColor(found.color || '#3b82f6');
     setFormClienteId(found.cliente_id ?? '');
+    setFormServiceId(found.service_id ?? '');
+    setFormSolicitanteNome(found.solicitante_nome ?? '');
+    setFormSolicitanteTelefone(found.solicitante_telefone ?? '');
+    setFormSolicitanteEmail(found.solicitante_email ?? '');
     setClientSearch('');
     setShowClientDropdown(false);
     setIsModalOpen(true);
@@ -196,42 +289,91 @@ export function CalendarPage() {
       toast.error('Somente visualização');
       return;
     }
-    const title = formTitle.trim();
-    if (!title) return;
     if (!formStart) return;
 
-    const startIso = new Date(formStart).toISOString();
-    const endIso = formEnd ? new Date(formEnd).toISOString() : undefined;
+    if (formKind === 'calendar_event') {
+      const title = formTitle.trim();
+      if (!title) return;
+
+      const startIso = new Date(formStart).toISOString();
+      const endIso = formEnd ? new Date(formEnd).toISOString() : undefined;
+
+      try {
+        if (!editingEventId) {
+          const created = await calendarService.create({
+            title,
+            start_at: startIso,
+            end_at: endIso,
+            all_day: formAllDay,
+            location: formLocation.trim() || undefined,
+            notes: formNotes.trim() || undefined,
+            color: formColor,
+            cliente_id: formClienteId || undefined,
+          });
+          setEvents((prev) => [dbEventToLocal(created), ...prev]);
+        } else {
+          const realId = editingEventId.startsWith('ce:') ? editingEventId.slice(3) : editingEventId;
+          const updated = await calendarService.update(realId, {
+            title,
+            start_at: startIso,
+            end_at: endIso,
+            all_day: formAllDay,
+            location: formLocation.trim() || undefined,
+            notes: formNotes.trim() || undefined,
+            color: formColor,
+            cliente_id: formClienteId || undefined,
+          });
+          const next = dbEventToLocal(updated);
+          setEvents((prev) => prev.map((e) => (e.id === editingEventId ? next : e)));
+        }
+        resetModal();
+      } catch (error) {
+        console.error('Erro ao salvar evento:', error);
+        alert('Erro ao salvar evento. Tente novamente.');
+      }
+      return;
+    }
+
+    const serviceId = String(formServiceId || '').trim();
+    const solicitanteNome = formSolicitanteNome.trim();
+    if (!serviceId) return;
+    if (!solicitanteNome) return;
+
+    const { date: dataAgendamento, time: horaInicio } = dateTimeLocalToParts(formStart);
+    const horaFim = formEnd ? dateTimeLocalToParts(formEnd).time : '';
 
     try {
+      const servicesById = new Map<string, ChurchService>();
+      for (const s of services) servicesById.set(s.id, s);
+
       if (!editingEventId) {
-        // Criar novo evento
-        const created = await calendarService.create({
-          title,
-          start_at: startIso,
-          end_at: endIso,
-          all_day: formAllDay,
-          location: formLocation.trim() || undefined,
-          notes: formNotes.trim() || undefined,
-          color: formColor,
-          cliente_id: formClienteId || undefined,
+        const created = await serviceAppointmentsService.create({
+          service_id: serviceId,
+          client_id: formClienteId || undefined,
+          data_agendamento: dataAgendamento,
+          hora_inicio: horaInicio ? `${horaInicio}:00` : undefined,
+          hora_fim: horaFim ? `${horaFim}:00` : undefined,
+          solicitante_nome: solicitanteNome,
+          solicitante_telefone: formSolicitanteTelefone.trim() || undefined,
+          solicitante_email: formSolicitanteEmail.trim() || undefined,
+          observacoes: formNotes.trim() || undefined,
         });
-        setEvents((prev) => [dbEventToLocal(created), ...prev]);
+        setEvents((prev) => [serviceAppointmentToLocal(created, servicesById.get(created.service_id)), ...prev]);
       } else {
-        // Atualizar evento existente
-        const updated = await calendarService.update(editingEventId, {
-          title,
-          start_at: startIso,
-          end_at: endIso,
-          all_day: formAllDay,
-          location: formLocation.trim() || undefined,
-          notes: formNotes.trim() || undefined,
-          color: formColor,
-          cliente_id: formClienteId || undefined,
+        const realId = editingEventId.startsWith('sa:') ? editingEventId.slice(3) : editingEventId;
+        const updated = await serviceAppointmentsService.update(realId, {
+          service_id: serviceId,
+          client_id: formClienteId || undefined,
+          data_agendamento: dataAgendamento,
+          hora_inicio: horaInicio ? `${horaInicio}:00` : undefined,
+          hora_fim: horaFim ? `${horaFim}:00` : undefined,
+          solicitante_nome: solicitanteNome,
+          solicitante_telefone: formSolicitanteTelefone.trim() || undefined,
+          solicitante_email: formSolicitanteEmail.trim() || undefined,
+          observacoes: formNotes.trim() || undefined,
         });
-        setEvents((prev) =>
-          prev.map((e) => (e.id === editingEventId ? dbEventToLocal(updated) : e))
-        );
+        const next = serviceAppointmentToLocal(updated as any, servicesById.get(updated.service_id));
+        setEvents((prev) => prev.map((e) => (e.id === editingEventId ? next : e)));
       }
       resetModal();
     } catch (error) {
@@ -250,7 +392,12 @@ export function CalendarPage() {
     if (!ok) return;
     
     try {
-      await calendarService.delete(id);
+      if (id.startsWith('sa:')) {
+        await serviceAppointmentsService.delete(id.slice(3));
+      } else {
+        const realId = id.startsWith('ce:') ? id.slice(3) : id;
+        await calendarService.delete(realId);
+      }
       setEvents((prev) => prev.filter((e) => e.id !== id));
       resetModal();
     } catch (error) {
@@ -272,17 +419,37 @@ export function CalendarPage() {
     if (!newStart) return;
 
     try {
-      const updated = await calendarService.update(eventId, {
+      const found = events.find((e) => e.id === eventId);
+      if (found?.kind === 'service_appointment') {
+        const startLocal = arg.event.start ? toLocalInputValue(arg.event.start.toISOString()) : '';
+        const endLocal = arg.event.end ? toLocalInputValue(arg.event.end.toISOString()) : '';
+        const { date: dataAgendamento, time: horaInicio } = dateTimeLocalToParts(startLocal);
+        const horaFim = endLocal ? dateTimeLocalToParts(endLocal).time : '';
+
+        const realId = eventId.startsWith('sa:') ? eventId.slice(3) : eventId;
+        const updated = await serviceAppointmentsService.update(realId, {
+          data_agendamento: dataAgendamento,
+          hora_inicio: horaInicio ? `${horaInicio}:00` : undefined,
+          hora_fim: horaFim ? `${horaFim}:00` : undefined,
+        });
+
+        const servicesById = new Map<string, ChurchService>();
+        for (const s of services) servicesById.set(s.id, s);
+        const next = serviceAppointmentToLocal(updated as any, servicesById.get(updated.service_id));
+        setEvents((prev) => prev.map((e) => (e.id === eventId ? next : e)));
+        return;
+      }
+
+      const realId = eventId.startsWith('ce:') ? eventId.slice(3) : eventId;
+      const updated = await calendarService.update(realId, {
         start_at: newStart,
         end_at: newEnd,
         all_day: arg.event.allDay,
       });
-      setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? dbEventToLocal(updated) : e))
-      );
+      const next = dbEventToLocal(updated);
+      setEvents((prev) => prev.map((e) => (e.id === eventId ? next : e)));
     } catch (error) {
       console.error('Erro ao mover evento:', error);
-      // Reverter a mudança visual
       arg.revert();
     }
   }
@@ -321,6 +488,9 @@ export function CalendarPage() {
         <style>{`
           .fc {
             font-family: inherit;
+            --fc-border-color: #e5e7eb;
+            --fc-page-bg-color: transparent;
+            --fc-today-bg-color: #eff6ff;
           }
           .fc .fc-toolbar-title {
             font-size: 1.5rem;
@@ -381,6 +551,8 @@ export function CalendarPage() {
             border: none;
             cursor: pointer;
             transition: all 0.2s;
+            line-height: 1.2;
+            white-space: normal;
           }
           .fc .fc-event:hover {
             opacity: 0.9;
@@ -392,6 +564,34 @@ export function CalendarPage() {
           }
           .fc .fc-h-event {
             border: none;
+          }
+          .fc .fc-daygrid-event {
+            white-space: normal;
+          }
+          .fc .fc-daygrid-event .fc-event-main-frame {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.125rem;
+            white-space: normal;
+          }
+          .fc .fc-daygrid-event .fc-event-time {
+            font-weight: 700;
+            white-space: nowrap;
+          }
+          .fc .fc-daygrid-event .fc-event-title-container,
+          .fc .fc-daygrid-event .fc-event-title {
+            white-space: normal;
+            overflow: visible;
+          }
+          .fc .fc-daygrid-event .fc-event-title {
+            word-break: break-word;
+          }
+          .fc .fc-list-event-title {
+            white-space: normal;
+          }
+          .fc .fc-list-event-title a {
+            white-space: normal;
+            word-break: break-word;
           }
         `}</style>
         <FullCalendar
@@ -421,6 +621,52 @@ export function CalendarPage() {
           events={fcEvents}
           select={openCreateFromSelect}
           eventClick={openEditFromClick}
+          eventContent={(arg) => {
+            const kind = (arg.event.extendedProps as any)?.kind as string | undefined;
+            const isService = kind === 'service_appointment';
+            const timeText = arg.timeText ? `${arg.timeText} ` : '';
+            return (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'baseline' }}>
+                {timeText ? <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{timeText}</span> : null}
+                <span style={{ fontWeight: 600 }}>{arg.event.title}</span>
+                {isService ? (
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      padding: '0.05rem 0.35rem',
+                      borderRadius: '9999px',
+                      background: 'rgba(255,255,255,0.35)',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    SERVIÇO
+                  </span>
+                ) : null}
+              </div>
+            );
+          }}
+          eventDidMount={(info) => {
+            const p = info.event.extendedProps as any;
+            const kind = String(p?.kind || '');
+            const lines: string[] = [];
+            if (info.timeText) lines.push(info.timeText);
+            lines.push(info.event.title);
+            if (kind === 'calendar_event') {
+              if (p?.location) lines.push(`Local: ${p.location}`);
+              if (p?.notes) lines.push(`Notas: ${p.notes}`);
+            }
+            if (kind === 'service_appointment') {
+              if (p?.solicitante_nome) lines.push(`Solicitante: ${p.solicitante_nome}`);
+              if (p?.solicitante_telefone) lines.push(`Telefone: ${p.solicitante_telefone}`);
+              if (p?.solicitante_email) lines.push(`Email: ${p.solicitante_email}`);
+              if (p?.observacoes) lines.push(`Obs: ${p.observacoes}`);
+            }
+            const tooltip = lines.filter(Boolean).join('\n');
+            if (tooltip) info.el.setAttribute('title', tooltip);
+          }}
           eventTimeFormat={{
             hour: '2-digit',
             minute: '2-digit',
@@ -443,7 +689,15 @@ export function CalendarPage() {
                   {editingEventId ? <Pencil className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">{editingEventId ? 'Editar evento' : 'Novo evento'}</h2>
+                  <h2 className="text-base font-bold text-gray-900">
+                    {editingEventId
+                      ? formKind === 'service_appointment'
+                        ? 'Editar agendamento'
+                        : 'Editar evento'
+                      : formKind === 'service_appointment'
+                        ? 'Novo agendamento'
+                        : 'Novo evento'}
+                  </h2>
                   <p className="text-sm text-gray-500">Clique em um dia para criar, clique no evento para editar.</p>
                 </div>
               </div>
@@ -455,14 +709,92 @@ export function CalendarPage() {
 
             <div className="space-y-4 p-5">
               <div>
-                <label className="text-sm font-semibold text-gray-700">Título</label>
-                <input
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Ex: Reunião de liderança"
+                <label className="text-sm font-semibold text-gray-700">Tipo</label>
+                <select
+                  value={formKind}
+                  onChange={(e) => {
+                    const next = e.target.value as any;
+                    setFormKind(next);
+                    if (next === 'service_appointment') {
+                      setFormAllDay(false);
+                      setFormColor('#10b981');
+                      setFormLocation('');
+                      setFormTitle('');
+                    } else {
+                      setFormColor('#3b82f6');
+                      setFormServiceId('');
+                      setFormSolicitanteNome('');
+                      setFormSolicitanteTelefone('');
+                      setFormSolicitanteEmail('');
+                    }
+                  }}
                   className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                />
+                >
+                  <option value="calendar_event">Evento</option>
+                  <option value="service_appointment">Agendamento de serviço</option>
+                </select>
               </div>
+
+              {formKind === 'calendar_event' ? (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700">Título</label>
+                  <input
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="Ex: Reunião de liderança"
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">Serviço</label>
+                    <select
+                      value={formServiceId}
+                      onChange={(e) => setFormServiceId(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">Selecione um serviço</option>
+                      {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">Solicitante</label>
+                    <input
+                      value={formSolicitanteNome}
+                      onChange={(e) => setFormSolicitanteNome(e.target.value)}
+                      placeholder="Nome do solicitante"
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Telefone (opcional)</label>
+                      <input
+                        value={formSolicitanteTelefone}
+                        onChange={(e) => setFormSolicitanteTelefone(e.target.value)}
+                        placeholder="Telefone"
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Email (opcional)</label>
+                      <input
+                        value={formSolicitanteEmail}
+                        onChange={(e) => setFormSolicitanteEmail(e.target.value)}
+                        placeholder="Email"
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -486,18 +818,20 @@ export function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Dia inteiro</p>
-                  <p className="text-xs text-gray-500">Use para aniversários, retiros, campanhas etc.</p>
+              {formKind === 'calendar_event' ? (
+                <div className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Dia inteiro</p>
+                    <p className="text-xs text-gray-500">Use para aniversários, retiros, campanhas etc.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formAllDay}
+                    onChange={(e) => setFormAllDay(e.target.checked)}
+                    className="h-5 w-5 rounded border-gray-300"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={formAllDay}
-                  onChange={(e) => setFormAllDay(e.target.checked)}
-                  className="h-5 w-5 rounded border-gray-300"
-                />
-              </div>
+              ) : null}
 
               {/* Seleção de Cliente */}
               <div className="relative">
@@ -565,15 +899,17 @@ export function CalendarPage() {
                 )}
               </div>
 
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Local</label>
-                <input
-                  value={formLocation}
-                  onChange={(e) => setFormLocation(e.target.value)}
-                  placeholder="Ex: Templo principal"
-                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
+              {formKind === 'calendar_event' ? (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700">Local</label>
+                  <input
+                    value={formLocation}
+                    onChange={(e) => setFormLocation(e.target.value)}
+                    placeholder="Ex: Templo principal"
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              ) : null}
 
               <div>
                 <label className="text-sm font-semibold text-gray-700">Notas</label>
@@ -586,25 +922,27 @@ export function CalendarPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-sm font-semibold text-gray-700 mb-2 block">Cor do Evento</label>
-                <div className="flex flex-wrap gap-2">
-                  {EVENT_COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      onClick={() => setFormColor(color.value)}
-                      className={`w-10 h-10 rounded-lg transition-all duration-200 ${
-                        formColor === color.value
-                          ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
-                          : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: color.value }}
-                      title={color.label}
-                    />
-                  ))}
+              {formKind === 'calendar_event' ? (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 mb-2 block">Cor do Evento</label>
+                  <div className="flex flex-wrap gap-2">
+                    {EVENT_COLORS.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() => setFormColor(color.value)}
+                        className={`w-10 h-10 rounded-lg transition-all duration-200 ${
+                          formColor === color.value
+                            ? 'ring-2 ring-offset-2 ring-gray-400 scale-110'
+                            : 'hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: color.value }}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t bg-gray-50 px-5 py-4">
@@ -628,11 +966,15 @@ export function CalendarPage() {
                   Cancelar
                 </button>
                 <button
-                  disabled={!formTitle.trim() || !formStart}
+                  disabled={
+                    formKind === 'calendar_event'
+                      ? !formTitle.trim() || !formStart
+                      : !formStart || !String(formServiceId || '').trim() || !formSolicitanteNome.trim()
+                  }
                   onClick={saveEvent}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
-                  {editingEventId ? 'Salvar alterações' : 'Criar evento'}
+                  {editingEventId ? 'Salvar alterações' : formKind === 'service_appointment' ? 'Criar agendamento' : 'Criar evento'}
                 </button>
               </div>
             </div>
