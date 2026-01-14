@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { KpiCard } from '../components/dashboard/KpiCard';
-import { StatCard } from '../components/dashboard/StatCard';
 import { CalendarWidget } from '../components/dashboard/CalendarWidget';
 import { NoticesWidget } from '../components/dashboard/NoticesWidget';
 import { FormsWidget } from '../components/dashboard/FormsWidget';
-import { MessagesWidget } from '../components/dashboard/MessagesWidget';
-import { RefreshCw, Wifi, Bot, MessageSquare, Users, Percent, ArrowUp, ArrowDown, Clock, Check, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
+import { RefreshCw, Wifi, Bot, Users, Percent, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { dashboardService, type DashboardStats } from '../services/supabase/dashboard';
 
 export function DashboardPage() {
+  const { isManager, isChurchAdmin, profile, isReadOnly } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -36,55 +36,45 @@ export function DashboardPage() {
     loadStats(true);
   };
 
+  const normalizedRole = String(profile?.role ?? '').trim().toLowerCase();
+  const dashboardTitle = isChurchAdmin || isManager
+    ? 'Dashboard Admin'
+    : isReadOnly || normalizedRole === 'consulta'
+      ? 'Dashboard Consulta'
+      : normalizedRole === 'manutencao'
+        ? 'Dashboard Manutenção'
+        : 'Dashboard';
+
   // Dados para KPIs
   const kpiData = [
-    { 
-      title: 'Conexões WhatsApp', 
-      value: stats ? `${stats.whatsappConnections.connected}/${stats.whatsappConnections.total}` : '0/0', 
-      icon: Wifi, 
-      color: '#4A90E2', 
-      status: (stats?.whatsappConnections?.connected ?? 0) > 0 ? 'ONLINE' : 'OFFLINE' 
+    {
+      title: 'Conexões WhatsApp',
+      value: stats ? `${stats.whatsappConnections.connected}/${stats.whatsappConnections.total}` : '0/0',
+      icon: Wifi,
+      color: '#4A90E2',
+      status: (stats?.whatsappConnections?.connected ?? 0) > 0 ? 'ONLINE' : 'OFFLINE'
     },
-    { 
-      title: 'Agentes IA', 
-      value: stats?.aiAgentsActive || 0, 
-      icon: Bot, 
-      color: '#9013FE', 
-      status: stats?.aiAgentsActive ? 'ATIVOS' : 'INATIVO' 
+    {
+      title: 'Agentes IA',
+      value: stats?.aiAgentsActive || 0,
+      icon: Bot,
+      color: '#9013FE',
+      status: stats?.aiAgentsActive ? 'ATIVOS' : 'INATIVO'
     },
-    { 
-      title: 'Conversas Ativas', 
-      value: stats?.activeConversations || 0, 
-      icon: MessageSquare, 
-      color: '#50E3C2', 
-      status: 'TEMPO REAL' 
+    {
+      title: 'Base de Contatos',
+      value: stats?.totalContacts || 0,
+      icon: Users,
+      color: '#F5A623',
+      status: 'CRM'
     },
-    { 
-      title: 'Base de Contatos', 
-      value: stats?.totalContacts || 0, 
-      icon: Users, 
-      color: '#F5A623', 
-      status: 'CRM' 
+    {
+      title: 'Taxa Conversão',
+      value: `${stats?.conversionRate || 0}%`,
+      icon: Percent,
+      color: '#F8E71C',
+      status: 'PIPELINE'
     },
-    { 
-      title: 'Taxa Conversão', 
-      value: `${stats?.conversionRate || 0}%`, 
-      icon: Percent, 
-      color: '#F8E71C', 
-      status: 'PIPELINE' 
-    },
-  ];
-
-  // Dados para estatísticas
-  const statData = [
-    { label: 'Hoje', value: stats?.messagesToday || 0, icon: ArrowUp },
-    { label: 'Enviadas', value: stats?.messagesSent || 0, icon: ArrowUp },
-    { label: 'Recebidas', value: stats?.messagesReceived || 0, icon: ArrowDown },
-    { label: 'Novos', value: stats?.newLeadsToday || 0, icon: Check },
-    { label: 'Pausas', value: 0, icon: Clock },
-    { label: 'Pipelines', value: stats?.totalLeads || 0, icon: Users },
-    { label: 'Ganhos', value: stats?.totalActiveClients || 0, icon: ThumbsUp },
-    { label: 'Perdidos', value: stats?.totalInactiveClients || 0, icon: ThumbsDown },
   ];
 
   if (isLoading) {
@@ -100,7 +90,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard Admin</h1>
+          <h1 className="text-2xl font-bold text-white">{dashboardTitle}</h1>
           <p className="text-sm text-gray-400">Monitoramento em tempo real do sistema</p>
         </div>
         <button 
@@ -113,15 +103,9 @@ export function DashboardPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiData.map((kpi) => (
           <KpiCard key={kpi.title} {...kpi} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        {statData.map((stat) => (
-            <StatCard key={stat.label} {...stat} />
         ))}
       </div>
 
@@ -132,10 +116,6 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6">
         <FormsWidget />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        <MessagesWidget />
       </div>
     </div>
   );

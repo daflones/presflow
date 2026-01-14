@@ -1,32 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { formsService, type FormResponse } from '../../services/supabase/forms';
-import { visitationResponsesService } from '../../services/supabase';
-import type { VisitationFormResponse } from '../../types/database';
-import { Loader2, FileText, User, Phone, Calendar, Clock, X } from 'lucide-react';
+import { Loader2, Search, FileText, Phone, Calendar, Clock, X } from 'lucide-react';
+import { getUserData } from '../lib/user';
+import { visitationResponsesService } from '../services/supabase';
+import type { VisitationFormResponse } from '../types/database';
 
-export function FormsWidget() {
-  const navigate = useNavigate();
-  const [responses, setResponses] = useState<FormResponse[]>([]);
+export function VisitationResponsesPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [responses, setResponses] = useState<VisitationFormResponse[]>([]);
+  const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<VisitationFormResponse | null>(null);
   const [isLoadingSelected, setIsLoadingSelected] = useState(false);
 
   useEffect(() => {
-    const loadResponses = async () => {
+    let mounted = true;
+    async function load() {
       try {
         setIsLoading(true);
-        const data = await formsService.getLatestResponses();
-        setResponses(data);
-      } catch (error) {
-        console.error('Erro ao carregar respostas de formulários:', error);
+        const profile = await getUserData();
+        if (!profile?.church_id) {
+          if (!mounted) return;
+          setResponses([]);
+          return;
+        }
+        const data = await visitationResponsesService.listByChurch(profile.church_id);
+        if (!mounted) return;
+        setResponses(data || []);
+      } catch {
+        if (!mounted) return;
+        setResponses([]);
       } finally {
+        if (!mounted) return;
         setIsLoading(false);
       }
+    }
+    load();
+    return () => {
+      mounted = false;
     };
-
-    loadResponses();
   }, []);
 
   useEffect(() => {
@@ -54,6 +65,15 @@ export function FormsWidget() {
       mounted = false;
     };
   }, [selectedId]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return responses;
+    return responses.filter((r) => {
+      const hay = [r.nome, r.email || '', r.telefone || '', r.status || ''].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [responses, query]);
 
   const details = useMemo(() => {
     if (!selected) return [] as Array<{ label: string; value: any }>;
@@ -89,48 +109,61 @@ export function FormsWidget() {
   }, [selected]);
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white flex items-center">
-          <FileText className="w-5 h-5 mr-3 text-purple-400" />
-          Formulários Recebidos
-        </h2>
-        <button
-          type="button"
-          onClick={() => navigate('/visitacao')}
-          className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors"
-        >
-          Ver Todos
-        </button>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Formulários de Visitação</h1>
+          <p className="text-sm text-gray-400">Respostas recebidas do formulário de visitação.</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-700/50 bg-gray-800/50 p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nome, email, telefone..."
+            className="w-full rounded-xl border border-gray-700 bg-gray-900/40 px-9 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none focus:border-purple-500"
+          />
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="flex-grow flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <span className="ml-2 text-gray-400">Carregando formulários...</span>
         </div>
-      ) : responses.length === 0 ? (
-        <div className="flex-grow flex items-center justify-center">
-          <p className="text-gray-400">Nenhum formulário recebido ainda.</p>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-gray-700/50 bg-gray-800/50 p-10 text-center text-sm text-gray-400">
+          Nenhum formulário encontrado.
         </div>
       ) : (
-        <div className="space-y-4 overflow-y-auto flex-grow">
-          {responses.map((response) => (
+        <div className="grid grid-cols-1 gap-4">
+          {filtered.map((r) => (
             <button
-              key={response.id}
+              key={r.id}
               type="button"
-              onClick={() => setSelectedId(response.id)}
-              className="w-full text-left bg-gray-700/50 p-4 rounded-lg hover:bg-gray-700/70 transition"
+              onClick={() => setSelectedId(r.id)}
+              className="w-full text-left rounded-2xl border border-gray-700/50 bg-gray-800/50 p-5 hover:bg-gray-800/70 transition"
             >
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-white flex items-center"><User className="w-4 h-4 mr-2 text-gray-400" />{response.nome}</p>
-                <span className={`px-2 py-1 text-xs font-bold rounded-full ${response.status === 'novo' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
-                  {response.status}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-white font-semibold">
+                    <FileText className="h-4 w-4 text-purple-400" />
+                    <span>{r.nome}</span>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-300 space-y-1">
+                    {r.telefone ? (
+                      <div className="flex items-center gap-2"><Phone className="h-4 w-4" />{r.telefone}</div>
+                    ) : null}
+                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Visita em: {new Date(r.data_visita).toLocaleDateString('pt-BR')}</div>
+                    <div className="flex items-center gap-2"><Clock className="h-4 w-4" />Recebido em: {new Date(r.created_at).toLocaleString('pt-BR')}</div>
+                  </div>
+                </div>
+                <span className={`shrink-0 px-2 py-1 text-xs font-bold rounded-full ${r.status === 'novo' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
+                  {r.status}
                 </span>
-              </div>
-              <div className="text-sm text-gray-400 space-y-1">
-                {response.telefone && <p className="flex items-center"><Phone className="w-4 h-4 mr-2" /> {response.telefone}</p>}
-                <p className="flex items-center"><Calendar className="w-4 h-4 mr-2" /> Visita em: {new Date(response.data_visita).toLocaleDateString()}</p>
-                <p className="flex items-center"><Clock className="w-4 h-4 mr-2" /> Recebido em: {new Date(response.created_at).toLocaleString()}</p>
               </div>
             </button>
           ))}

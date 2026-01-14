@@ -13,6 +13,11 @@ export type CreateServiceAppointmentInput = {
   solicitante_email?: string;
   solicitante_cpf?: string;
   detalhes?: Record<string, any>;
+  documentos_entregues?: any[];
+  documentos_pendentes?: string[];
+  valor_total?: number;
+  valor_sinal_pago?: number;
+  valor_restante?: number;
   observacoes?: string;
   status?: string;
   pagamento_status?: string;
@@ -31,6 +36,49 @@ export const serviceAppointmentsService = {
       .from('service_appointments')
       .select('*')
       .eq('church_id', profile.church_id)
+      .order('data_agendamento', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getInferredEmailsByClientIds(clientIds: string[]): Promise<Record<string, string>> {
+    const profile = await getUserData();
+    if (!profile?.church_id) return {};
+    const ids = (clientIds || []).filter(Boolean);
+    if (ids.length === 0) return {};
+
+    const { data, error } = await supabase
+      .from('service_appointments')
+      .select('client_id, solicitante_email, updated_at, created_at')
+      .eq('church_id', profile.church_id)
+      .in('client_id', ids)
+      .not('solicitante_email', 'is', null)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    const map: Record<string, string> = {};
+    for (const row of data || []) {
+      const clientId = String((row as any).client_id || '').trim();
+      const email = String((row as any).solicitante_email || '').trim();
+      if (!clientId || !email) continue;
+      if (!map[clientId]) {
+        map[clientId] = email;
+      }
+    }
+    return map;
+  },
+
+  async getByClientId(clientId: string): Promise<ServiceAppointment[]> {
+    const profile = await getUserData();
+    if (!profile?.church_id) return [];
+
+    const { data, error } = await supabase
+      .from('service_appointments')
+      .select('*')
+      .eq('church_id', profile.church_id)
+      .eq('client_id', clientId)
       .order('data_agendamento', { ascending: true });
 
     if (error) throw error;
@@ -69,6 +117,11 @@ export const serviceAppointmentsService = {
         solicitante_email: input.solicitante_email || null,
         solicitante_cpf: input.solicitante_cpf || null,
         detalhes: input.detalhes || {},
+        documentos_entregues: input.documentos_entregues || [],
+        documentos_pendentes: input.documentos_pendentes || [],
+        valor_total: input.valor_total ?? null,
+        valor_sinal_pago: input.valor_sinal_pago ?? null,
+        valor_restante: input.valor_restante ?? null,
         observacoes: input.observacoes || null,
         status: input.status || 'solicitado',
         pagamento_status: input.pagamento_status || 'pendente',
@@ -101,6 +154,11 @@ export const serviceAppointmentsService = {
         solicitante_email: input.solicitante_email === undefined ? undefined : input.solicitante_email || null,
         solicitante_cpf: input.solicitante_cpf === undefined ? undefined : input.solicitante_cpf || null,
         detalhes: input.detalhes === undefined ? undefined : input.detalhes || {},
+        documentos_entregues: input.documentos_entregues === undefined ? undefined : input.documentos_entregues || [],
+        documentos_pendentes: input.documentos_pendentes === undefined ? undefined : input.documentos_pendentes || [],
+        valor_total: input.valor_total === undefined ? undefined : (input.valor_total ?? null),
+        valor_sinal_pago: input.valor_sinal_pago === undefined ? undefined : (input.valor_sinal_pago ?? null),
+        valor_restante: input.valor_restante === undefined ? undefined : (input.valor_restante ?? null),
         observacoes: input.observacoes === undefined ? undefined : input.observacoes || null,
         forma_pagamento: input.forma_pagamento === undefined ? undefined : input.forma_pagamento || null,
         updated_at: new Date().toISOString(),

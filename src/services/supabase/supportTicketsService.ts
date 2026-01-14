@@ -128,7 +128,12 @@ export const supportTicketsService = {
     }
   },
 
-  async getStats(churchId: string): Promise<{
+  async getStats(
+    churchId: string,
+    filters?: {
+      categoria?: string;
+    }
+  ): Promise<{
     total: number;
     pendentes: number;
     emAndamento: number;
@@ -136,10 +141,16 @@ export const supportTicketsService = {
     urgentes: number;
     hoje: number;
   }> {
-    const { data, error } = await supabase
+    let query = supabase
       .from('support_tickets')
-      .select('status, prioridade, created_at')
+      .select('status, prioridade, created_at, categoria')
       .eq('church_id', churchId);
+
+    if (filters?.categoria) {
+      query = query.eq('categoria', filters.categoria);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar estatísticas:', error);

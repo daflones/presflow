@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Search, Plus, Pencil, Trash2, Eye, X, Phone, Mail, Tag, UserRound, Building2, LayoutGrid, List, Target, Heart, Sparkles, CalendarDays, Calendar } from 'lucide-react';
-import { clientsService, calendarService } from '../services/supabase';
-import type { Client as DbClient, ClientStatus, ClientCategory, CalendarEvent } from '../types/database';
+import { Search, Plus, Pencil, Trash2, Eye, X, Phone, Mail, Tag, UserRound, Building2, LayoutGrid, List, Calendar } from 'lucide-react';
+import { clientsService, calendarService, serviceAppointmentsService } from '../services/supabase';
+import type { Client as DbClient, ClientStatus, ClientCategory, CalendarEvent, ServiceAppointment } from '../types/database';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -23,13 +23,6 @@ function statusBadge(status: ClientStatus) {
   }
 }
 
-function parseTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
-
 function formatPhone(value?: string) {
   if (!value) return '';
   return value;
@@ -43,6 +36,10 @@ const CATEGORIES: { id: ClientCategory; label: string; color: string }[] = [
   { id: 'hospedagens', label: 'Hospedagens', color: 'bg-amber-50 border-amber-200 text-amber-700' },
   { id: 'turismo', label: 'Turismo', color: 'bg-green-50 border-green-200 text-green-700' },
 ];
+
+function categoryLabel(category: ClientCategory) {
+  return CATEGORIES.find((c) => c.id === category)?.label || 'Lead';
+}
 
 function KanbanColumn({ 
   category, 
@@ -77,7 +74,20 @@ function KanbanColumn({
   );
 }
 
-function KanbanCard({ client, onEdit, onView, readOnly }: { client: Client; onEdit: () => void; onDelete?: () => void; onView: () => void; readOnly: boolean }) {
+function KanbanCard({
+  client,
+  displayEmail,
+  onEdit,
+  onView,
+  readOnly,
+}: {
+  client: Client;
+  displayEmail: string;
+  onEdit: () => void;
+  onDelete?: () => void;
+  onView: () => void;
+  readOnly: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: client.id, disabled: readOnly });
 
   const style = {
@@ -115,10 +125,15 @@ function KanbanCard({ client, onEdit, onView, readOnly }: { client: Client; onEd
             <span className="truncate">{client.phone}</span>
           </div>
         )}
-        {client.email && (
+        {displayEmail ? (
           <div className="flex items-center gap-1 truncate">
             <Mail className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{client.email}</span>
+            <span className="truncate">{displayEmail}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 truncate">
+            <Mail className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">Sem email</span>
           </div>
         )}
       </div>
@@ -161,8 +176,22 @@ export function ContactsPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [_isLoading, setIsLoading] = useState(true);
   const [_isSaving, setIsSaving] = useState(false);
-  const [clientEvents, setClientEvents] = useState<CalendarEvent[]>([]);
+
+  type ClientLinkedItem = {
+    id: string;
+    kind: 'event' | 'appointment';
+    title: string;
+    date: Date;
+    color?: string;
+    email?: string | null;
+    eventType?: string | null;
+  };
+
+  const [clientEvents, setClientEvents] = useState<ClientLinkedItem[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [inferredEmailByClientId, setInferredEmailByClientId] = useState<Record<string, string>>({});
+  const [tableVisibleCount, setTableVisibleCount] = useState(10);
+  const [kanbanVisibleByCategory, setKanbanVisibleByCategory] = useState<Record<string, number>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -180,12 +209,7 @@ export function ContactsPage() {
   const [formEmail, setFormEmail] = useState('');
   const [formStatus, setFormStatus] = useState<ClientStatus>('lead');
   const [formCategory, setFormCategory] = useState<ClientCategory>('lead');
-  const [formTags, setFormTags] = useState('');
   const [formNotes, setFormNotes] = useState('');
-  const [formInterest, setFormInterest] = useState('');
-  const [formMotivation, setFormMotivation] = useState('');
-  const [formExpectation, setFormExpectation] = useState('');
-  const [formEventType, setFormEventType] = useState('');
 
   // Carregar clientes do Supabase
   const loadClients = useCallback(async () => {
@@ -204,40 +228,120 @@ export function ContactsPage() {
     loadClients();
   }, [loadClients]);
 
-  // Carregar eventos do cliente selecionado
   useEffect(() => {
-    async function loadClientEvents() {
-      if (!selectedClientId) {
-        setClientEvents([]);
+    setTableVisibleCount(10);
+    setKanbanVisibleByCategory({
+      lead: 10,
+      casamentos: 10,
+      batizados: 10,
+      'ensaios-fotograficos': 10,
+      hospedagens: 10,
+      turismo: 10,
+    });
+  }, [query, viewMode]);
+
+  useEffect(() => {
+    async function loadInferredEmails() {
+      const ids = clients
+        .filter((c) => !String(c.email || '').trim())
+        .map((c) => c.id)
+        .filter(Boolean);
+      if (ids.length === 0) {
+        setInferredEmailByClientId({});
         return;
       }
-      setIsLoadingEvents(true);
       try {
-        const events = await calendarService.getByClienteId(selectedClientId);
-        setClientEvents(events);
-      } catch (error) {
-        console.error('Erro ao carregar eventos do cliente:', error);
-        setClientEvents([]);
-      } finally {
-        setIsLoadingEvents(false);
+        const map = await serviceAppointmentsService.getInferredEmailsByClientIds(ids);
+        setInferredEmailByClientId(map || {});
+      } catch {
+        setInferredEmailByClientId({});
       }
     }
-    loadClientEvents();
-  }, [selectedClientId]);
+    loadInferredEmails();
+  }, [clients]);
+
+  const getDisplayEmail = useCallback((c: Client) => {
+    const direct = String(c.email || '').trim();
+    if (direct) return direct;
+    const inferred = String(inferredEmailByClientId[c.id] || '').trim();
+    return inferred || '';
+  }, [inferredEmailByClientId]);
 
   const selectedClient = useMemo(() => {
     if (!selectedClientId) return null;
     return clients.find((c) => c.id === selectedClientId) ?? null;
   }, [clients, selectedClientId]);
 
+  // Carregar eventos/agendamentos do cliente selecionado
+  useEffect(() => {
+    async function loadClientLinkedItems() {
+      if (!selectedClientId) {
+        setClientEvents([]);
+        return;
+      }
+      setIsLoadingEvents(true);
+      try {
+        const [events, appointments] = await Promise.all([
+          calendarService.getByClienteId(selectedClientId),
+          serviceAppointmentsService.getByClientId(selectedClientId),
+        ]);
+
+        const mappedEvents: ClientLinkedItem[] = (events || []).map((e: CalendarEvent) => ({
+          id: e.id,
+          kind: 'event',
+          title: e.title,
+          date: new Date(e.start_at),
+          color: e.color,
+          email: null,
+          eventType: e.event_type || null,
+        }));
+
+        const mappedAppointments: ClientLinkedItem[] = (appointments || []).map((a: ServiceAppointment) => {
+          const dateStr = a.data_agendamento;
+          const timeStr = (a.hora_inicio || '09:00:00').slice(0, 8);
+          return {
+            id: a.id,
+            kind: 'appointment',
+            title: `Agendamento - ${a.solicitante_nome}`,
+            date: new Date(`${dateStr}T${timeStr}`),
+            color: '#10b981',
+            email: a.solicitante_email || null,
+            eventType: null,
+          };
+        });
+
+        const merged = [...mappedEvents, ...mappedAppointments].sort((a, b) => a.date.getTime() - b.date.getTime());
+        setClientEvents(merged);
+      } catch (error) {
+        console.error('Erro ao carregar eventos/agendamentos do cliente:', error);
+        setClientEvents([]);
+      } finally {
+        setIsLoadingEvents(false);
+      }
+    }
+    loadClientLinkedItems();
+  }, [selectedClientId]);
+
+  const inferredClientEmail = useMemo(() => {
+    if (!selectedClient) return null;
+    if (selectedClient.email) return null;
+    const email = clientEvents.map((e) => String(e.email || '').trim()).find((v) => v);
+    return email || null;
+  }, [selectedClient, clientEvents]);
+
   const filteredClients = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter((c) => {
-      const hay = [c.name, c.email ?? '', c.phone ?? '', c.status, ...c.tags].join(' ').toLowerCase();
+      const hay = [c.name, c.email ?? '', c.phone ?? '', c.status, categoryLabel(c.category)].join(' ').toLowerCase();
       return hay.includes(q);
     });
   }, [clients, query]);
+
+  const displayedClients = useMemo(() => {
+    if (query.trim()) return filteredClients;
+    return filteredClients.slice(0, tableVisibleCount);
+  }, [filteredClients, tableVisibleCount, query]);
 
   function openCreate() {
     if (!canEditClients) {
@@ -250,12 +354,7 @@ export function ContactsPage() {
     setFormEmail('');
     setFormStatus('lead');
     setFormCategory('lead');
-    setFormTags('');
     setFormNotes('');
-    setFormInterest('');
-    setFormMotivation('');
-    setFormExpectation('');
-    setFormEventType('');
     setIsFormOpen(true);
   }
 
@@ -269,13 +368,9 @@ export function ContactsPage() {
     setFormPhone(client.whatsapp || client.phone || '');
     setFormEmail(client.email ?? '');
     setFormStatus(client.status);
-    setFormCategory(client.category);
-    setFormTags(client.tags.join(', '));
+    const validCategory = client.category && CATEGORIES.some((c) => c.id === client.category) ? client.category : 'lead';
+    setFormCategory(validCategory);
     setFormNotes(client.notes ?? '');
-    setFormInterest(client.interest ?? '');
-    setFormMotivation(client.motivation ?? '');
-    setFormExpectation(client.expectation ?? '');
-    setFormEventType(client.event_type ?? '');
     setIsFormOpen(true);
   }
 
@@ -297,12 +392,8 @@ export function ContactsPage() {
         email: formEmail.trim() || undefined,
         status: formStatus,
         category: formCategory,
-        tags: parseTags(formTags),
+        tags: [],
         notes: formNotes.trim() || undefined,
-        interest: formInterest.trim() || undefined,
-        motivation: formMotivation.trim() || undefined,
-        expectation: formExpectation.trim() || undefined,
-        event_type: formEventType.trim() || undefined,
       };
 
       if (!editingClientId) {
@@ -396,6 +487,30 @@ export function ContactsPage() {
     return grouped;
   }, [filteredClients]);
 
+  const displayedClientsByCategory = useMemo(() => {
+    const q = query.trim();
+    const map: Record<ClientCategory, Client[]> = {
+      lead: [],
+      casamentos: [],
+      batizados: [],
+      'ensaios-fotograficos': [],
+      hospedagens: [],
+      turismo: [],
+    };
+
+    for (const cat of Object.keys(map) as ClientCategory[]) {
+      const list = clientsByCategory[cat] || [];
+      if (q) {
+        map[cat] = list;
+      } else {
+        const limit = kanbanVisibleByCategory[cat] ?? 10;
+        map[cat] = list.slice(0, limit);
+      }
+    }
+
+    return map;
+  }, [clientsByCategory, kanbanVisibleByCategory, query]);
+
   const activeClient = activeId ? clients.find(c => c.id === activeId) : null;
 
   return (
@@ -467,18 +582,34 @@ export function ContactsPage() {
                   <KanbanColumn
                     key={category.id}
                     category={category}
-                    clients={clientsByCategory[category.id]}
+                    clients={displayedClientsByCategory[category.id]}
                   >
-                    {clientsByCategory[category.id].map((client) => (
+                    {displayedClientsByCategory[category.id].map((client) => (
                       <KanbanCard
                         key={client.id}
                         client={client}
+                        displayEmail={getDisplayEmail(client)}
                         onEdit={() => openEdit(client)}
                         onDelete={() => removeClient(client.id)}
                         onView={() => setSelectedClientId(client.id)}
                         readOnly={!canEditClients}
                       />
                     ))}
+
+                    {!query.trim() && (clientsByCategory[category.id]?.length || 0) > (kanbanVisibleByCategory[category.id] ?? 10) ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKanbanVisibleByCategory((prev) => ({
+                            ...prev,
+                            [category.id]: (prev[category.id] ?? 10) + 10,
+                          }));
+                        }}
+                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Mostrar mais
+                      </button>
+                    ) : null}
                   </KanbanColumn>
                 ))}
               </div>
@@ -506,7 +637,7 @@ export function ContactsPage() {
                 <th className="px-4 py-3">Cliente</th>
                 <th className="px-4 py-3">Contato</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Tags</th>
+                <th className="px-4 py-3">Categoria</th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
@@ -518,7 +649,7 @@ export function ContactsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredClients.map((client) => (
+                displayedClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
@@ -544,10 +675,10 @@ export function ContactsPage() {
                             <span>Sem telefone</span>
                           </div>
                         )}
-                        {client.email ? (
+                        {getDisplayEmail(client) ? (
                           <div className="flex items-center gap-2">
                             <Mail className="h-4 w-4 text-gray-400" />
-                            <span className="truncate">{client.email}</span>
+                            <span className="truncate">{getDisplayEmail(client)}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-gray-400">
@@ -563,24 +694,9 @@ export function ContactsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      {client.tags.length === 0 ? (
-                        <span className="text-sm text-gray-400">—</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {client.tags.slice(0, 3).map((t) => (
-                            <span
-                              key={`${client.id}_${t}`}
-                              className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
-                            >
-                              <Tag className="h-3 w-3 text-gray-400" />
-                              {t}
-                            </span>
-                          ))}
-                          {client.tags.length > 3 ? (
-                            <span className="text-xs text-gray-500">+{client.tags.length - 3}</span>
-                          ) : null}
-                        </div>
-                      )}
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold text-gray-700">
+                        {categoryLabel(client.category)}
+                      </span>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-end gap-2">
@@ -612,6 +728,18 @@ export function ContactsPage() {
               )}
             </tbody>
             </table>
+
+            {!query.trim() && filteredClients.length > displayedClients.length ? (
+              <div className="border-t bg-white p-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setTableVisibleCount((c) => c + 10)}
+                  className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Mostrar mais
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -690,22 +818,12 @@ export function ContactsPage() {
                     onChange={(e) => setFormCategory(e.target.value as ClientCategory)}
                     className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                   >
-                    <option value="sem-categoria">Sem Categoria</option>
-                    <option value="eventos">Eventos</option>
-                    <option value="casamentos">Casamentos</option>
-                    <option value="festas">Festas</option>
-                    <option value="compromissos">Compromissos</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Tags (separadas por vírgula)</label>
-                  <input
-                    value={formTags}
-                    onChange={(e) => setFormTags(e.target.value)}
-                    placeholder="Ex: lead, evento, pastoral"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -719,54 +837,11 @@ export function ContactsPage() {
                   />
                 </div>
 
-                {/* Campos de Qualificação */}
-                <div className="sm:col-span-2 pt-4 border-t">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Qualificação do Lead</h3>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Produto de Interesse</label>
-                  <input
-                    value={formInterest}
-                    onChange={(e) => setFormInterest(e.target.value)}
-                    placeholder="Ex: Casamento, Batizado..."
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Tipo de Evento</label>
-                  <input
-                    value={formEventType}
-                    onChange={(e) => setFormEventType(e.target.value)}
-                    placeholder="Ex: Cerimônia religiosa..."
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Motivação</label>
-                  <input
-                    value={formMotivation}
-                    onChange={(e) => setFormMotivation(e.target.value)}
-                    placeholder="O que motivou o contato..."
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Expectativa</label>
-                  <input
-                    value={formExpectation}
-                    onChange={(e) => setFormExpectation(e.target.value)}
-                    placeholder="O que espera do serviço..."
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
+                
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t bg-gray-50 px-5 py-4">
+            <div className="flex items-center justify-end gap-2 border-t bg-gray-50 p-4">
               <button
                 onClick={() => setIsFormOpen(false)}
                 className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -828,118 +903,33 @@ export function ContactsPage() {
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <Mail className="h-4 w-4 text-gray-400" />
-                    <span>{selectedClient.email ? selectedClient.email : 'Sem email cadastrado'}</span>
+                    <span>
+                      {selectedClient.email
+                        ? selectedClient.email
+                        : inferredClientEmail
+                          ? inferredClientEmail
+                          : 'Sem email cadastrado'}
+                    </span>
                   </div>
+
                   <div className="flex items-center gap-2 text-gray-700">
                     <Tag className="h-4 w-4 text-gray-400" />
                     <span>
-                      {selectedClient.tags.length > 0 ? selectedClient.tags.join(', ') : 'Sem tags'}
+                      {categoryLabel(selectedClient.category)}
                     </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Interesse e Qualificação */}
-              {(selectedClient.interest || selectedClient.motivation || selectedClient.expectation || selectedClient.event_type) && (
-                <div className="rounded-xl border bg-white p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Qualificação do Cliente</h3>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {selectedClient.interest && (
-                      <div className="rounded-lg bg-blue-50 p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Target className="h-4 w-4 text-blue-600" />
-                          <p className="text-xs font-semibold text-blue-700">Produto de Interesse</p>
-                        </div>
-                        <p className="text-sm text-gray-900">{selectedClient.interest}</p>
-                      </div>
-                    )}
-                    {selectedClient.motivation && (
-                      <div className="rounded-lg bg-pink-50 p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Heart className="h-4 w-4 text-pink-600" />
-                          <p className="text-xs font-semibold text-pink-700">Motivação</p>
-                        </div>
-                        <p className="text-sm text-gray-900">{selectedClient.motivation}</p>
-                      </div>
-                    )}
-                    {selectedClient.expectation && (
-                      <div className="rounded-lg bg-purple-50 p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className="h-4 w-4 text-purple-600" />
-                          <p className="text-xs font-semibold text-purple-700">Expectativa</p>
-                        </div>
-                        <p className="text-sm text-gray-900">{selectedClient.expectation}</p>
-                      </div>
-                    )}
-                    {selectedClient.event_type && (
-                      <div className="rounded-lg bg-orange-50 p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <CalendarDays className="h-4 w-4 text-orange-600" />
-                          <p className="text-xs font-semibold text-orange-700">Tipo de Evento</p>
-                        </div>
-                        <p className="text-sm text-gray-900">{selectedClient.event_type}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Observações */}
-              <div className="rounded-xl border bg-white p-4">
-                <h3 className="text-sm font-semibold text-gray-900">Observações</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">
-                  {selectedClient.notes ? selectedClient.notes : 'Nenhuma observação cadastrada.'}
-                </p>
-              </div>
-
-              {/* Informações adicionais */}
-              <div className="rounded-xl border bg-white p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Informações Adicionais</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-600">Último contato</p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">
-                      {selectedClient.last_contact_at 
-                        ? new Date(selectedClient.last_contact_at).toLocaleDateString('pt-BR')
-                        : '—'}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-600">Origem</p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">{selectedClient.source || 'WhatsApp'}</p>
-                  </div>
-                  {selectedClient.church_name && (
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-600">Nome da Igreja</p>
-                      <p className="mt-1 text-sm font-bold text-gray-900">{selectedClient.church_name}</p>
-                    </div>
-                  )}
-                  {selectedClient.segment && (
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-600">Segmento</p>
-                      <p className="mt-1 text-sm font-bold text-gray-900">{selectedClient.segment}</p>
-                    </div>
-                  )}
-                  {selectedClient.monthly_volume && (
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-600">Volume Mensal</p>
-                      <p className="mt-1 text-sm font-bold text-gray-900">{selectedClient.monthly_volume}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Eventos/Agendamentos do Cliente */}
-              <div className="rounded-xl border bg-white p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-blue-600" />
                     Eventos/Agendamentos
                   </h3>
                   {clientEvents.length > 0 && (
-                    <span className="text-xs text-gray-500">{clientEvents.length} evento(s)</span>
+                    <span className="text-xs text-gray-500">{clientEvents.length} item(ns)</span>
                   )}
                 </div>
+
                 {isLoadingEvents ? (
                   <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
@@ -955,35 +945,38 @@ export function ContactsPage() {
                       >
                         <div
                           className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-                          style={{ backgroundColor: event.color || '#3b82f6' }}
+                          style={{ backgroundColor: event.color || (event.kind === 'appointment' ? '#10b981' : '#3b82f6') }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
                           <p className="text-xs text-gray-500">
-                            {new Date(event.start_at).toLocaleDateString('pt-BR', {
+                            {event.date.toLocaleDateString('pt-BR', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
                             })}
+                            {' · '}
+                            {event.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            {' · '}
+                            {event.kind === 'appointment' ? 'Agendamento' : 'Evento'}
                           </p>
-                          {event.event_type && (
+                          {event.eventType ? (
                             <span className="inline-flex items-center mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                              {event.event_type}
+                              {event.eventType}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     ))}
                     {clientEvents.length > 5 && (
                       <p className="text-xs text-center text-gray-500 pt-2">
-                        +{clientEvents.length - 5} evento(s) adicional(is)
+                        +{clientEvents.length - 5} item(ns) adicional(is)
                       </p>
                     )}
                   </div>
                 )}
               </div>
+
             </div>
 
             <div className="sticky bottom-0 border-t bg-white p-4">

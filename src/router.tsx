@@ -15,6 +15,7 @@ import { NoticesPage } from './pages/NoticesPage';
 import { UsersPage } from './pages/UsersPage';
 import { ArquivosIAPage } from './pages/ArquivosIAPage';
 import { PerfilIgrejaPage } from './pages/PerfilIgrejaPage';
+import { VisitationResponsesPage } from './pages/VisitationResponsesPage';
 import { AdminDashboard, AdminIgrejas, AdminConfigIA, AdminClientes, AdminArquivos, AdminServicos, AdminHospedagem, AdminVisitacao } from './pages/admin';
 import { AdminCalendario } from './pages/admin/AdminCalendario';
 import { PublicVisitationForm } from './pages/PublicVisitationForm';
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           { path: '/arquivos-ia', element: <ArquivosIAPage /> },
           { path: '/contatos', element: <ContactsPage /> },
           { path: '/calendario', element: <CalendarPage /> },
+          { path: '/visitacao', element: <VisitationResponsesPage /> },
           { path: '/avisos', element: <NoticesPage /> },
           { path: '/usuarios', element: <UsersPage /> },
           { path: '/perfil-igreja', element: <PerfilIgrejaPage /> },

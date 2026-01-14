@@ -28,6 +28,17 @@ type CalendarEvent = {
   solicitante_nome?: string;
   solicitante_telefone?: string;
   solicitante_email?: string;
+  solicitante_cpf?: string;
+  detalhes?: Record<string, any>;
+  documentos_entregues?: any[];
+  documentos_pendentes?: string[];
+  valor_total?: number;
+  valor_sinal_pago?: number;
+  valor_restante?: number;
+  status?: string;
+  pagamento_status?: string;
+  forma_pagamento?: string;
+  origem?: string;
   observacoes?: string;
 };
 
@@ -88,6 +99,17 @@ function serviceAppointmentToLocal(a: ServiceAppointment, service?: ChurchServic
     solicitante_nome: a.solicitante_nome,
     solicitante_telefone: a.solicitante_telefone,
     solicitante_email: a.solicitante_email,
+    solicitante_cpf: a.solicitante_cpf,
+    detalhes: a.detalhes || {},
+    documentos_entregues: a.documentos_entregues || [],
+    documentos_pendentes: a.documentos_pendentes || [],
+    valor_total: a.valor_total,
+    valor_sinal_pago: a.valor_sinal_pago,
+    valor_restante: a.valor_restante,
+    status: a.status,
+    pagamento_status: a.pagamento_status,
+    forma_pagamento: a.forma_pagamento,
+    origem: a.origem,
     observacoes: a.observacoes,
     notes: a.observacoes || undefined,
   };
@@ -122,6 +144,10 @@ export function CalendarPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<ChurchService[]>([]);
 
+  const [activeTab, setActiveTab] = useState<'events' | 'appointments'>('appointments');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
+  const [listVisibleCount, setListVisibleCount] = useState(10);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
@@ -138,6 +164,18 @@ export function CalendarPage() {
   const [formSolicitanteNome, setFormSolicitanteNome] = useState('');
   const [formSolicitanteTelefone, setFormSolicitanteTelefone] = useState('');
   const [formSolicitanteEmail, setFormSolicitanteEmail] = useState('');
+  const [formSolicitanteCpf, setFormSolicitanteCpf] = useState('');
+  const [formStatus, setFormStatus] = useState<string>('solicitado');
+  const [formPagamentoStatus, setFormPagamentoStatus] = useState<string>('pendente');
+  const [formFormaPagamento, setFormFormaPagamento] = useState('');
+  const [formValorTotal, setFormValorTotal] = useState<string>('');
+  const [formValorSinalPago, setFormValorSinalPago] = useState<string>('');
+  const [formValorRestante, setFormValorRestante] = useState<string>('');
+  const [formDocumentosEntregues, setFormDocumentosEntregues] = useState<string>('');
+  const [formDocumentosPendentes, setFormDocumentosPendentes] = useState<string>('');
+  const [formDetalhesJson, setFormDetalhesJson] = useState<string>('{}');
+  const [showDocumentosEntregues, setShowDocumentosEntregues] = useState(false);
+  const [showDetalhes, setShowDetalhes] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
 
@@ -178,6 +216,21 @@ export function CalendarPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    setListVisibleCount(10);
+  }, [activeTab, viewMode]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        resetModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen]);
+
   // Filtrar clientes pela busca
   const filteredClients = useMemo(() => {
     if (!clientSearch.trim()) return clients.slice(0, 10);
@@ -196,7 +249,11 @@ export function CalendarPage() {
   }, [clients, formClienteId]);
 
   const fcEvents: EventInput[] = useMemo(() => {
-    return events.map((e) => ({
+    const filtered = events.filter((e) =>
+      activeTab === 'events' ? e.kind === 'calendar_event' : e.kind === 'service_appointment',
+    );
+
+    return filtered.map((e) => ({
       id: e.id,
       title: e.title,
       start: e.start,
@@ -216,7 +273,7 @@ export function CalendarPage() {
         observacoes: e.observacoes,
       },
     }));
-  }, [events]);
+  }, [events, activeTab]);
 
   function openCreateFromSelect(arg: DateSelectArg) {
     if (!canEditCalendar) {
@@ -224,7 +281,7 @@ export function CalendarPage() {
       return;
     }
     setEditingEventId(null);
-    setFormKind('calendar_event');
+    setFormKind(activeTab === 'appointments' ? 'service_appointment' : 'calendar_event');
     setFormTitle('');
     setFormAllDay(arg.allDay);
 
@@ -248,6 +305,18 @@ export function CalendarPage() {
     setFormSolicitanteNome('');
     setFormSolicitanteTelefone('');
     setFormSolicitanteEmail('');
+    setFormSolicitanteCpf('');
+    setFormStatus('solicitado');
+    setFormPagamentoStatus('pendente');
+    setFormFormaPagamento('');
+    setFormValorTotal('');
+    setFormValorSinalPago('');
+    setFormValorRestante('');
+    setFormDocumentosEntregues('');
+    setFormDocumentosPendentes('');
+    setFormDetalhesJson('{}');
+    setShowDocumentosEntregues(false);
+    setShowDetalhes(false);
     setClientSearch('');
     setShowClientDropdown(false);
     setIsModalOpen(true);
@@ -274,6 +343,35 @@ export function CalendarPage() {
     setFormSolicitanteNome(found.solicitante_nome ?? '');
     setFormSolicitanteTelefone(found.solicitante_telefone ?? '');
     setFormSolicitanteEmail(found.solicitante_email ?? '');
+    setFormSolicitanteCpf(found.solicitante_cpf ?? '');
+    setFormStatus(String(found.status ?? 'solicitado'));
+    setFormPagamentoStatus(String(found.pagamento_status ?? 'pendente'));
+    setFormFormaPagamento(String(found.forma_pagamento ?? ''));
+    setFormValorTotal(found.valor_total === undefined || found.valor_total === null ? '' : String(found.valor_total));
+    setFormValorSinalPago(found.valor_sinal_pago === undefined || found.valor_sinal_pago === null ? '' : String(found.valor_sinal_pago));
+    setFormValorRestante(found.valor_restante === undefined || found.valor_restante === null ? '' : String(found.valor_restante));
+    const docsEnt = Array.isArray(found.documentos_entregues) ? found.documentos_entregues : [];
+    const docsEntLines = docsEnt
+      .map((d: any) => String(d?.nome || '').trim())
+      .filter(Boolean)
+      .join('\n');
+    setFormDocumentosEntregues(docsEntLines);
+
+    const docsPend = Array.isArray(found.documentos_pendentes) ? found.documentos_pendentes : [];
+    setFormDocumentosPendentes(docsPend.join('\n'));
+
+    const detalhes = (found as any).detalhes;
+    const detalhesIsEmptyObject = detalhes && typeof detalhes === 'object' && !Array.isArray(detalhes) && Object.keys(detalhes).length === 0;
+    const detalhesText =
+      detalhes && typeof detalhes === 'object' && !Array.isArray(detalhes) && typeof detalhes.texto === 'string'
+        ? detalhes.texto
+        : detalhesIsEmptyObject || detalhes == null
+          ? ''
+          : JSON.stringify(detalhes, null, 2);
+    setFormDetalhesJson(detalhesText || '');
+
+    setShowDocumentosEntregues(Boolean(docsEntLines.trim()));
+    setShowDetalhes(Boolean(String(detalhesText || '').trim()));
     setClientSearch('');
     setShowClientDropdown(false);
     setIsModalOpen(true);
@@ -339,6 +437,72 @@ export function CalendarPage() {
     if (!serviceId) return;
     if (!solicitanteNome) return;
 
+    const parseMaybeJson = (raw: string) => {
+      const t = String(raw || '').trim();
+      if (!t) return null;
+      if (t.startsWith('{') || t.startsWith('[')) {
+        return JSON.parse(t);
+      }
+      return null;
+    };
+
+    let detalhesObj: Record<string, any> = {};
+    try {
+      const raw = String(formDetalhesJson || '').trim();
+      if (!raw) {
+        detalhesObj = {};
+      } else {
+        const maybe = parseMaybeJson(raw);
+        if (maybe !== null) {
+          detalhesObj = (maybe && typeof maybe === 'object') ? maybe : {};
+        } else {
+          detalhesObj = { texto: raw };
+        }
+      }
+    } catch {
+      toast.error('Detalhes inválido');
+      return;
+    }
+
+    let docsEntregues: any[] = [];
+    try {
+      const raw = String(formDocumentosEntregues || '').trim();
+      if (!raw) {
+        docsEntregues = [];
+      } else {
+        const maybe = parseMaybeJson(raw);
+        if (maybe !== null) {
+          docsEntregues = Array.isArray(maybe) ? maybe : [];
+        } else {
+          const names = raw
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean);
+          docsEntregues = names.map((nome) => ({ nome, entregue: true }));
+        }
+      }
+    } catch {
+      toast.error('Documentos entregues inválido');
+      return;
+    }
+
+    const docsPendentes = String(formDocumentosPendentes || '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const parseMoney = (v: string): number | undefined => {
+      const raw = String(v || '').trim();
+      if (!raw) return undefined;
+      const normalized = raw.replace(/\./g, '').replace(',', '.');
+      const n = Number(normalized);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const valorTotal = parseMoney(formValorTotal);
+    const valorSinalPago = parseMoney(formValorSinalPago);
+    const valorRestante = parseMoney(formValorRestante);
+
     const { date: dataAgendamento, time: horaInicio } = dateTimeLocalToParts(formStart);
     const horaFim = formEnd ? dateTimeLocalToParts(formEnd).time : '';
 
@@ -356,6 +520,16 @@ export function CalendarPage() {
           solicitante_nome: solicitanteNome,
           solicitante_telefone: formSolicitanteTelefone.trim() || undefined,
           solicitante_email: formSolicitanteEmail.trim() || undefined,
+          solicitante_cpf: formSolicitanteCpf.trim() || undefined,
+          status: String(formStatus || 'solicitado'),
+          pagamento_status: String(formPagamentoStatus || 'pendente'),
+          forma_pagamento: formFormaPagamento.trim() || undefined,
+          valor_total: valorTotal,
+          valor_sinal_pago: valorSinalPago,
+          valor_restante: valorRestante,
+          documentos_entregues: docsEntregues,
+          documentos_pendentes: docsPendentes,
+          detalhes: detalhesObj,
           observacoes: formNotes.trim() || undefined,
         });
         setEvents((prev) => [serviceAppointmentToLocal(created, servicesById.get(created.service_id)), ...prev]);
@@ -370,6 +544,16 @@ export function CalendarPage() {
           solicitante_nome: solicitanteNome,
           solicitante_telefone: formSolicitanteTelefone.trim() || undefined,
           solicitante_email: formSolicitanteEmail.trim() || undefined,
+          solicitante_cpf: formSolicitanteCpf.trim() || undefined,
+          status: String(formStatus || 'solicitado'),
+          pagamento_status: String(formPagamentoStatus || 'pendente'),
+          forma_pagamento: formFormaPagamento.trim() || undefined,
+          valor_total: valorTotal,
+          valor_sinal_pago: valorSinalPago,
+          valor_restante: valorRestante,
+          documentos_entregues: docsEntregues,
+          documentos_pendentes: docsPendentes,
+          detalhes: detalhesObj,
           observacoes: formNotes.trim() || undefined,
         });
         const next = serviceAppointmentToLocal(updated as any, servicesById.get(updated.service_id));
@@ -461,27 +645,77 @@ export function CalendarPage() {
           <h1 className="text-2xl font-bold text-gray-900">Calendário</h1>
           <p className="text-sm text-gray-500">Visualize, crie e gerencie seus eventos.</p>
         </div>
+      </div>
 
-        <button
-          onClick={() => {
-            const now = new Date();
-            const end = new Date(now.getTime() + 60 * 60 * 1000);
-            openCreateFromSelect({
-              start: now,
-              end,
-              startStr: now.toISOString(),
-              endStr: end.toISOString(),
-              allDay: false,
-              jsEvent: null as unknown as MouseEvent,
-              view: null as unknown as any,
-            });
-          }}
-          disabled={!canEditCalendar}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Novo evento
-        </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('events')}
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+              activeTab === 'events'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Eventos
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('appointments')}
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+              activeTab === 'appointments'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Agendamentos
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('calendar')}
+              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
+                viewMode === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Calendário
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
+                viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Lista
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              const now = new Date();
+              const end = new Date(now.getTime() + 60 * 60 * 1000);
+              openCreateFromSelect({
+                start: now,
+                end,
+                startStr: now.toISOString(),
+                endStr: end.toISOString(),
+                allDay: false,
+                jsEvent: null as unknown as MouseEvent,
+                view: null as unknown as any,
+              });
+            }}
+            disabled={!canEditCalendar}
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            {activeTab === 'appointments' ? 'Novo agendamento' : 'Novo evento'}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200/50 bg-white/80 backdrop-blur-xl p-6 shadow-xl">
@@ -491,6 +725,11 @@ export function CalendarPage() {
             --fc-border-color: #e5e7eb;
             --fc-page-bg-color: transparent;
             --fc-today-bg-color: #eff6ff;
+          }
+          .fc .fc-scrollgrid,
+          .fc .fc-scrollgrid table {
+            border-radius: 0.75rem;
+            overflow: hidden;
           }
           .fc .fc-toolbar-title {
             font-size: 1.5rem;
@@ -510,6 +749,10 @@ export function CalendarPage() {
           .fc .fc-button:hover {
             background: #f3f4f6;
             border-color: #d1d5db;
+          }
+          .fc .fc-button:focus,
+          .fc .fc-button-primary:focus {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
           }
           .fc .fc-button-primary:not(:disabled):active,
           .fc .fc-button-primary:not(:disabled).fc-button-active {
@@ -532,6 +775,9 @@ export function CalendarPage() {
             font-weight: 500;
             padding: 0.5rem;
           }
+          .fc .fc-daygrid-day-frame {
+            padding: 0.25rem;
+          }
           .fc .fc-col-header-cell-cushion {
             color: #6b7280;
             font-weight: 600;
@@ -542,6 +788,27 @@ export function CalendarPage() {
           }
           .fc .fc-daygrid-day.fc-day-today {
             background: #eff6ff !important;
+          }
+          .fc .fc-timegrid-slot,
+          .fc .fc-timegrid-axis,
+          .fc .fc-timegrid-col {
+            background: rgba(255, 255, 255, 0.65);
+          }
+          .fc .fc-timegrid-slot-label {
+            color: #6b7280;
+            font-weight: 600;
+          }
+          .fc .fc-list {
+            border-radius: 0.75rem;
+            overflow: hidden;
+          }
+          .fc .fc-list-day-cushion {
+            background: #f9fafb;
+            color: #111827;
+            font-weight: 700;
+          }
+          .fc .fc-list-event:hover td {
+            background: #f3f4f6;
           }
           .fc .fc-event {
             border-radius: 0.375rem;
@@ -594,95 +861,234 @@ export function CalendarPage() {
             word-break: break-word;
           }
         `}</style>
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-          initialView="dayGridMonth"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,listWeek',
-          }}
-          buttonText={{
-            today: 'Hoje',
-            month: 'Mês',
-            week: 'Semana',
-            day: 'Dia',
-            list: 'Lista',
-          }}
-          height="auto"
-          locale={ptBrLocale}
-          selectable={canEditCalendar}
-          selectMirror
-          dayMaxEvents={3}
-          nowIndicator
-          editable={canEditCalendar}
-          droppable
-          eventDrop={handleEventDrop}
-          events={fcEvents}
-          select={openCreateFromSelect}
-          eventClick={openEditFromClick}
-          eventContent={(arg) => {
-            const kind = (arg.event.extendedProps as any)?.kind as string | undefined;
-            const isService = kind === 'service_appointment';
-            const timeText = arg.timeText ? `${arg.timeText} ` : '';
-            return (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'baseline' }}>
-                {timeText ? <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{timeText}</span> : null}
-                <span style={{ fontWeight: 600 }}>{arg.event.title}</span>
-                {isService ? (
-                  <span
-                    style={{
-                      marginLeft: 'auto',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      padding: '0.05rem 0.35rem',
-                      borderRadius: '9999px',
-                      background: 'rgba(255,255,255,0.35)',
-                      lineHeight: 1.2,
-                      whiteSpace: 'nowrap',
-                    }}
+        {viewMode === 'calendar' ? (
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,listWeek',
+            }}
+            buttonText={{
+              today: 'Hoje',
+              month: 'Mês',
+              week: 'Semana',
+              day: 'Dia',
+              list: 'Lista',
+            }}
+            height="auto"
+            locale={ptBrLocale}
+            selectable={canEditCalendar}
+            selectMirror
+            dayMaxEvents={3}
+            nowIndicator
+            editable={canEditCalendar}
+            droppable
+            eventDrop={handleEventDrop}
+            events={fcEvents}
+            select={openCreateFromSelect}
+            eventClick={openEditFromClick}
+            eventContent={(arg) => {
+              const kind = (arg.event.extendedProps as any)?.kind as string | undefined;
+              const isService = kind === 'service_appointment';
+              const timeText = arg.timeText ? `${arg.timeText} ` : '';
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'baseline' }}>
+                  {timeText ? <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{timeText}</span> : null}
+                  <span style={{ fontWeight: 600 }}>{arg.event.title}</span>
+                  {isService ? (
+                    <span
+                      style={{
+                        marginLeft: 'auto',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '0.05rem 0.35rem',
+                        borderRadius: '9999px',
+                        background: 'rgba(255,255,255,0.35)',
+                        lineHeight: 1.2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      SERVIÇO
+                    </span>
+                  ) : null}
+                </div>
+              );
+            }}
+            eventDidMount={(info) => {
+              const p = info.event.extendedProps as any;
+              const kind = String(p?.kind || '');
+              const lines: string[] = [];
+              if (info.timeText) lines.push(info.timeText);
+              lines.push(info.event.title);
+              if (kind === 'calendar_event') {
+                if (p?.location) lines.push(`Local: ${p.location}`);
+                if (p?.notes) lines.push(`Notas: ${p.notes}`);
+              }
+              if (kind === 'service_appointment') {
+                if (p?.solicitante_nome) lines.push(`Solicitante: ${p.solicitante_nome}`);
+                if (p?.solicitante_telefone) lines.push(`Telefone: ${p.solicitante_telefone}`);
+                if (p?.solicitante_email) lines.push(`Email: ${p.solicitante_email}`);
+                if (p?.observacoes) lines.push(`Obs: ${p.observacoes}`);
+              }
+              const tooltip = lines.filter(Boolean).join('\n');
+              if (tooltip) info.el.setAttribute('title', tooltip);
+            }}
+            eventTimeFormat={{
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            }}
+            slotLabelFormat={{
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            }}
+          />
+        ) : (
+          <div className="space-y-3">
+            {events
+              .filter((e) => (activeTab === 'events' ? e.kind === 'calendar_event' : e.kind === 'service_appointment'))
+              .slice()
+              .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+              .slice(0, listVisibleCount)
+              .map((e) => {
+                const start = new Date(e.start);
+                const end = e.end ? new Date(e.end) : null;
+                const dateLabel = start.toLocaleDateString('pt-BR', {
+                  weekday: 'short',
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                });
+                const timeLabel = e.allDay
+                  ? 'Dia inteiro'
+                  : `${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${
+                      end ? ` - ${end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''
+                    }`;
+
+                const badge = e.kind === 'service_appointment' ? 'AGENDAMENTO' : 'EVENTO';
+
+                return (
+                  <div
+                    key={e.id}
+                    className="group flex flex-col gap-3 rounded-xl border border-gray-200/70 bg-white px-4 py-4 shadow-sm transition hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
                   >
-                    SERVIÇO
-                  </span>
-                ) : null}
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="mt-0.5 h-10 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: e.color || (e.kind === 'service_appointment' ? '#10b981' : '#3b82f6') }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canEditCalendar) return;
+                          openEditFromClick({
+                            el: null as unknown as HTMLElement,
+                            event: {
+                              id: e.id,
+                            } as any,
+                            jsEvent: null as unknown as MouseEvent,
+                            view: null as unknown as any,
+                          });
+                        }}
+                        className="min-w-0 text-left"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-gray-900 group-hover:text-blue-700 truncate">{e.title}</p>
+                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-gray-700">
+                            {badge}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                          <span className="font-semibold text-gray-700">{dateLabel}</span>
+                          <span className="text-gray-500">{timeLabel}</span>
+                        </div>
+                        {e.kind === 'calendar_event' && e.location ? (
+                          <div className="mt-1 text-xs text-gray-500">{e.location}</div>
+                        ) : null}
+                        {e.kind === 'service_appointment' && e.solicitante_nome ? (
+                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                            <UserRound className="h-3.5 w-3.5" />
+                            <span>Solicitante: {e.solicitante_nome}</span>
+                          </div>
+                        ) : null}
+                      </button>
+                    </div>
+
+                    {canEditCalendar ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openEditFromClick({
+                              el: null as unknown as HTMLElement,
+                              event: {
+                                id: e.id,
+                              } as any,
+                              jsEvent: null as unknown as MouseEvent,
+                              view: null as unknown as any,
+                            });
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeEvent(e.id)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Apagar
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+            {events.filter((e) => (activeTab === 'events' ? e.kind === 'calendar_event' : e.kind === 'service_appointment'))
+              .length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-600">
+                Nenhum item cadastrado.
               </div>
-            );
-          }}
-          eventDidMount={(info) => {
-            const p = info.event.extendedProps as any;
-            const kind = String(p?.kind || '');
-            const lines: string[] = [];
-            if (info.timeText) lines.push(info.timeText);
-            lines.push(info.event.title);
-            if (kind === 'calendar_event') {
-              if (p?.location) lines.push(`Local: ${p.location}`);
-              if (p?.notes) lines.push(`Notas: ${p.notes}`);
-            }
-            if (kind === 'service_appointment') {
-              if (p?.solicitante_nome) lines.push(`Solicitante: ${p.solicitante_nome}`);
-              if (p?.solicitante_telefone) lines.push(`Telefone: ${p.solicitante_telefone}`);
-              if (p?.solicitante_email) lines.push(`Email: ${p.solicitante_email}`);
-              if (p?.observacoes) lines.push(`Obs: ${p.observacoes}`);
-            }
-            const tooltip = lines.filter(Boolean).join('\n');
-            if (tooltip) info.el.setAttribute('title', tooltip);
-          }}
-          eventTimeFormat={{
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }}
-          slotLabelFormat={{
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }}
-        />
+            ) : null}
+
+            {(() => {
+              const all = events
+                .filter((e) => (activeTab === 'events' ? e.kind === 'calendar_event' : e.kind === 'service_appointment'))
+                .slice()
+                .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+              const hasMore = all.length > listVisibleCount;
+              if (!hasMore) return null;
+              return (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setListVisibleCount((c) => c + 10)}
+                    className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    Mostrar mais
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) resetModal();
+          }}
+        >
+          <div className="flex w-full max-w-2xl max-h-[85vh] flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -707,7 +1113,7 @@ export function CalendarPage() {
               </button>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="flex-1 overflow-y-auto space-y-4 p-5">
               <div>
                 <label className="text-sm font-semibold text-gray-700">Tipo</label>
                 <select
@@ -726,6 +1132,16 @@ export function CalendarPage() {
                       setFormSolicitanteNome('');
                       setFormSolicitanteTelefone('');
                       setFormSolicitanteEmail('');
+                      setFormSolicitanteCpf('');
+                      setFormStatus('solicitado');
+                      setFormPagamentoStatus('pendente');
+                      setFormFormaPagamento('');
+                      setFormValorTotal('');
+                      setFormValorSinalPago('');
+                      setFormValorRestante('');
+                      setFormDocumentosEntregues('');
+                      setFormDocumentosPendentes('');
+                      setFormDetalhesJson('{}');
                     }
                   }}
                   className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
@@ -792,6 +1208,169 @@ export function CalendarPage() {
                         className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">CPF (opcional)</label>
+                    <input
+                      value={formSolicitanteCpf}
+                      onChange={(e) => setFormSolicitanteCpf(e.target.value)}
+                      placeholder="CPF"
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Status</label>
+                      <select
+                        value={formStatus}
+                        onChange={(e) => setFormStatus(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="solicitado">Solicitado</option>
+                        <option value="aguardando_documentos">Aguardando documentos</option>
+                        <option value="confirmado">Confirmado</option>
+                        <option value="realizado">Realizado</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Pagamento</label>
+                      <select
+                        value={formPagamentoStatus}
+                        onChange={(e) => setFormPagamentoStatus(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="pendente">Pendente</option>
+                        <option value="sinal_pago">Sinal pago</option>
+                        <option value="pago_total">Pago total</option>
+                        <option value="reembolsado">Reembolsado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">Forma de pagamento (opcional)</label>
+                    <input
+                      value={formFormaPagamento}
+                      onChange={(e) => setFormFormaPagamento(e.target.value)}
+                      placeholder="Ex: PIX, Cartão, Dinheiro"
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Valor total (opcional)</label>
+                      <input
+                        value={formValorTotal}
+                        onChange={(e) => setFormValorTotal(e.target.value)}
+                        placeholder="0,00"
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Sinal pago (opcional)</label>
+                      <input
+                        value={formValorSinalPago}
+                        onChange={(e) => setFormValorSinalPago(e.target.value)}
+                        placeholder="0,00"
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Restante (opcional)</label>
+                      <input
+                        value={formValorRestante}
+                        onChange={(e) => setFormValorRestante(e.target.value)}
+                        placeholder="0,00"
+                        className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700">Documentos pendentes (1 por linha)</label>
+                    <textarea
+                      value={formDocumentosPendentes}
+                      onChange={(e) => setFormDocumentosPendentes(e.target.value)}
+                      rows={3}
+                      placeholder="RG\nCPF\nComprovante"
+                      className="mt-1 w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div>
+                    {!showDocumentosEntregues ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowDocumentosEntregues(true)}
+                        className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Adicionar documentos entregues
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-semibold text-gray-700">Documentos entregues</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormDocumentosEntregues('');
+                              setShowDocumentosEntregues(false);
+                            }}
+                            className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                          >
+                            Ocultar
+                          </button>
+                        </div>
+                        <textarea
+                          value={formDocumentosEntregues}
+                          onChange={(e) => setFormDocumentosEntregues(e.target.value)}
+                          rows={4}
+                          placeholder="RG\nCPF\nComprovante"
+                          className="mt-1 w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">1 documento por linha. (Se quiser, também aceita JSON)</p>
+                      </>
+                    )}
+                  </div>
+
+                  <div>
+                    {!showDetalhes ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowDetalhes(true)}
+                        className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Adicionar detalhes
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-semibold text-gray-700">Detalhes</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormDetalhesJson('');
+                              setShowDetalhes(false);
+                            }}
+                            className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                          >
+                            Ocultar
+                          </button>
+                        </div>
+                        <textarea
+                          value={formDetalhesJson}
+                          onChange={(e) => setFormDetalhesJson(e.target.value)}
+                          rows={4}
+                          placeholder="Descreva aqui os detalhes do agendamento..."
+                          className="mt-1 w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Você pode escrever livremente. (Se quiser, também aceita JSON)</p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

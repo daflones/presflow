@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Clock, CheckCircle, AlertTriangle, FileText, MessageCircle } from 'lucide-react';
+import { Bell, Clock, CheckCircle, ListChecks } from 'lucide-react';
 import { supportTicketsService } from '../../services/supabase/supportTicketsService';
 import { getUserData } from '../../lib/user';
 
 export function NoticesWidget() {
-  const [stats, setStats] = useState({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+  const [statsIntencoes, setStatsIntencoes] = useState({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+  const [statsAvisos, setStatsAvisos] = useState({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
 
   useEffect(() => {
     const load = async () => {
@@ -13,29 +14,38 @@ export function NoticesWidget() {
         const profile = await getUserData();
         const churchId = profile?.church_id;
         if (!churchId) {
-          setStats({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+          setStatsIntencoes({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+          setStatsAvisos({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
           return;
         }
 
-        const data = await supportTicketsService.getStats(churchId);
-        setStats(data);
+        const [intencoes, avisos] = await Promise.all([
+          supportTicketsService.getStats(churchId, { categoria: 'intencao_missa' }),
+          supportTicketsService.getStats(churchId, { categoria: 'aviso' }),
+        ]);
+
+        setStatsIntencoes(intencoes);
+        setStatsAvisos(avisos);
       } catch (error) {
         console.error('Erro ao carregar estatísticas de tickets:', error);
-        setStats({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+        setStatsIntencoes({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
+        setStatsAvisos({ total: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, urgentes: 0, hoje: 0 });
       }
     };
 
     load();
   }, []);
 
-  const noticesData = useMemo(() => [
-    { label: 'Pendentes', value: stats.pendentes, icon: Clock, bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
-    { label: 'Aprovados', value: stats.emAndamento, icon: CheckCircle, bgColor: 'bg-green-500/20', textColor: 'text-green-400', borderColor: 'border-green-500/30' },
-    { label: 'Confirmados', value: stats.resolvidos, icon: CheckCircle, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
-    { label: 'Urgentes', value: stats.urgentes, icon: AlertTriangle, bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
-    { label: 'Pedidos', value: stats.hoje, icon: FileText, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-400', borderColor: 'border-indigo-500/30' },
-    { label: 'Avisos', value: stats.total, icon: MessageCircle, bgColor: 'bg-purple-500/20', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  ], [stats]);
+  const noticesData = useMemo(() => {
+    return [
+      { label: 'Intenções pendentes', value: statsIntencoes.pendentes, icon: Clock, bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
+      { label: 'Intenções em andamento', value: statsIntencoes.emAndamento, icon: ListChecks, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400', borderColor: 'border-blue-500/30' },
+      { label: 'Intenções resolvidas', value: statsIntencoes.resolvidos, icon: CheckCircle, bgColor: 'bg-green-500/20', textColor: 'text-green-400', borderColor: 'border-green-500/30' },
+      { label: 'Avisos pendentes', value: statsAvisos.pendentes, icon: Clock, bgColor: 'bg-purple-500/20', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
+      { label: 'Avisos em andamento', value: statsAvisos.emAndamento, icon: ListChecks, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-400', borderColor: 'border-indigo-500/30' },
+      { label: 'Avisos resolvidos', value: statsAvisos.resolvidos, icon: CheckCircle, bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400', borderColor: 'border-emerald-500/30' },
+    ];
+  }, [statsAvisos, statsIntencoes]);
 
   return (
     <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700/50">

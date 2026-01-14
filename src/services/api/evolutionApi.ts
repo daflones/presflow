@@ -566,7 +566,25 @@ class EvolutionApiService {
    * POST /chat/findMessages/{instanceName}
    * Find messages
    */
-  async findMessages(instanceName: string, options: FindMessagesOptions): Promise<MessageInfo[]> {
+  async findMessages(
+    instanceName: string,
+    options: FindMessagesOptions | { remoteJid?: string; limit?: number; page?: number }
+  ): Promise<MessageInfo[]> {
+    const anyOpts: any = options as any
+    const remoteJid =
+      String(anyOpts?.remoteJid || anyOpts?.where?.key?.remoteJid || '').trim()
+    const limit = Number(anyOpts?.limit ?? 50)
+    const page = Number(anyOpts?.page ?? 1)
+
+    // Quando usamos o backend (/api), a rota proxy espera { remoteJid, limit, page }.
+    if (this.baseUrl === '/api') {
+      return this.request(`/chat/findMessages/${instanceName}`, {
+        method: 'POST',
+        body: JSON.stringify({ remoteJid, limit, page })
+      })
+    }
+
+    // Fallback compatível com Evolution direta (quando existir)
     return this.request(`/chat/findMessages/${instanceName}`, {
       method: 'POST',
       body: JSON.stringify(options)

@@ -705,8 +705,6 @@ app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, 
 });
 
 // ========== ENDPOINTS DE CHAT/CONVERSAS ==========
-
-// Endpoint para buscar todos os chats de uma instância
 app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
@@ -727,6 +725,30 @@ app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, 
     
     if (!response.ok) {
       return res.status(response.status).json(data);
+    }
+
+    // Não inventar remoteJid a partir de owner/lastMessage.
+    // Apenas repassar quando o próprio chat vier com remoteJid/jid/chatId/id.
+    if (Array.isArray(data)) {
+      const sanitized = data
+        .map((chat) => {
+          const remoteJid =
+            (chat && typeof chat.remoteJid === 'string' && chat.remoteJid.includes('@') && chat.remoteJid) ||
+            (chat && typeof chat.jid === 'string' && chat.jid.includes('@') && chat.jid) ||
+            (chat && typeof chat.chatId === 'string' && chat.chatId.includes('@') && chat.chatId) ||
+            (chat && typeof chat.id === 'string' && chat.id.includes('@') && chat.id) ||
+            '';
+
+          if (!remoteJid) return null;
+
+          return {
+            ...chat,
+            remoteJid,
+          };
+        })
+        .filter(Boolean);
+
+      return res.json(sanitized);
     }
 
     res.json(data);
@@ -760,7 +782,7 @@ app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (re
       body: JSON.stringify({
         where: {
           key: {
-            remoteJid: remoteJid
+            remoteJid
           }
         },
         limit: limit,
@@ -781,8 +803,6 @@ app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (re
     res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
-
-// Endpoint para buscar contatos
 app.post('/api/chat/findContacts/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
