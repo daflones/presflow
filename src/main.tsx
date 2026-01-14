@@ -5,6 +5,16 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import './index.css'
 import App from './App.tsx'
 
+const disableConsole = true
+
+if (disableConsole) {
+  console.log = () => {}
+  console.info = () => {}
+  console.debug = () => {}
+  console.warn = () => {}
+  console.error = () => {}
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -20,7 +30,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
-      <ReactQueryDevtools initialIsOpen={false} />
+      {!disableConsole && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   </StrictMode>,
 )

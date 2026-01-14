@@ -108,9 +108,7 @@ export const dashboardService = {
     const [
       clientsResult,
       eventsResult,
-      noticesResult,
       aiConfigResult,
-      conversationsResult,
     ] = await Promise.all([
       // Clients/CRM
       supabase.from('clients')
@@ -121,29 +119,11 @@ export const dashboardService = {
       supabase.from('calendar_events')
         .select('id, start_at, church_id')
         .eq('church_id', churchId),
-      
-      // Notices
-      supabase.from('notices')
-        .select('id, type, priority, is_active, church_id')
-        .eq('church_id', churchId),
 
       // AI Config (para verificar se está ativo)
       supabase.from('ai_configs')
         .select('id, church_id')
         .eq('church_id', churchId),
-
-      // Conversas (WhatsApp) - contar apenas da instância ativa/configurada nessa igreja
-      (async () => {
-        const instanceName = whatsappResult.data?.instance || null;
-        if (!instanceName) {
-          return { data: [], error: null } as any;
-        }
-        return supabase
-          .from('whatsapp_chats')
-          .select('id, last_message_at, church_id, instance_name')
-          .eq('church_id', churchId)
-          .eq('instance_name', instanceName);
-      })(),
     ]);
 
     // Processar WhatsApp
@@ -181,19 +161,14 @@ export const dashboardService = {
     const eventsFuture = events.filter(e => new Date(e.start_at) > today).length;
     const eventsTotal = events.length;
 
-    // Processar Avisos
-    const notices = noticesResult.data || [];
-    const activeNotices = notices.filter(n => n.is_active);
-    const noticesPending = activeNotices.filter(n => n.type === 'info').length;
-    const noticesApproved = activeNotices.filter(n => n.priority === 0).length;
-    const noticesConfirmed = activeNotices.length;
-    const noticesUrgent = activeNotices.filter(n => n.type === 'urgent' || n.priority === 2).length;
-    const noticesRequests = activeNotices.filter(n => n.type === 'warning').length;
-    const noticesAlerts = activeNotices.filter(n => n.type === 'event').length;
+    const noticesPending = 0;
+    const noticesApproved = 0;
+    const noticesConfirmed = 0;
+    const noticesUrgent = 0;
+    const noticesRequests = 0;
+    const noticesAlerts = 0;
 
-    // Processar Conversas
-    const conversations = conversationsResult?.data || [];
-    const activeConversations = conversations.length;
+    const activeConversations = 0;
 
     // Processar IA
     const aiConfigs = aiConfigResult.data || [];

@@ -152,130 +152,59 @@ class WhatsAppMessagesService {
   // =====================================================
 
   async getChats(instanceName: string): Promise<WhatsAppChat[]> {
-    const churchId = await this.getChurchId()
-    
-    // First, clean up any chats with invalid remote_jid (without @)
-    try {
-      await supabase
-        .from('whatsapp_chats')
-        .delete()
-        .eq('church_id', churchId)
-        .eq('instance_name', instanceName)
-        .not('remote_jid', 'like', '%@%')
-    } catch (cleanupError) {
-      console.log('[WhatsAppMessages] Cleanup error (non-critical):', cleanupError)
-    }
-    
-    const { data, error } = await supabase
-      .from('whatsapp_chats')
-      .select('*')
-      .eq('church_id', churchId)
-      .eq('instance_name', instanceName)
-      .order('is_pinned', { ascending: false })
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-
-    if (error) throw error
-    return data || []
+    void instanceName
+    return []
   }
 
   async getChatByJid(instanceName: string, remoteJid: string): Promise<WhatsAppChat | null> {
-    const churchId = await this.getChurchId()
-    
-    const { data, error } = await supabase
-      .from('whatsapp_chats')
-      .select('*')
-      .eq('church_id', churchId)
-      .eq('instance_name', instanceName)
-      .eq('remote_jid', remoteJid)
-      .maybeSingle()
-
-    if (error) {
-      console.error('[WhatsAppMessages] Erro ao buscar chat:', error)
-      return null
-    }
-    return data
+    void instanceName
+    void remoteJid
+    return null
   }
 
   async createOrUpdateChat(input: CreateChatInput): Promise<WhatsAppChat> {
-    const churchId = await this.getChurchId()
-
-    const { data, error } = await supabase
-      .from('whatsapp_chats')
-      .upsert(
-        {
-          church_id: churchId,
-          instance_name: input.instance_name,
-          remote_jid: input.remote_jid,
-          contact_name: input.contact_name,
-          contact_push_name: input.contact_push_name,
-          profile_picture_url: input.profile_picture_url,
-          is_group: input.is_group || input.remote_jid.includes('@g.us'),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'church_id,instance_name,remote_jid',
-        }
-      )
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  async updateChatLastMessage(chatId: string, preview: string, timestamp: string): Promise<void> {
-    const { error } = await supabase
-      .from('whatsapp_chats')
-      .update({
-        last_message_preview: preview,
-        last_message_at: timestamp,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', chatId)
-
-    if (error) throw error
-  }
-
-  async updateChatUnreadCount(chatId: string, count: number): Promise<void> {
-    const { error } = await supabase
-      .from('whatsapp_chats')
-      .update({
-        unread_count: count,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', chatId)
-
-    if (error) throw error
-  }
-
-  async incrementUnreadCount(chatId: string): Promise<void> {
-    const { data: chat } = await supabase
-      .from('whatsapp_chats')
-      .select('unread_count')
-      .eq('id', chatId)
-      .single()
-
-    if (chat) {
-      await this.updateChatUnreadCount(chatId, (chat.unread_count || 0) + 1)
+    // Tabela removida: manter compatibilidade sem bater no Supabase
+    const nowIso = new Date().toISOString()
+    return {
+      id: `disabled:${input.instance_name}:${input.remote_jid}`,
+      church_id: 'disabled',
+      instance_name: input.instance_name,
+      remote_jid: input.remote_jid,
+      contact_name: input.contact_name,
+      contact_push_name: input.contact_push_name,
+      profile_picture_url: input.profile_picture_url,
+      is_group: input.is_group || input.remote_jid.includes('@g.us'),
+      unread_count: 0,
+      is_archived: false,
+      is_pinned: false,
+      created_at: nowIso,
+      updated_at: nowIso,
     }
   }
 
-  async archiveChat(chatId: string, archived: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('whatsapp_chats')
-      .update({ is_archived: archived })
-      .eq('id', chatId)
+  async updateChatLastMessage(chatId: string, preview: string, timestamp: string): Promise<void> {
+    void chatId
+    void preview
+    void timestamp
+  }
 
-    if (error) throw error
+  async updateChatUnreadCount(chatId: string, count: number): Promise<void> {
+    void chatId
+    void count
+  }
+
+  async incrementUnreadCount(chatId: string): Promise<void> {
+    void chatId
+  }
+
+  async archiveChat(chatId: string, archived: boolean): Promise<void> {
+    void chatId
+    void archived
   }
 
   async pinChat(chatId: string, pinned: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('whatsapp_chats')
-      .update({ is_pinned: pinned })
-      .eq('id', chatId)
-
-    if (error) throw error
+    void chatId
+    void pinned
   }
 
   // =====================================================

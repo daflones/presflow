@@ -472,6 +472,7 @@ export default function WhatsAppChatPage() {
   const [editorSquareSize, setEditorSquareSize] = useState<number>(0)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isFetchingChatsRef = useRef(false)
   const isFetchingMessagesRef = useRef(false)
@@ -480,6 +481,8 @@ export default function WhatsAppChatPage() {
   const selectedChatIdRef = useRef<string | null>(null)
   const messagesRequestTokenRef = useRef(0)
   const chatJidsByChatIdRef = useRef<Map<string, string[]>>(new Map())
+  const shouldAutoScrollRef = useRef(true)
+  const userScrolledUpRef = useRef(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
@@ -678,19 +681,11 @@ export default function WhatsAppChatPage() {
     return s
   }
 
-  const extractDigitsKeyFromJid = (jid: string): string => {
-    const s = String(jid || '').trim()
-    if (!s) return ''
-    const beforeAt = s.split('@')[0] || ''
-    const digits = beforeAt.replace(/\D/g, '')
-    return digits || ''
-  }
-
-  const pickRepresentativeJid = (jids: string[]): string => {
-    const cleaned = (jids || []).map((j) => String(j || '').trim()).filter(Boolean)
-    const preferPhone = cleaned.find((j) => j.endsWith('@s.whatsapp.net') || j.endsWith('@c.us'))
-    if (preferPhone) return preferPhone
-    return cleaned[0] || ''
+  const resolveCanonicalJid = (jid: string): string => {
+    const raw = String(jid || '').trim()
+    if (!raw) return raw
+    // Se findContacts já indicou um canônico (preferência por @s.whatsapp.net), usar.
+    return jidAliasRef.current.get(raw) || raw
   }
 
   const pickCanonicalJid = (jids: string[]): string => {
@@ -760,7 +755,6 @@ export default function WhatsAppChatPage() {
       // Fonte de verdade: Evolution API (v2: POST /chat/findChats/{instance})
       const apiResponse = await evolutionApi.findChats(instanceName)
       const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
-      console.log('[WhatsAppChat] Evolution findChats:', { instanceName, count: apiChats.length })
 
       // Resolver nomes em lote (evita chamar fetchProfile para cada chat e reduz erro 400 em massa)
       if (!contactsLoadedRef.current) {
@@ -867,64 +861,48 @@ export default function WhatsAppChatPage() {
               profile_picture_url: chat.profile_picture_url,
               is_group: false,
             })
-            .catch((chatError) => {
-              console.log('Erro ao salvar chat:', chatError)
-            })
+            .catch(() => {})
         }
       }
 
-      // Mesclar duplicatas do mesmo contato quando a Evolution retorna @lid e @s.whatsapp.net.
-      // Agrupa por dígitos do JID (antes do @) e mantém 1 chat representativo.
+      // Mesclar duplicatas do mesmo contato quando a Evolution retorna múltiplos JIDs para a mesma pessoa
+      // (ex.: @lid e @s.whatsapp.net). Para casos em que o @lid não contém o telefone (ID grande),
+      // usamos o mapeamento derivado do findContacts (jidAliasRef/canonicalToJidsRef).
       const grouped = new Map<string, { rep: WhatsAppChat; jids: Set<string> }>()
       for (const c of mappedChats) {
-        const key = extractDigitsKeyFromJid(c.remote_jid) || c.remote_jid
-        const group = grouped.get(key)
+        const canonical = resolveCanonicalJid(c.remote_jid)
+        const group = grouped.get(canonical)
         if (!group) {
-          grouped.set(key, { rep: c, jids: new Set([c.remote_jid]) })
+          const linked = canonicalToJidsRef.current.get(canonical)
+          const jids = new Set<string>(linked ? Array.from(linked) : [])
+          jids.add(c.remote_jid)
+          grouped.set(canonical, { rep: { ...c, id: `${instanceName}:${canonical}`, remote_jid: canonical }, jids })
           continue
         }
 
         group.jids.add(c.remote_jid)
+        const linked = canonicalToJidsRef.current.get(canonical)
+        if (linked) for (const j of linked) group.jids.add(j)
 
         const repTs = group.rep.last_message_at ? new Date(group.rep.last_message_at).getTime() : 0
         const curTs = c.last_message_at ? new Date(c.last_message_at).getTime() : 0
         const preferCurrentForPreview = curTs >= repTs
 
-        const chosenJid = pickRepresentativeJid([group.rep.remote_jid, c.remote_jid])
-        const useIncomingAsRep = chosenJid === c.remote_jid
-
-        if (useIncomingAsRep) {
-          group.rep = {
-            ...c,
-            id: `${instanceName}:${key}`,
-            remote_jid: chosenJid,
-            contact_name: c.contact_name || group.rep.contact_name,
-            contact_push_name: c.contact_push_name || group.rep.contact_push_name,
-            profile_picture_url: c.profile_picture_url || group.rep.profile_picture_url,
-            unread_count: (group.rep.unread_count || 0) + (c.unread_count || 0),
-            last_message_at: preferCurrentForPreview ? c.last_message_at : group.rep.last_message_at,
-            last_message_preview: preferCurrentForPreview ? c.last_message_preview : group.rep.last_message_preview,
-          }
-        } else {
-          group.rep = {
-            ...group.rep,
-            id: `${instanceName}:${key}`,
-            remote_jid: chosenJid,
-            unread_count: (group.rep.unread_count || 0) + (c.unread_count || 0),
-            contact_name: group.rep.contact_name || c.contact_name,
-            contact_push_name: group.rep.contact_push_name || c.contact_push_name,
-            profile_picture_url: group.rep.profile_picture_url || c.profile_picture_url,
-            last_message_at: preferCurrentForPreview ? c.last_message_at : group.rep.last_message_at,
-            last_message_preview: preferCurrentForPreview ? c.last_message_preview : group.rep.last_message_preview,
-          }
+        group.rep = {
+          ...group.rep,
+          id: `${instanceName}:${canonical}`,
+          remote_jid: canonical,
+          unread_count: (group.rep.unread_count || 0) + (c.unread_count || 0),
+          contact_name: group.rep.contact_name || c.contact_name,
+          contact_push_name: group.rep.contact_push_name || c.contact_push_name,
+          profile_picture_url: group.rep.profile_picture_url || c.profile_picture_url,
+          last_message_at: preferCurrentForPreview ? c.last_message_at : group.rep.last_message_at,
+          last_message_preview: preferCurrentForPreview ? c.last_message_preview : group.rep.last_message_preview,
         }
       }
 
       const list = Array.from(grouped.values())
-      chatJidsByChatIdRef.current = new Map(
-        list.map((g) => [g.rep.id, Array.from(g.jids)])
-      )
-
+      chatJidsByChatIdRef.current = new Map(list.map((g) => [g.rep.id, Array.from(g.jids)]))
       setChats(list.map((g) => g.rep))
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
@@ -968,13 +946,6 @@ export default function WhatsAppChatPage() {
       )
 
       const apiMessages = responses.flatMap((x) => x.messages)
-
-      console.log('[WhatsAppChat] Evolution findMessages:', {
-        instanceName,
-        remoteJid: chat.remote_jid,
-        jids,
-        count: Array.isArray(apiMessages) ? apiMessages.length : 0
-      })
 
       const nowIso = new Date().toISOString()
       const mappedMessages: WhatsAppMessage[] = []
@@ -1090,9 +1061,12 @@ export default function WhatsAppChatPage() {
         await whatsappMessagesService.updateChatUnreadCount(chat.id, 0)
       }
 
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
+      // Só rolar para o fim se o usuário já estava no fim (ou próximo)
+      if (shouldAutoScrollRef.current) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }, 100)
+      }
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error)
     } finally {
@@ -1169,9 +1143,6 @@ export default function WhatsAppChatPage() {
     
     const textToSend = newMessage.trim()
 
-    console.log('[WhatsAppChat] Sending message to:', selectedChat.remote_jid)
-    console.log('[WhatsAppChat] Selected chat:', selectedChat)
-
     // UX: limpar imediatamente
     setNewMessage('')
 
@@ -1226,9 +1197,12 @@ export default function WhatsAppChatPage() {
       })
 
       // Atualizar histórico a partir da Evolution (sem depender de Supabase)
+      // Forçar scroll após envio (usuário acabou de enviar)
+      shouldAutoScrollRef.current = true
+      userScrolledUpRef.current = false
       await loadMessages(selectedChat)
       
-      // Scroll to bottom
+      // Scroll to bottom (sempre ao enviar)
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
@@ -1278,6 +1252,9 @@ export default function WhatsAppChatPage() {
         })
       }
 
+      // Forçar scroll após envio de mídia
+      shouldAutoScrollRef.current = true
+      userScrolledUpRef.current = false
       await loadMessages(selectedChat)
       setShowAttachMenu(false)
       setPendingCaption('')
@@ -1509,13 +1486,31 @@ export default function WhatsAppChatPage() {
   }, [selectedChat, loadMessages])
 
   // Poll messages for near real-time updates when a chat is selected
+  // Pausa o polling se o usuário estiver lendo mensagens antigas (rolado para cima)
   useEffect(() => {
     if (!instanceName || !selectedChat) return
     const interval = setInterval(() => {
-      loadMessages(selectedChat)
+      // Só atualiza se usuário não estiver rolado pra cima
+      if (!userScrolledUpRef.current) {
+        loadMessages(selectedChat)
+      }
     }, 5000)
     return () => clearInterval(interval)
   }, [instanceName, selectedChat, loadMessages])
+
+  // Detectar se usuário está no fim da lista de mensagens
+  const handleMessagesScroll = useCallback(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    
+    // Considerar "no fim" se estiver a menos de 100px do final
+    const isNearBottom = distanceFromBottom < 100
+    shouldAutoScrollRef.current = isNearBottom
+    userScrolledUpRef.current = !isNearBottom
+  }, [])
 
   // Filter chats by search
   const filteredChats = chats.filter(chat => {
@@ -1637,6 +1632,8 @@ export default function WhatsAppChatPage() {
 
             {/* Messages */}
             <div 
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
               className="flex-1 overflow-y-auto p-4"
               style={{ backgroundImage: 'url(/whatsapp-bg.png)', backgroundColor: '#e5ddd5' }}
             >

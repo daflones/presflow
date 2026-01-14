@@ -76,8 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchChurchByOwnerId = async (userId: string, accessToken: string): Promise<Church | null> => {
-    console.log('Buscando igreja para userId:', userId);
-
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -91,19 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        console.error('Erro HTTP ao buscar igreja:', response.status);
         return null;
       }
 
       const data = await response.json();
-      console.log('Igreja encontrada:', data);
 
       if (Array.isArray(data) && data.length > 0) {
         return data[0] as Church;
       }
       return null;
     } catch (error) {
-      console.error('Erro ao buscar igreja:', error);
       return null;
     }
   };
@@ -161,7 +156,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setChurch(churchData);
         }
       } catch (error) {
-        console.error('Erro ao obter sessão:', error);
       } finally {
         setLoading(false);
       }

@@ -803,6 +803,33 @@ app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (re
     res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
   }
 });
+
+// Endpoint para buscar base64 de uma mensagem de mídia
+app.post('/api/chat/getBase64FromMediaMessage/:instanceName', ensureInstanceAccess, async (req, res) => {
+  try {
+    const { instanceName } = req.params;
+    const body = req.body || {};
+
+    const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar base64 da mídia:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
 app.post('/api/chat/findContacts/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;

@@ -55,18 +55,12 @@ class WhatsAppService {
     
     // Remover barra final da URL se existir
     this.baseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl
-    
-    console.log('WhatsApp Service - Base URL:', this.baseUrl)
-    console.log('WhatsApp Service - API Key:', this.apiKey ? 'Configurada' : 'Não configurada')
-    console.log('WhatsApp Service - Webhook URL:', this.webhookUrl ? 'Configurada' : 'Não configurada')
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     // Garantir que endpoint começa com /
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
     const url = `${this.baseUrl}${cleanEndpoint}`
-    
-    console.log('Fazendo requisição para:', url)
     
     const authHeaders: Record<string, string> = {}
     const { data } = await supabase.auth.getSession()
@@ -141,9 +135,6 @@ class WhatsAppService {
       }
     }
 
-    console.log('Criando instância com webhook:', this.webhookUrl)
-    console.log('Eventos habilitados:', payload.webhook.events)
-
     return this.makeRequest('/instance/create', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -192,21 +183,15 @@ class WhatsAppService {
       throw new Error(`Instância ${instanceName} não encontrada`)
     }
     
-    console.log('Instância encontrada:', instance)
-    
     // Tentar obter QR code
     const result = await this.makeRequest(`/instance/connect/${instanceName}`)
-    console.log('QR Code response:', result)
-    console.log('QR Code response keys:', Object.keys(result))
-    console.log('QR Code base64:', result.base64)
     
     // Se tiver o campo base64, usar diretamente
     if (result.base64 && typeof result.base64 === 'string') {
-      console.log('Using base64 field directly')
       // Remover prefixo data:image/png;base64, se existir
       const base64Data = result.base64.replace('data:image/png;base64,', '')
       return {
-        code: base64Data,
+        code: result.code || '',
         pairingCode: result.pairingCode || '',
         count: result.count || 1,
         base64: base64Data
@@ -215,24 +200,20 @@ class WhatsAppService {
     
     // Fallback para o campo code se base64 não existir
     if (result.code && typeof result.code === 'string') {
-      console.log('Processing QR Code code...')
       
       // Se for uma string concatenada com vírgulas, extrair apenas a primeira parte
       if (result.code.includes(',')) {
         const parts = result.code.split(',')
         const firstPart = parts[0]
-        console.log('QR Code is concatenated format, extracting first part:', firstPart)
         
         // Remover prefixo "2@" se existir
         let cleanCode = firstPart
         if (firstPart.startsWith('2@')) {
           cleanCode = firstPart.substring(2)
-          console.log('Removed prefix 2@, clean code:', cleanCode)
         }
         
         // Verificar se a parte limpa é base64 válido
         if (cleanCode.match(/^[A-Za-z0-9+/]+={0,2}$/)) {
-          console.log('Clean code is valid base64')
           return {
             code: cleanCode,
             pairingCode: result.pairingCode || '',
@@ -240,17 +221,15 @@ class WhatsAppService {
             base64: cleanCode
           }
         } else {
-          console.log('Clean code is not valid base64, checking all parts...')
           
           // Tentar cada parte até encontrar base64 válido
           for (let i = 0; i < parts.length; i++) {
-            let part = parts[i]
+            let part = parts[i].trim()
             if (part.startsWith('2@')) {
               part = part.substring(2)
             }
             
             if (part.match(/^[A-Za-z0-9+/]+={0,2}$/)) {
-              console.log(`Found valid base64 in part ${i}:`, part)
               return {
                 code: part,
                 pairingCode: result.pairingCode || '',
@@ -259,14 +238,11 @@ class WhatsAppService {
               }
             }
           }
-          
-          console.log('No valid base64 found in any part')
         }
       }
       
       // Se já for base64, retornar como está
       if (result.code.startsWith('data:image/png;base64,')) {
-        console.log('QR Code is data URL format')
         return {
           code: result.code.replace('data:image/png;base64,', ''),
           pairingCode: result.pairingCode || '',
@@ -276,7 +252,6 @@ class WhatsAppService {
       }
       // Se for base64 sem o prefixo, retornar
       else if (result.code.match(/^[A-Za-z0-9+/]+={0,2}$/)) {
-        console.log('QR Code is base64 format')
         return {
           code: result.code,
           pairingCode: result.pairingCode || '',
@@ -284,11 +259,6 @@ class WhatsAppService {
           base64: result.code
         }
       }
-      else {
-        console.log('QR Code format unknown:', result.code.substring(0, 100))
-      }
-    } else {
-      console.log('QR Code code is missing or not string')
     }
     
     throw new Error('Formato de QR Code inválido')
@@ -296,7 +266,6 @@ class WhatsAppService {
 
   async deleteInstance(instanceName: string): Promise<void> {
     // Evolution API usa DELETE no endpoint /instance/delete/{instanceName}
-    console.log('[WhatsApp] Deletando instância:', instanceName)
     
     try {
       // Primeiro tentar fazer logout para desconectar
@@ -304,18 +273,14 @@ class WhatsAppService {
         await this.makeRequest(`/instance/logout/${instanceName}`, {
           method: 'DELETE'
         })
-        console.log('[WhatsApp] Logout realizado com sucesso')
       } catch (logoutError) {
-        console.log('[WhatsApp] Logout falhou (instância pode já estar desconectada):', logoutError)
       }
       
       // Depois deletar a instância
       await this.makeRequest(`/instance/delete/${instanceName}`, {
         method: 'DELETE'
       })
-      console.log('[WhatsApp] Instância deletada com sucesso')
     } catch (error) {
-      console.error('[WhatsApp] Erro ao deletar instância:', error)
       throw error
     }
   }
@@ -388,7 +353,6 @@ class WhatsAppService {
         }
       }
     } catch (error) {
-      console.error('[WhatsApp] Erro ao buscar instância do banco:', error)
     }
 
     // Fallback: tentar localStorage (cache)
@@ -435,7 +399,6 @@ class WhatsAppService {
       delay?: number
     }
   ): Promise<any> {
-    console.log('Enviando mensagem de texto via WhatsApp')
     
     // Se já for remoteJid (contém @s.whatsapp.net), usar direto
     // Caso contrário, formatar número
@@ -461,10 +424,8 @@ class WhatsAppService {
         method: 'POST',
         body: JSON.stringify(payload)
       })
-      console.log('Mensagem enviada com sucesso:', result)
       return result
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error)
       throw error
     }
   }
