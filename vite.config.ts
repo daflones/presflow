@@ -90,6 +90,9 @@ export default defineConfig(({ mode }) => {
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,txt,jpg,jpeg,webp}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, 
+        cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/html_cifras\//],
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
