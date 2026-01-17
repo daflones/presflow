@@ -207,9 +207,10 @@ export function ConversationsPage() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [mediaLoading, setMediaLoading] = useState<Record<string, boolean>>({});
   const [mediaCache, setMediaCache] = useState<Record<string, string>>({});
-  const [connectionDate, setConnectionDate] = useState<Date | null>(null);
   const jidAliasRef = useRef<Map<string, string>>(new Map());
-  const canonicalToJidsRef = useRef<Map<string, Set<string>>>(new Map());
+  const contactNameCacheRef = useRef<Map<string, string>>(new Map());
+  const profilePicCacheRef = useRef<Map<string, string>>(new Map());
+  const chatRemoteJidsByChatIdRef = useRef<Map<string, string[]>>(new Map());
   const contactsLoadedForInstanceRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -236,63 +237,55 @@ export function ConversationsPage() {
     return raw;
   }
 
-  function isPhoneLikeName(name?: string): boolean {
-    const n = String(name || '').trim();
-    if (!n) return true;
-    return /^[0-9()+\s-]+$/.test(n);
-  }
-
   function extractRemoteJidFromChat(chat: any): string {
     const primary = chat?.remoteJid || chat?.remote_jid;
     if (typeof primary === 'string') {
       const jid = normalizeRemoteJid(primary.trim());
       if (jid) return jid;
     }
-
-    const fallback = chat?.lastMessage?.key?.remoteJid || chat?.lastMessage?.key?.remote_jid;
-    if (typeof fallback === 'string') {
-      const jid = normalizeRemoteJid(fallback.trim());
-      if (jid) return jid;
-    }
-
     return '';
   }
 
   function pickCanonicalJid(jids: string[]): string {
     const normalized = jids.map((j) => normalizeRemoteJid(j)).filter(Boolean);
-    const preferPhone = normalized.find((j) => j.endsWith('@s.whatsapp.net') || j.endsWith('@c.us'));
-    if (preferPhone) return preferPhone;
-    const preferLid = normalized.find((j) => j.endsWith('@lid'));
-    if (preferLid) return preferLid;
     return normalized[0] || '';
   }
 
-  function extractJidsFromUnknown(input: any, acc: Set<string>, depth: number) {
-    if (!input || depth <= 0) return;
-    if (typeof input === 'string') {
-      const s = input.trim();
-      if (/@(s\.whatsapp\.net|c\.us|g\.us|lid)$/i.test(s)) {
-        const jid = normalizeRemoteJid(s);
-        if (jid) acc.add(jid);
+  function extractContactJids(contact: any): string[] {
+    const candidates: unknown[] = [
+      contact?.id,
+      contact?.remoteJid,
+      contact?.jid,
+      contact?.wid,
+      contact?.waId,
+      contact?.wa_id,
+    ];
+
+    const out = new Set<string>();
+    for (const c of candidates) {
+      if (typeof c !== 'string') continue;
+      const s0 = c.trim();
+      if (!s0) continue;
+
+      if (/@(s\.whatsapp\.net|c\.us|g\.us|lid)$/i.test(s0)) {
+        const jid = normalizeRemoteJid(s0);
+        if (jid) out.add(jid);
+        continue;
       }
-      return;
-    }
-    if (Array.isArray(input)) {
-      for (const v of input) extractJidsFromUnknown(v, acc, depth - 1);
-      return;
-    }
-    if (typeof input === 'object') {
-      for (const v of Object.values(input)) {
-        extractJidsFromUnknown(v, acc, depth - 1);
+
+      if (/^\d{6,}$/.test(s0)) {
+        out.add(`${s0}@s.whatsapp.net`);
+        out.add(`${s0}@lid`);
       }
     }
+    return Array.from(out);
   }
 
   async function ensureContactsAliases(instanceName: string) {
     if (contactsLoadedForInstanceRef.current === instanceName) return;
     contactsLoadedForInstanceRef.current = instanceName;
     jidAliasRef.current = new Map();
-    canonicalToJidsRef.current = new Map();
+    contactNameCacheRef.current = new Map();
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -306,16 +299,23 @@ export function ConversationsPage() {
       const contacts: any[] = Array.isArray(data) ? data : [];
 
       for (const c of contacts) {
-        const set = new Set<string>();
-        extractJidsFromUnknown(c, set, 3);
-        const jids = Array.from(set);
+        const jids = extractContactJids(c);
         if (jids.length < 2) continue;
         const canonical = pickCanonicalJid(jids);
         if (!canonical) continue;
-        // Guardar o conjunto completo de JIDs associados ao canônico
-        canonicalToJidsRef.current.set(canonical, new Set<string>(jids));
         for (const jid of jids) {
           jidAliasRef.current.set(jid, canonical);
+        }
+      }
+
+      for (const c of contacts) {
+        const name = c?.pushName || c?.notify || c?.name;
+        if (!name) continue;
+        const jids = extractContactJids(c);
+        for (const jid of jids) {
+          contactNameCacheRef.current.set(jid, String(name));
+          const num = jid.split('@')[0];
+          if (num) contactNameCacheRef.current.set(num, String(name));
         }
       }
     } catch (e) {
@@ -323,83 +323,29 @@ export function ConversationsPage() {
     }
   }
 
-  function getCanonicalJid(jid: string): string {
-    return jidAliasRef.current.get(jid) || jid;
-  }
+  async function ensureProfilePic(instanceName: string, remoteJid: string) {
+    if (!remoteJid) return;
+    if (profilePicCacheRef.current.has(remoteJid)) return;
+    const number = remoteJid.split('@')[0];
+    if (!number) return;
 
-  function addCanonicalMapping(canonical: string, jid: string) {
-    const map = canonicalToJidsRef.current;
-    const set = map.get(canonical) || new Set<string>();
-    set.add(canonical);
-    set.add(jid);
-    map.set(canonical, set);
-  }
-
-  function dedupeChats(list: Chat[]): Chat[] {
-    const map = new Map<string, Chat>();
-
-    for (const c of list) {
-      const key = normalizeRemoteJid(c.remoteJid || c.id);
-      if (!key) continue;
-
-      const existing = map.get(key);
-      if (!existing) {
-        map.set(key, { ...c, id: key, remoteJid: key });
-        continue;
-      }
-
-      const existingTime = existing.lastMessageTime || 0;
-      const currentTime = c.lastMessageTime || 0;
-      const useCurrentForLastMessage = currentTime >= existingTime;
-
-      const mergedName =
-        !isPhoneLikeName(c.name) && isPhoneLikeName(existing.name)
-          ? c.name
-          : existing.name || c.name;
-
-      map.set(key, {
-        ...existing,
-        id: key,
-        remoteJid: key,
-        name: mergedName,
-        pushName: existing.pushName || c.pushName,
-        profilePicUrl: existing.profilePicUrl || c.profilePicUrl,
-        unreadCount: (existing.unreadCount || 0) + (c.unreadCount || 0),
-        lastMessageTime: Math.max(existingTime, currentTime) || undefined,
-        lastMessage: useCurrentForLastMessage ? c.lastMessage : existing.lastMessage,
+    try {
+      const authHeaders = await getAuthHeaders();
+      const r = await fetch(`${API_BASE}/chat/fetchProfilePictureUrl/${instanceName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ number })
       });
+      const data = await r.json().catch(() => null);
+      const url = String(data?.profilePictureUrl || data?.profilePicUrl || '').trim();
+      if (!url) return;
+      profilePicCacheRef.current.set(remoteJid, url);
+      setChats((prev) => prev.map((c) => (c.remoteJid === remoteJid ? { ...c, profilePicUrl: url } : c)));
+      setSelectedChat((prev) => (prev?.remoteJid === remoteJid ? { ...prev, profilePicUrl: url } : prev));
+    } catch {
+      // ignore
     }
-
-    return Array.from(map.values());
   }
-
-  // Buscar data de conexão do banco de dados
-  useEffect(() => {
-    async function fetchConnectionDate() {
-      try {
-        const instanceData = await whatsappDbService.getInstance();
-        if (instanceData.connected_at) {
-          setConnectionDate(new Date(instanceData.connected_at));
-          console.log('[ConversationsPage] Data de conexão:', instanceData.connected_at);
-        }
-      } catch (error) {
-        console.error('[ConversationsPage] Erro ao buscar data de conexão:', error);
-      }
-    }
-    fetchConnectionDate();
-  }, []);
-
-  // Buscar instâncias conectadas
-  useEffect(() => {
-    fetchInstances();
-  }, []);
-
-  // Buscar chats quando instância é selecionada ou data de conexão muda
-  useEffect(() => {
-    if (selectedInstance) {
-      fetchChats();
-    }
-  }, [selectedInstance, connectionDate]);
 
   // Buscar mensagens quando chat é selecionado
   useEffect(() => {
@@ -464,43 +410,93 @@ export function ConversationsPage() {
     try {
       await ensureContactsAliases(selectedInstance);
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/chat/findChats/${selectedInstance}`, {
+      const response = await fetch(`${API_BASE}/chat/findChatsEnriched/${selectedInstance}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({})
+        body: JSON.stringify({ limitPics: 12 })
       });
       
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        const formattedChats: Chat[] = data
-          .map((chat: any) => {
-            const rawJid = extractRemoteJidFromChat(chat);
-            const canonical = rawJid ? getCanonicalJid(rawJid) : '';
-            if (canonical && rawJid) addCanonicalMapping(canonical, rawJid);
-            return {
-              id: canonical,
-              remoteJid: canonical,
-              name: chat.name || chat.pushName || formatPhoneNumber(canonical),
-            pushName: chat.pushName,
-            profilePicUrl: chat.profilePicUrl || chat.profilePictureUrl || chat.profile_picture_url,
-            lastMessage: chat.lastMessage?.message?.conversation || 
-                        chat.lastMessage?.message?.extendedTextMessage?.text || '',
-            lastMessageTime: chat.lastMessage?.messageTimestamp,
-            unreadCount: chat.unreadCount || 0
-            } as Chat;
-          })
-          .filter((c: Chat) => !!c.remoteJid)
-          .filter((c: Chat) => !c.remoteJid.includes('@g.us'));
+        const grouped = new Map<string, Chat>();
+        const chatRemoteJids = new Map<string, Set<string>>();
 
-        const merged = dedupeChats(formattedChats)
-          .sort((a: Chat, b: Chat) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
-        
-        console.log('[ConversationsPage] Chats carregados:', merged.length, 'de', data.length);
-        setChats(merged);
+        for (const chat of data) {
+          const rawJid = extractRemoteJidFromChat(chat);
+          if (!rawJid) continue;
+          if (rawJid.includes('@g.us')) continue;
+
+          const stableChatIdRaw =
+            (typeof chat?.chatId === 'string' && chat.chatId.trim()) ||
+            (typeof chat?.chat_id === 'string' && chat.chat_id.trim()) ||
+            (typeof chat?.conversationId === 'string' && chat.conversationId.trim()) ||
+            (typeof chat?.conversation_id === 'string' && chat.conversation_id.trim()) ||
+            '';
+          const picKey = String(
+            chat.profilePictureUrl || chat.profilePicUrl || chat.profile_picture_url || ''
+          ).trim();
+          const hasPicKey = /^https?:\/\//i.test(picKey);
+          const stableKey = (hasPicKey ? `pic:${picKey}` : '') || stableChatIdRaw || rawJid;
+
+          const incoming: Chat = {
+            id: stableKey,
+            remoteJid: rawJid,
+            name:
+              chat.contactName ||
+              chat.name ||
+              chat.pushName ||
+              contactNameCacheRef.current.get(rawJid) ||
+              contactNameCacheRef.current.get(rawJid.split('@')[0]) ||
+              formatPhoneNumber(rawJid),
+            pushName: chat.pushName,
+            profilePicUrl:
+              chat.profilePictureUrl ||
+              chat.profilePicUrl ||
+              chat.profile_picture_url ||
+              profilePicCacheRef.current.get(rawJid),
+            lastMessage:
+              chat.lastMessage?.message?.conversation ||
+              chat.lastMessage?.message?.extendedTextMessage?.text || '',
+            lastMessageTime: chat.lastMessage?.messageTimestamp,
+            unreadCount: chat.unreadCount || 0,
+          } as Chat;
+
+          const existing = grouped.get(stableKey);
+          if (!existing) {
+            grouped.set(stableKey, incoming);
+            chatRemoteJids.set(incoming.id, new Set([rawJid]));
+            continue;
+          }
+
+          const set = chatRemoteJids.get(existing.id) || new Set<string>();
+          set.add(rawJid);
+          chatRemoteJids.set(existing.id, set);
+
+          const repTs = existing.lastMessageTime || 0;
+          const curTs = incoming.lastMessageTime || 0;
+          const preferCurrentForPreview = curTs >= repTs;
+
+          grouped.set(stableKey, {
+            ...existing,
+            // remoteJid é sempre o PRIMEIRO visto no grupo
+            unreadCount: (existing.unreadCount || 0) + (incoming.unreadCount || 0),
+            name: existing.name || incoming.name,
+            pushName: existing.pushName || incoming.pushName,
+            profilePicUrl: existing.profilePicUrl || incoming.profilePicUrl,
+            lastMessageTime: Math.max(repTs, curTs) || undefined,
+            lastMessage: preferCurrentForPreview ? incoming.lastMessage : existing.lastMessage,
+          });
+        }
+
+        const ordered = Array.from(grouped.values()).sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+        chatRemoteJidsByChatIdRef.current = new Map(
+          ordered.map((c) => [c.id, Array.from(chatRemoteJids.get(c.id) || new Set([c.remoteJid]))])
+        );
+        setChats(ordered);
+
       }
     } catch (error) {
-      console.error('Erro ao buscar chats:', error);
     } finally {
       setIsLoadingChats(false);
     }
@@ -512,22 +508,24 @@ export function ConversationsPage() {
     setIsLoadingMessages(true);
     try {
       const authHeaders = await getAuthHeaders();
-      const canonical = selectedChat.remoteJid;
-      const linked = canonicalToJidsRef.current.get(canonical);
-      const jids = linked ? Array.from(linked) : [canonical];
+      const jids = chatRemoteJidsByChatIdRef.current.get(selectedChat.id) || [selectedChat.remoteJid];
 
       const responses = await Promise.all(
         jids.map(async (jid) => {
-          const r = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
+          const response = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
-              remoteJid: jid,
+              where: {
+                key: {
+                  remoteJid: jid
+                }
+              },
               limit: 20,
               page: page
             })
           });
-          return r.json();
+          return response.json();
         })
       );
 
@@ -556,7 +554,7 @@ export function ConversationsPage() {
         if (dedup.has(String(msgId))) continue;
         dedup.set(String(msgId), {
           id: String(msgId),
-          key: msg.key || { remoteJid: msg?.key?.remoteJid || canonical, fromMe: false, id: String(msgId) },
+          key: msg.key || { remoteJid: msg?.key?.remoteJid || selectedChat.remoteJid, fromMe: false, id: String(msgId) },
           message: msg.message || {},
           messageTimestamp: msg.messageTimestamp || Date.now() / 1000,
           pushName: msg.pushName,
@@ -590,7 +588,7 @@ export function ConversationsPage() {
     
     setIsSending(true);
     try {
-      const phoneNumber = selectedChat.remoteJid.replace('@s.whatsapp.net', '');
+      const phoneNumber = selectedChat.remoteJid.split('@')[0];
       const authHeaders = await getAuthHeaders();
       
       const response = await fetch(`${API_BASE}/message/sendText/${selectedInstance}`, {
@@ -638,7 +636,7 @@ export function ConversationsPage() {
   }
 
   function formatPhoneNumber(jid: string): string {
-    const number = jid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+    const number = jid.split('@')[0];
     if (number.startsWith('55') && number.length >= 12) {
       const ddd = number.slice(2, 4);
       const rest = number.slice(4);
@@ -722,7 +720,7 @@ export function ConversationsPage() {
     
     setIsSending(true);
     try {
-      const phoneNumber = selectedChat.remoteJid.replace('@s.whatsapp.net', '');
+      const phoneNumber = selectedChat.remoteJid.split('@')[0];
       const base64 = await fileToBase64(file);
       const authHeaders = await getAuthHeaders();
       

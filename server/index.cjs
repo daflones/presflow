@@ -28,7 +28,7 @@ async function supabaseRequest(endpoint, options = {}) {
       ...options.headers
     }
   });
-  
+
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     if (!response.ok) {
       const errorText = await response.text().catch(() => `Status ${response.statusText}`);
@@ -235,12 +235,6 @@ async function isPlatformManager(callerAuthId) {
 app.use(cors());
 app.use(express.json());
 
-// Log de todas as requisições
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
-  next();
-});
-
 // Proxy para Evolution API
 app.use('/api/evolution', async (req, res) => {
   try {
@@ -292,6 +286,133 @@ app.use('/api/evolution', async (req, res) => {
   }
 });
 
+app.post('/api/chat/findChatsEnriched/:instanceName', ensureInstanceAccess, async (req, res) => {
+  try {
+    const { instanceName } = req.params;
+    const body = req.body || {};
+
+    const chatsResp = await fetchAPI(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      },
+      body: JSON.stringify(body)
+    });
+
+    const chatsData = await chatsResp.json();
+    if (!chatsResp.ok) {
+      return res.status(chatsResp.status).json(chatsData);
+    }
+
+    const contactsCacheKey = `${instanceName}`;
+    let contactsMap = getCached(__cache.contactsByInstance, contactsCacheKey);
+    if (!contactsMap) {
+      const contactsResp = await fetchAPI(`${EVOLUTION_API_URL}/chat/findContacts/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': EVOLUTION_API_KEY
+        },
+        body: JSON.stringify({ where: {} })
+      });
+
+      const contactsData = await contactsResp.json();
+      const map = new Map();
+      if (contactsResp.ok && Array.isArray(contactsData)) {
+        for (const c of contactsData) {
+          const name = c?.pushName || c?.notify || c?.name;
+          if (!name) continue;
+          const candidates = [c?.id, c?.remoteJid, c?.jid, c?.wid, c?.waId, c?.wa_id];
+          for (const cand of candidates) {
+            if (typeof cand !== 'string') continue;
+            const s = cand.trim();
+            if (!s) continue;
+            map.set(s, String(name));
+            const num = extractNumberFromJid(s);
+            if (num) map.set(num, String(name));
+            if (/^\d{6,}$/.test(s)) {
+              map.set(`${s}@s.whatsapp.net`, String(name));
+              map.set(`${s}@lid`, String(name));
+            }
+          }
+        }
+        contactsMap = map;
+        setCached(__cache.contactsByInstance, contactsCacheKey, contactsMap, 5 * 60 * 1000);
+      } else {
+        contactsMap = map;
+        setCached(__cache.contactsByInstance, contactsCacheKey, contactsMap, 60 * 1000);
+      }
+    }
+
+    const list = Array.isArray(chatsData) ? chatsData : [];
+    const enriched = [];
+    let remainingPics = Math.max(0, Math.min(20, Number(body?.limitPics ?? 12)));
+
+    for (const chat of list) {
+      const remoteJid =
+        (chat && typeof chat.remoteJid === 'string' && chat.remoteJid.includes('@') && chat.remoteJid) ||
+        (chat && typeof chat.jid === 'string' && chat.jid.includes('@') && chat.jid) ||
+        (chat && typeof chat.id === 'string' && chat.id.includes('@') && chat.id) ||
+        '';
+      if (!remoteJid) continue;
+
+      const number = extractNumberFromJid(remoteJid);
+      const contactName =
+        (typeof chat?.name === 'string' && chat.name.trim()) ||
+        (typeof chat?.pushName === 'string' && chat.pushName.trim()) ||
+        (contactsMap && (contactsMap.get(remoteJid) || contactsMap.get(number))) ||
+        '';
+
+      let profilePictureUrl =
+        (typeof chat?.profilePicUrl === 'string' && chat.profilePicUrl.trim()) ||
+        (typeof chat?.profilePictureUrl === 'string' && chat.profilePictureUrl.trim()) ||
+        (typeof chat?.profile_picture_url === 'string' && chat.profile_picture_url.trim()) ||
+        '';
+
+      if (!profilePictureUrl && number && remainingPics > 0) {
+        const picKey = `${instanceName}:${number}`;
+        const cached = getCached(__cache.profilePicByInstanceNumber, picKey);
+        if (cached) {
+          profilePictureUrl = cached;
+        } else {
+          remainingPics -= 1;
+          try {
+            const picResp = await fetchAPI(`${EVOLUTION_API_URL}/chat/fetchProfilePictureUrl/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': EVOLUTION_API_KEY
+              },
+              body: JSON.stringify({ number })
+            });
+            const picData = await picResp.json().catch(() => null);
+            const url = String(picData?.profilePictureUrl || picData?.profilePicUrl || '').trim();
+            if (url) {
+              profilePictureUrl = url;
+              setCached(__cache.profilePicByInstanceNumber, picKey, url, 30 * 60 * 1000);
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      enriched.push({
+        ...chat,
+        remoteJid,
+        contactName,
+        profilePictureUrl,
+      });
+    }
+
+    return res.json(enriched);
+  } catch (error) {
+    console.error('Erro ao buscar chats enriquecidos:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 app.get('/api/auth/list-users', async (req, res) => {
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -316,7 +437,6 @@ app.get('/api/auth/list-users', async (req, res) => {
     }
 
     const platformManager = await isPlatformManager(callerAuthId);
-    console.log('[list-users] callerAuthId:', callerAuthId, 'platformManager:', platformManager, 'churchId:', churchId);
     if (platformManager) {
       const usersData = await supabaseRequest(`users?church_id=eq.${churchId}&select=id,auth_id,name,email,role,is_active,created_at,updated_at&order=created_at.desc`, {
         method: 'GET',
@@ -492,28 +612,51 @@ async function fetchAPI(url, options = {}) {
   return fetch(url, options);
 }
 
+const __cache = {
+  contactsByInstance: new Map(),
+  profilePicByInstanceNumber: new Map(),
+};
+
+function getCached(map, key) {
+  const entry = map.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt && entry.expiresAt < Date.now()) {
+    map.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCached(map, key, value, ttlMs) {
+  map.set(key, {
+    value,
+    expiresAt: typeof ttlMs === 'number' && ttlMs > 0 ? Date.now() + ttlMs : 0,
+  });
+}
+
+function extractNumberFromJid(jid) {
+  const raw = String(jid || '').trim();
+  if (!raw) return '';
+  return raw.split('@')[0] || '';
+}
+
 // Endpoint para criar instância
 app.post('/api/instance/create', async (req, res) => {
   try {
-    console.log('=== CRIAÇÃO DE INSTÂNCIA ===');
-    console.log('Recebendo requisição para criar instância:', req.body);
-
     const accessToken = getBearerToken(req);
     if (accessToken && (await isReadOnlyUser(accessToken))) {
       return res.status(403).json({ error: 'Somente visualização' });
     }
-    
+
     const { instanceName, phoneNumber, number } = req.body;
     const resolvedNumber = phoneNumber || number;
-    
+
     if (!instanceName || !resolvedNumber) {
-      console.log('Erro: instanceName ou number/phoneNumber não fornecidos');
       return res.status(400).json({ error: 'instanceName e number (ou phoneNumber) são obrigatórios' });
     }
-    
+
     const formattedName = formatInstanceName(instanceName);
-    console.log('Nome formatado:', formattedName);
-    
+
     // Aceita payload "completo" enviado pelo frontend (webhook/settings/etc)
     // e também o formato antigo (phoneNumber).
     const body = {
@@ -524,10 +667,6 @@ app.post('/api/instance/create', async (req, res) => {
       integration: req.body.integration || 'WHATSAPP-BAILEYS',
     };
 
-    console.log('Enviando para Evolution API:', EVOLUTION_API_URL);
-    console.log('Body:', JSON.stringify(body, null, 2));
-    console.log('API Key:', EVOLUTION_API_KEY ? 'Configurada' : 'NÃO CONFIGURADA');
-
     const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/create`, {
       method: 'POST',
       headers: {
@@ -536,26 +675,19 @@ app.post('/api/instance/create', async (req, res) => {
       },
       body: JSON.stringify(body)
     });
-
-    console.log('Status da resposta:', response.status);
     const responseText = await response.text();
-    console.log('Resposta bruta da Evolution API:', responseText);
-    
+
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      console.log('Erro ao fazer parse do JSON:', e);
       data = { error: 'Resposta inválida da Evolution API', rawResponse: responseText };
     }
-    
-    console.log('Resposta processada:', JSON.stringify(data, null, 2));
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
 
-    console.log('Instância criada com sucesso, aguardando conexão...');
     res.json(data);
   } catch (error) {
     console.error('Erro ao criar instância:', error);
@@ -569,16 +701,10 @@ app.get('/api/instance/connect/:instanceName', async (req, res) => {
     const { instanceName } = req.params;
     const { phoneNumber } = req.query;
 
-    console.log('=== CONECTANDO INSTÂNCIA ===');
-    console.log('InstanceName:', instanceName);
-    console.log('PhoneNumber:', phoneNumber);
-
     let url = `${EVOLUTION_API_URL}/instance/connect/${instanceName}`;
     if (phoneNumber) {
       url += `?phone=${phoneNumber}`;
     }
-
-    console.log('URL da requisição:', url);
 
     const response = await fetchAPI(url, {
       method: 'GET',
@@ -586,27 +712,18 @@ app.get('/api/instance/connect/:instanceName', async (req, res) => {
         'apikey': EVOLUTION_API_KEY
       }
     });
-
-    console.log('Status da resposta:', response.status);
     const responseText = await response.text();
-    console.log('Resposta bruta:', responseText);
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      console.log('Erro ao fazer parse do JSON:', e);
       data = { error: 'Resposta inválida da Evolution API', rawResponse: responseText };
     }
-    
-    console.log('Resposta processada:', JSON.stringify(data, null, 2));
-    
+
     if (!response.ok) {
-      console.log('Erro na resposta da Evolution API:', response.status, responseText);
       return res.status(response.status).json(data);
     }
-
-    console.log('QR Code obtido com sucesso');
     res.json(data);
   } catch (error) {
     console.error('Erro ao conectar instância:', error);
@@ -635,7 +752,7 @@ app.get('/api/instance/fetchInstances', async (req, res) => {
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -654,9 +771,6 @@ app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, 
   try {
     const { instanceName } = req.params;
 
-    console.log('=== VERIFICANDO STATUS ===');
-    console.log('InstanceName:', instanceName);
-
     const response = await fetchAPI(`${EVOLUTION_API_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
       method: 'GET',
       headers: {
@@ -664,28 +778,22 @@ app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, 
       }
     });
 
-    console.log('Status da resposta:', response.status);
     const responseText = await response.text();
-    console.log('Resposta bruta:', responseText);
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      console.log('Erro ao fazer parse do JSON:', e);
       data = { error: 'Resposta inválida da Evolution API', rawResponse: responseText };
     }
-    
-    console.log('Resposta processada:', JSON.stringify(data, null, 2));
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
 
     const instance = data.find(inst => inst.name === instanceName);
-    
+
     if (!instance) {
-      console.log('Instância não encontrada');
       return res.status(404).json({ error: 'Instância não encontrada' });
     }
 
@@ -696,7 +804,6 @@ app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, 
       profilePictureUrl: instance.profilePicUrl
     };
 
-    console.log('Status final:', result);
     res.json(result);
   } catch (error) {
     console.error('Erro ao verificar status da instância:', error);
@@ -708,8 +815,6 @@ app.get('/api/instance/status/:instanceName', ensureInstanceAccess, async (req, 
 app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
-    console.log('=== BUSCANDO CHATS ===');
-    console.log('InstanceName:', instanceName);
 
     const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
       method: 'POST',
@@ -717,12 +822,11 @@ app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, 
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
-      body: JSON.stringify({})
+      body: JSON.stringify(req.body || {})
     });
 
-    console.log('Status da resposta:', response.status);
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -735,7 +839,6 @@ app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, 
           const remoteJid =
             (chat && typeof chat.remoteJid === 'string' && chat.remoteJid.includes('@') && chat.remoteJid) ||
             (chat && typeof chat.jid === 'string' && chat.jid.includes('@') && chat.jid) ||
-            (chat && typeof chat.chatId === 'string' && chat.chatId.includes('@') && chat.chatId) ||
             (chat && typeof chat.id === 'string' && chat.id.includes('@') && chat.id) ||
             '';
 
@@ -762,16 +865,7 @@ app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, 
 app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (req, res) => {
   try {
     const { instanceName } = req.params;
-    const { remoteJid, limit = 50, page = 1 } = req.body;
-
-    console.log('=== BUSCANDO MENSAGENS ===');
-    console.log('InstanceName:', instanceName);
-    console.log('RemoteJid:', remoteJid);
-    console.log('Limit:', limit, 'Page:', page);
-
-    if (!remoteJid) {
-      return res.status(400).json({ error: 'remoteJid é obrigatório' });
-    }
+    const body = req.body || {};
 
     const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
       method: 'POST',
@@ -779,20 +873,10 @@ app.post('/api/chat/findMessages/:instanceName', ensureInstanceAccess, async (re
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
-      body: JSON.stringify({
-        where: {
-          key: {
-            remoteJid
-          }
-        },
-        limit: limit,
-        page: page
-      })
+      body: JSON.stringify(body)
     });
-
-    console.log('Status da resposta:', response.status);
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -863,10 +947,6 @@ app.post('/api/chat/fetchProfilePictureUrl/:instanceName', ensureInstanceAccess,
     const { instanceName } = req.params;
     const { number } = req.body;
 
-    console.log('=== BUSCANDO FOTO DE PERFIL ===');
-    console.log('InstanceName:', instanceName);
-    console.log('Number:', number);
-
     const response = await fetchAPI(`${EVOLUTION_API_URL}/chat/fetchProfilePictureUrl/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -877,7 +957,7 @@ app.post('/api/chat/fetchProfilePictureUrl/:instanceName', ensureInstanceAccess,
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -901,12 +981,8 @@ app.post('/api/message/sendText/:instanceName', ensureInstanceAccess, async (req
     }
 
     const { instanceName } = req.params;
-    const { number, text } = req.body;
-
-    console.log('=== ENVIANDO MENSAGEM ===');
-    console.log('InstanceName:', instanceName);
-    console.log('Number:', number);
-    console.log('Text:', text);
+    const body = req.body || {};
+    const { number, text } = body;
 
     if (!number || !text) {
       return res.status(400).json({ error: 'number e text são obrigatórios' });
@@ -918,16 +994,11 @@ app.post('/api/message/sendText/:instanceName', ensureInstanceAccess, async (req
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
-      body: JSON.stringify({
-        number,
-        text,
-        delay: 1200
-      })
+      body: JSON.stringify(body)
     });
 
-    console.log('Status da resposta:', response.status);
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -951,12 +1022,8 @@ app.post('/api/message/sendMedia/:instanceName', ensureInstanceAccess, async (re
     }
 
     const { instanceName } = req.params;
-    const { number, mediatype, mimetype, caption, media, fileName } = req.body;
-
-    console.log('=== ENVIANDO MÍDIA ===');
-    console.log('InstanceName:', instanceName);
-    console.log('Number:', number);
-    console.log('MediaType:', mediatype);
+    const body = req.body || {};
+    const { number, mediatype, media } = body;
 
     if (!number || !media || !mediatype) {
       return res.status(400).json({ error: 'number, media e mediatype são obrigatórios' });
@@ -968,20 +1035,11 @@ app.post('/api/message/sendMedia/:instanceName', ensureInstanceAccess, async (re
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
-      body: JSON.stringify({
-        number,
-        mediatype,
-        mimetype,
-        caption,
-        media,
-        fileName,
-        delay: 1200
-      })
+      body: JSON.stringify(body)
     });
 
-    console.log('Status da resposta:', response.status);
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -1005,11 +1063,8 @@ app.post('/api/message/sendAudio/:instanceName', ensureInstanceAccess, async (re
     }
 
     const { instanceName } = req.params;
-    const { number, audio } = req.body;
-
-    console.log('=== ENVIANDO ÁUDIO ===');
-    console.log('InstanceName:', instanceName);
-    console.log('Number:', number);
+    const body = req.body || {};
+    const { number, audio } = body;
 
     if (!number || !audio) {
       return res.status(400).json({ error: 'number e audio são obrigatórios' });
@@ -1021,16 +1076,11 @@ app.post('/api/message/sendAudio/:instanceName', ensureInstanceAccess, async (re
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
-      body: JSON.stringify({
-        number,
-        audio,
-        delay: 1200
-      })
+      body: JSON.stringify(body)
     });
 
-    console.log('Status da resposta:', response.status);
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -1048,9 +1098,6 @@ app.post('/api/chat/getBase64/:instanceName', ensureInstanceAccess, async (req, 
     const { instanceName } = req.params;
     const { message } = req.body;
 
-    console.log('=== BUSCANDO MÍDIA BASE64 ===');
-    console.log('InstanceName:', instanceName);
-
     if (!message) {
       return res.status(400).json({ error: 'message é obrigatório' });
     }
@@ -1065,7 +1112,7 @@ app.post('/api/chat/getBase64/:instanceName', ensureInstanceAccess, async (req, 
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       return res.status(response.status).json(data);
     }
@@ -1096,10 +1143,7 @@ function generateSlug(name) {
 // Endpoint para registrar igreja e usuário
 app.post('/api/auth/register', async (req, res) => {
   try {
-    console.log('=== REGISTRO DE IGREJA ===');
-    
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Supabase não configurado');
       return res.status(500).json({ error: 'Servidor não configurado corretamente' });
     }
 
@@ -1108,8 +1152,6 @@ app.post('/api/auth/register', async (req, res) => {
     if (!churchName || !userName || !email || !password) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
-
-    console.log('Criando usuário no Auth:', email);
 
     // 1. Criar usuário no Auth
     const authData = await supabaseAuthAdmin('users', {
@@ -1124,10 +1166,8 @@ app.post('/api/auth/register', async (req, res) => {
       })
     });
 
-    console.log('Usuário Auth criado:', authData.id);
-
     const slug = generateSlug(churchName);
-    
+
     // 2. Criar igreja
     const churchData = await supabaseRequest('churches', {
       method: 'POST',
@@ -1142,7 +1182,6 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     const church = Array.isArray(churchData) ? churchData[0] : churchData;
-    console.log('Igreja criada:', church.id);
 
     res.json({
       success: true,
@@ -1168,10 +1207,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Endpoint para criar usuário em igreja existente
 app.post('/api/auth/create-user', async (req, res) => {
   try {
-    console.log('=== CRIAÇÃO DE USUÁRIO ===');
-    
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('Supabase não configurado');
       return res.status(500).json({ error: 'Servidor não configurado corretamente' });
     }
 
@@ -1199,7 +1235,6 @@ app.post('/api/auth/create-user', async (req, res) => {
     }
 
     const platformManager = await isPlatformManager(callerAuthId);
-    console.log('[create-user] callerAuthId:', callerAuthId, 'platformManager:', platformManager, 'targetChurchId:', churchId);
     if (!platformManager) {
 
 
@@ -1235,8 +1270,6 @@ app.post('/api/auth/create-user', async (req, res) => {
     }
     }
 
-    console.log('Criando usuário no Auth:', email);
-
     // 1. Criar usuário no Auth
     const authData = await supabaseAuthAdmin('users', {
       method: 'POST',
@@ -1249,8 +1282,6 @@ app.post('/api/auth/create-user', async (req, res) => {
         }
       })
     });
-
-    console.log('Usuário Auth criado:', authData.id);
 
     // 2. Criar perfil do usuário
     const userData = await supabaseRequest('users', {
@@ -1266,7 +1297,6 @@ app.post('/api/auth/create-user', async (req, res) => {
     });
 
     const user = Array.isArray(userData) ? userData[0] : userData;
-    console.log('Perfil criado:', user.id);
 
     res.json({
       success: true,
@@ -1292,7 +1322,6 @@ app.post('/api/auth/create-user', async (req, res) => {
 
 app.post('/api/forms/submit', async (req, res) => {
   try {
-    console.log('=== SUBMISSÃO DE FORMULÁRIO DE VISITAÇÃO ===');
     const responseData = req.body;
 
     if (!responseData.church_id || !responseData.form_config_id) {
@@ -1303,15 +1332,11 @@ app.post('/api/forms/submit', async (req, res) => {
     responseData.ip_address = req.ip;
     responseData.user_agent = req.headers['user-agent'];
 
-    console.log('Dados recebidos para salvar:', responseData);
-
     const data = await supabaseRequest('visitation_form_responses', {
       method: 'POST',
       body: JSON.stringify(responseData),
       prefer: 'return=minimal' // Não precisa retornar o objeto inserido
     });
-
-    console.log('Resposta do Supabase:', data);
 
     res.status(201).json({ success: true, message: 'Formulário enviado com sucesso!' });
 
@@ -1343,7 +1368,5 @@ if (process.env.NODE_ENV === 'production') {
 
 // Inicializar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`API Evolution: ${EVOLUTION_API_URL}`);
-  console.log(`Supabase: ${SUPABASE_URL ? 'Configurado' : 'NÃO CONFIGURADO'}`);
+  // intentionally silent
 });

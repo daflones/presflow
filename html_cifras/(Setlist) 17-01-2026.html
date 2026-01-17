@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setlist - Apresentação Musical</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            padding: 40px 20px;
+            line-height: 1.6;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(236, 119, 171, 0.3) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            box-shadow: 
+                0 30px 90px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, 
+                #667eea 0%, 
+                #764ba2 25%, 
+                #f093fb 50%, 
+                #4facfe 75%, 
+                #00f2fe 100%);
+            animation: gradientShift 8s ease infinite;
+            background-size: 200% 100%;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .header {
+            text-align: center;
+            padding: 60px 40px 50px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+            position: relative;
+        }
+        
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+        
+        .header h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 72px;
+            font-weight: 400;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: 8px;
+            text-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .header .subtitle {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+        
+        .songs-wrapper {
+            padding: 40px 50px 50px;
+        }
+        
+        .songs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        
+        .song-item {
+            display: flex;
+            align-items: center;
+            padding: 20px 24px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(102, 126, 234, 0.12);
+            box-shadow: 
+                0 8px 24px rgba(102, 126, 234, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.04);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            page-break-inside: avoid;
+        }
+        
+        .song-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            transform: scaleY(0);
+            transform-origin: bottom;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .song-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        
+        .song-item:hover {
+            transform: translateY(-4px) translateX(8px);
+            box-shadow: 
+                0 16px 48px rgba(102, 126, 234, 0.24),
+                0 8px 16px rgba(0, 0, 0, 0.08);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .song-item:hover::before {
+            transform: scaleY(1);
+            transform-origin: top;
+        }
+        
+        .song-item:hover::after {
+            opacity: 1;
+        }
+        
+        .song-item:hover .song-number {
+            transform: scale(1.15);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .song-number {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 32px;
+            font-weight: 400;
+            min-width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            color: #667eea;
+            border-radius: 14px;
+            margin-right: 20px;
+            position: relative;
+            z-index: 1;
+            box-shadow: 
+                0 4px 12px rgba(102, 126, 234, 0.15),
+                inset 0 1px 2px rgba(255, 255, 255, 0.5);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 2px;
+        }
+        
+        .song-info {
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .song-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+        }
+        
+        .song-artist {
+            font-size: 13px;
+            color: #667eea;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.85;
+        }
+        
+        .section-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 48px;
+            font-weight: 400;
+            text-align: center;
+            background: linear-gradient(135deg, #764ba2 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 50px 0 30px;
+            letter-spacing: 4px;
+            position: relative;
+            padding-bottom: 20px;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 4px;
+            background: linear-gradient(90deg, #764ba2, #f093fb);
+            border-radius: 2px;
+        }
+        
+        .finale-item {
+            background: linear-gradient(135deg, #fef5ff 0%, #f8f3ff 100%);
+            border: 2px solid rgba(240, 147, 251, 0.3);
+        }
+        
+        .finale-item::before {
+            background: linear-gradient(180deg, #f093fb 0%, #764ba2 100%);
+        }
+        
+        .finale-item .song-number {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+            color: #764ba2;
+        }
+        
+        .finale-item:hover .song-number {
+            background: linear-gradient(135deg, #f093fb 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .print-button {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Montserrat', sans-serif;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 
+                0 8px 24px rgba(102, 126, 234, 0.4),
+                0 4px 8px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        
+        .print-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 32px rgba(102, 126, 234, 0.5),
+                0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .print-button:active {
+            transform: translateY(-1px);
+        }
+        
+        @media (max-width: 768px) {
+            .songs-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 56px;
+            }
+            
+            .songs-wrapper {
+                padding: 30px 25px 40px;
+            }
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 15px;
+            }
+            
+            body::before {
+                display: none;
+            }
+            
+            .print-button {
+                display: none;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+            
+            .header h1 {
+                font-size: 52px;
+            }
+            
+            .song-item {
+                padding: 16px 20px;
+                margin-bottom: 10px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+            
+            .song-item:hover {
+                transform: none;
+            }
+            
+            .section-title {
+                margin: 35px 0 25px;
+            }
+        }
+
+        .song-detail {
+            display: none;
+            padding: 35px 50px 50px;
+        }
+
+        .song-detail.active {
+            display: block;
+        }
+
+        .songs-wrapper.hidden {
+            display: none;
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .back-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Montserrat', sans-serif;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            transition: transform 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .scroll-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+
+        .scroll-select {
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #1a1a2e;
+            outline: none;
+        }
+
+        .scroll-button {
+            background: rgba(255, 255, 255, 0.92);
+            color: #1a1a2e;
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 800;
+            font-family: 'Montserrat', sans-serif;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .scroll-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .lyrics-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: nowrap;
+            margin-bottom: 10px;
+            position: -webkit-sticky;
+            position: sticky;
+            top: 10px;
+            z-index: 30;
+            padding: 6px 0;
+            background: #0f1224;
+        }
+
+        .scroll-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+
+        .control-pill {
+            height: 34px;
+            min-width: 34px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.82);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        .control-pill.icon {
+            padding: 0;
+            width: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-pill:active {
+            transform: translateY(1px);
+        }
+
+        .detail-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #1a1a2e;
+            letter-spacing: 0.2px;
+            line-height: 1.2;
+        }
+
+        .detail-artist {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+
+        .chords-image {
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid rgba(102, 126, 234, 0.14);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            margin: 18px 0 22px;
+            display: none;
+        }
+
+        .chords-image.visible {
+            display: block;
+        }
+
+        .lyrics {
+            background: #0f1224;
+            color: #f3f5ff;
+            border-radius: 18px;
+            padding: 22px;
+            overflow: auto;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+            max-height: 75vh;
+        }
+
+        .lyrics::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .lyrics::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+        }
+
+        .lyrics pre {
+            margin: 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 16px;
+            line-height: 1.65;
+            white-space: pre;
+        }
+
+        .lyrics-content {
+            padding-top: 48px;
+        }
+
+        .lyrics-pre {
+            margin: 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 16px;
+            line-height: 1.65;
+            white-space: pre;
+        }
+
+        @media (max-width: 768px) {
+            .song-detail {
+                padding: 28px 25px 40px;
+            }
+
+            .detail-title {
+                font-size: 20px;
+            }
+
+            .lyrics pre {
+                font-size: 14px;
+            }
+
+            body {
+                padding: 18px 10px;
+            }
+
+            .songs-wrapper {
+                padding: 22px 16px 30px;
+            }
+
+            .songs-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .lyrics {
+                padding: 14px;
+                max-height: 72vh;
+            }
+
+            .lyrics-toolbar {
+                top: 10px;
+                right: 10px;
+            }
+
+            .control-pill {
+                height: 32px;
+                min-width: 32px;
+                padding: 0 9px;
+                font-size: 11px;
+            }
+
+            .lyrics-pre {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button" onclick="window.print()">🖨️ Imprimir</button>
+    
+    <div class="container">
+        <div class="header">
+            <h1>SETLIST</h1>
+            <p class="subtitle">Ordem de Apresentação</p>
+        </div>
+        
+        <div class="songs-wrapper">
+            <div class="songs-grid">
+                <div class="song-item" data-song-title="Onde Anda Você" data-song-artist="Tom Jobim / Vinicius">
+                    <div class="song-number">01</div>
+                    <div class="song-info">
+                        <div class="song-title">Onde Anda Você</div>
+                        <div class="song-artist">Tom Jobim / Vinicius</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Por Onde Andei" data-song-artist="Nando Reis">
+                    <div class="song-number">02</div>
+                    <div class="song-info">
+                        <div class="song-title">Por Onde Andei</div>
+                        <div class="song-artist">Nando Reis</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Outra Vida" data-song-artist="Armandinho">
+                    <div class="song-number">03</div>
+                    <div class="song-info">
+                        <div class="song-title">Outra Vida</div>
+                        <div class="song-artist">Armandinho</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Desenho de Deus" data-song-artist="Armandinho">
+                    <div class="song-number">04</div>
+                    <div class="song-info">
+                        <div class="song-title">Desenho de Deus</div>
+                        <div class="song-artist">Armandinho</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Gostava Tanto de Você" data-song-artist="Tim Maia">
+                    <div class="song-number">05</div>
+                    <div class="song-info">
+                        <div class="song-title">Gostava Tanto de Você</div>
+                        <div class="song-artist">Tim Maia</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Réu Confesso" data-song-artist="Tim Maia">
+                    <div class="song-number">06</div>
+                    <div class="song-info">
+                        <div class="song-title">Réu Confesso</div>
+                        <div class="song-artist">Tim Maia</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Não Quero Dinheiro" data-song-artist="Tim Maia">
+                    <div class="song-number">07</div>
+                    <div class="song-info">
+                        <div class="song-title">Não Quero Dinheiro</div>
+                        <div class="song-artist">Tim Maia</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Anunciação" data-song-artist="Alceu Valença">
+                    <div class="song-number">08</div>
+                    <div class="song-info">
+                        <div class="song-title">Anunciação</div>
+                        <div class="song-artist">Alceu Valença</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="La Belle de Jour" data-song-artist="Alceu Valença">
+                    <div class="song-number">09</div>
+                    <div class="song-info">
+                        <div class="song-title">La Belle de Jour</div>
+                        <div class="song-artist">Alceu Valença</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Descobridor dos Sete Mares" data-song-artist="Tim Maia">
+                    <div class="song-number">10</div>
+                    <div class="song-info">
+                        <div class="song-title">Descobridor dos Sete Mares</div>
+                        <div class="song-artist">Tim Maia</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Sina" data-song-artist="Djavan">
+                    <div class="song-number">11</div>
+                    <div class="song-info">
+                        <div class="song-title">Sina</div>
+                        <div class="song-artist">Djavan</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Te Devoro" data-song-artist="Djavan">
+                    <div class="song-number">12</div>
+                    <div class="song-info">
+                        <div class="song-title">Te Devoro</div>
+                        <div class="song-artist">Djavan</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Sozinho" data-song-artist="Peninha / Caetano">
+                    <div class="song-number">13</div>
+                    <div class="song-info">
+                        <div class="song-title">Sozinho</div>
+                        <div class="song-artist">Peninha / Caetano</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Primeiros Erros" data-song-artist="Capital Inicial">
+                    <div class="song-number">14</div>
+                    <div class="song-info">
+                        <div class="song-title">Primeiros Erros</div>
+                        <div class="song-artist">Capital Inicial</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="À Sua Maneira" data-song-artist="Capital Inicial">
+                    <div class="song-number">15</div>
+                    <div class="song-info">
+                        <div class="song-title">À Sua Maneira</div>
+                        <div class="song-artist">Capital Inicial</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Pais e Filhos" data-song-artist="Legião Urbana">
+                    <div class="song-number">16</div>
+                    <div class="song-info">
+                        <div class="song-title">Pais e Filhos</div>
+                        <div class="song-artist">Legião Urbana</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Tempo Perdido" data-song-artist="Legião Urbana">
+                    <div class="song-number">17</div>
+                    <div class="song-info">
+                        <div class="song-title">Tempo Perdido</div>
+                        <div class="song-artist">Legião Urbana</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Anjos" data-song-artist="O Rappa">
+                    <div class="song-number">18</div>
+                    <div class="song-info">
+                        <div class="song-title">Anjos</div>
+                        <div class="song-artist">O Rappa</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="O Rodo Cotidiano" data-song-artist="O Rappa">
+                    <div class="song-number">19</div>
+                    <div class="song-info">
+                        <div class="song-title">O Rodo Cotidiano</div>
+                        <div class="song-artist">O Rappa</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Pescador de Ilusões" data-song-artist="O Rappa">
+                    <div class="song-number">20</div>
+                    <div class="song-info">
+                        <div class="song-title">Pescador de Ilusões</div>
+                        <div class="song-artist">O Rappa</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Sorri, Sou Rei" data-song-artist="Natiruts">
+                    <div class="song-number">21</div>
+                    <div class="song-info">
+                        <div class="song-title">Sorri, Sou Rei</div>
+                        <div class="song-artist">Natiruts</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Andei Só" data-song-artist="Natiruts">
+                    <div class="song-number">22</div>
+                    <div class="song-info">
+                        <div class="song-title">Andei Só</div>
+                        <div class="song-artist">Natiruts</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Quero Ser Feliz Também" data-song-artist="Natiruts">
+                    <div class="song-number">23</div>
+                    <div class="song-info">
+                        <div class="song-title">Quero Ser Feliz Também</div>
+                        <div class="song-artist">Natiruts</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Semente" data-song-artist="Armandinho">
+                    <div class="song-number">24</div>
+                    <div class="song-info">
+                        <div class="song-title">Semente</div>
+                        <div class="song-artist">Armandinho</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Fico Assim Sem Você" data-song-artist="Adriana Calcanhotto">
+                    <div class="song-number">25</div>
+                    <div class="song-info">
+                        <div class="song-title">Fico Assim Sem Você</div>
+                        <div class="song-artist">Adriana Calcanhotto</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Exagerado" data-song-artist="Cazuza">
+                    <div class="song-number">26</div>
+                    <div class="song-info">
+                        <div class="song-title">Exagerado</div>
+                        <div class="song-artist">Cazuza</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="De Janeiro a Janeiro" data-song-artist="Roberta Campos">
+                    <div class="song-number">27</div>
+                    <div class="song-info">
+                        <div class="song-title">De Janeiro a Janeiro</div>
+                        <div class="song-artist">Roberta Campos</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Pra Você Guardei o Amor" data-song-artist="Nando Reis">
+                    <div class="song-number">28</div>
+                    <div class="song-info">
+                        <div class="song-title">Pra Você Guardei o Amor</div>
+                        <div class="song-artist">Nando Reis</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Oração" data-song-artist="A Banda Mais Bonita">
+                    <div class="song-number">29</div>
+                    <div class="song-info">
+                        <div class="song-title">Oração</div>
+                        <div class="song-artist">A Banda Mais Bonita</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Samurai" data-song-artist="Djavan">
+                    <div class="song-number">30</div>
+                    <div class="song-info">
+                        <div class="song-title">Samurai</div>
+                        <div class="song-artist">Djavan</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Velha Infância" data-song-artist="Tribalistas">
+                    <div class="song-number">31</div>
+                    <div class="song-info">
+                        <div class="song-title">Velha Infância</div>
+                        <div class="song-artist">Tribalistas</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="Malandragem" data-song-artist="Cássia Eller">
+                    <div class="song-number">32</div>
+                    <div class="song-info">
+                        <div class="song-title">Malandragem</div>
+                        <div class="song-artist">Cássia Eller</div>
+                    </div>
+                </div>
+                
+                <div class="song-item" data-song-title="O Segundo Sol" data-song-artist="Cássia Eller">
+                    <div class="song-number">33</div>
+                    <div class="song-info">
+                        <div class="song-title">O Segundo Sol</div>
+                        <div class="song-artist">Cássia Eller</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section-title">Finalização</div>
+            
+            <div class="songs-grid">
+                <div class="song-item finale-item">
+                    <div class="song-number">🎸</div>
+                    <div class="song-info">
+                        <div class="song-title">Outra Vida</div>
+                        <div class="song-artist">Reprise Intimista</div>
+                    </div>
+                </div>
+                
+                <div class="song-item finale-item">
+                    <div class="song-number">🎵</div>
+                    <div class="song-info">
+                        <div class="song-title">Sozinho</div>
+                        <div class="song-artist">Versão Acústica</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="song-detail" id="songDetail">
+            <div class="detail-header">
+                <div>
+                    <div class="detail-title" id="detailTitle"></div>
+                    <div class="detail-artist" id="detailArtist"></div>
+                </div>
+                <button class="back-button" id="backButton" type="button">Voltar</button>
+            </div>
+
+            <img class="chords-image" id="chordsImage" alt="Cifras" />
+
+            <div class="lyrics" id="lyricsBox">
+                <div class="lyrics-toolbar">
+                    <div class="scroll-controls">
+                        <button class="control-pill" id="scrollSpeedButton" type="button">MED</button>
+                        <button class="control-pill icon" id="scrollToggleButton" type="button" aria-label="Play/Pause">▶</button>
+                        <button class="control-pill" id="scrollTopButton" type="button">TOPO</button>
+                    </div>
+                </div>
+                <div class="lyrics-content">
+                    <pre class="lyrics-pre" id="lyricsPre"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ASSETS_DIR = 'Imagens%20e%20Texto';
+
+        function getTxtPathForTitle(title) {
+            return `${ASSETS_DIR}/${encodeURIComponent(title)}.txt`;
+        }
+
+        function getImagePathForTitle(title) {
+            return `${ASSETS_DIR}/${encodeURIComponent(title)}.png`;
+        }
+
+        const songsWrapper = document.querySelector('.songs-wrapper');
+        const detailEl = document.getElementById('songDetail');
+        const detailTitleEl = document.getElementById('detailTitle');
+        const detailArtistEl = document.getElementById('detailArtist');
+        const lyricsBoxEl = document.getElementById('lyricsBox');
+        const lyricsPreEl = document.getElementById('lyricsPre');
+        const chordsImageEl = document.getElementById('chordsImage');
+        const backButton = document.getElementById('backButton');
+        const scrollSpeedButtonEl = document.getElementById('scrollSpeedButton');
+        const scrollToggleButtonEl = document.getElementById('scrollToggleButton');
+        const scrollTopButtonEl = document.getElementById('scrollTopButton');
+
+        const SCROLL_SPEED_PX_PER_SEC_BY_KEY = {
+            very_slow: 20,
+            slow: 35,
+            medium: 55,
+            mid_high: 80,
+            above: 110,
+            high: 160,
+        };
+
+        const SPEED_KEYS = ['very_slow', 'slow', 'medium', 'mid_high', 'above', 'high'];
+        const SPEED_LABELS = {
+            very_slow: 'V.S',
+            slow: 'LENTO',
+            medium: 'MED',
+            mid_high: 'M+R',
+            above: 'ACIM',
+            high: 'RÁP',
+        };
+
+        let speedIndex = 2;
+
+        let autoScrollRunning = false;
+        let autoScrollRafId = null;
+        let autoScrollLastTs = 0;
+        let autoScrollRemainderPx = 0;
+
+        function getSelectedSpeedPxPerSec() {
+            const key = SPEED_KEYS[speedIndex] || 'medium';
+            return SCROLL_SPEED_PX_PER_SEC_BY_KEY[key] ?? SCROLL_SPEED_PX_PER_SEC_BY_KEY.medium;
+        }
+
+        function updateSpeedButtonLabel() {
+            if (!scrollSpeedButtonEl) return;
+            const key = SPEED_KEYS[speedIndex] || 'medium';
+            scrollSpeedButtonEl.textContent = SPEED_LABELS[key] || 'MED';
+        }
+
+        function updateScrollToggleLabel() {
+            scrollToggleButtonEl.textContent = autoScrollRunning ? '⏸' : '▶';
+        }
+
+        function stopAutoScroll() {
+            autoScrollRunning = false;
+            autoScrollLastTs = 0;
+            autoScrollRemainderPx = 0;
+            if (autoScrollRafId) {
+                cancelAnimationFrame(autoScrollRafId);
+                autoScrollRafId = null;
+            }
+            updateScrollToggleLabel();
+        }
+
+        function stepAutoScroll(ts) {
+            if (!autoScrollRunning) return;
+            if (!autoScrollLastTs) autoScrollLastTs = ts;
+            const dtMs = ts - autoScrollLastTs;
+            autoScrollLastTs = ts;
+
+            const speed = getSelectedSpeedPxPerSec();
+            const deltaPxFloat = (speed * dtMs) / 1000 + autoScrollRemainderPx;
+            const deltaPx = Math.floor(deltaPxFloat);
+            autoScrollRemainderPx = deltaPxFloat - deltaPx;
+
+            if (deltaPx <= 0) {
+                autoScrollRafId = requestAnimationFrame(stepAutoScroll);
+                return;
+            }
+
+            if (!lyricsBoxEl) {
+                stopAutoScroll();
+                return;
+            }
+
+            lyricsBoxEl.scrollTop = (lyricsBoxEl.scrollTop || 0) + deltaPx;
+
+            const maxScrollTop = Math.max(0, (lyricsBoxEl.scrollHeight || 0) - (lyricsBoxEl.clientHeight || 0));
+            const current = lyricsBoxEl.scrollTop || 0;
+            if (current >= maxScrollTop - 2) {
+                stopAutoScroll();
+                return;
+            }
+
+            autoScrollRafId = requestAnimationFrame(stepAutoScroll);
+        }
+
+        function startAutoScroll() {
+            autoScrollRunning = true;
+            updateScrollToggleLabel();
+            autoScrollRafId = requestAnimationFrame(stepAutoScroll);
+        }
+
+        function toggleAutoScroll() {
+            if (autoScrollRunning) {
+                stopAutoScroll();
+                return;
+            }
+            startAutoScroll();
+        }
+
+        function scrollLyricsToTop() {
+            if (!lyricsBoxEl) return;
+            lyricsBoxEl.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function setHashForTitle(title) {
+            const encoded = encodeURIComponent(title);
+            window.location.hash = `#musica=${encoded}`;
+        }
+
+        function getTitleFromHash() {
+            const hash = window.location.hash || '';
+            const match = hash.match(/#musica=([^&]+)/);
+            if (!match) return null;
+            try {
+                return decodeURIComponent(match[1]);
+            } catch {
+                return null;
+            }
+        }
+
+        function openSongDetail(title, artist) {
+            detailTitleEl.textContent = title || '';
+            detailArtistEl.textContent = artist || '';
+            chordsImageEl.classList.remove('visible');
+
+            stopAutoScroll();
+
+            songsWrapper.classList.add('hidden');
+            detailEl.classList.add('active');
+
+            chordsImageEl.onload = () => {
+                chordsImageEl.classList.add('visible');
+            };
+            chordsImageEl.onerror = () => {
+                chordsImageEl.classList.remove('visible');
+                chordsImageEl.removeAttribute('src');
+            };
+            chordsImageEl.src = getImagePathForTitle(title);
+
+            const txtPath = getTxtPathForTitle(title);
+            if (lyricsPreEl) {
+                lyricsPreEl.textContent = 'Carregando...';
+            }
+            fetch(txtPath)
+                .then((r) => (r.ok ? r.text() : Promise.reject()))
+                .then((t) => {
+                    if (lyricsPreEl) lyricsPreEl.textContent = t;
+                    scrollLyricsToTop();
+                })
+                .catch(() => {
+                    if (lyricsPreEl) lyricsPreEl.textContent = 'Não foi possível carregar a letra.';
+                });
+
+            setHashForTitle(title);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeSongDetail() {
+            detailEl.classList.remove('active');
+            songsWrapper.classList.remove('hidden');
+            stopAutoScroll();
+            if (window.location.hash.startsWith('#musica=')) {
+                window.location.hash = '';
+            }
+        }
+
+        document.querySelectorAll('.song-item').forEach((item) => {
+            item.addEventListener('click', () => {
+                const title = item.getAttribute('data-song-title') || item.querySelector('.song-title')?.textContent?.trim();
+                const artist = item.getAttribute('data-song-artist') || item.querySelector('.song-artist')?.textContent?.trim();
+                if (!title) return;
+                openSongDetail(title, artist);
+            });
+        });
+
+        backButton.addEventListener('click', () => {
+            closeSongDetail();
+        });
+
+        scrollToggleButtonEl.addEventListener('click', () => {
+            toggleAutoScroll();
+        });
+
+        scrollTopButtonEl.addEventListener('click', () => {
+            stopAutoScroll();
+            scrollLyricsToTop();
+        });
+
+        scrollSpeedButtonEl.addEventListener('click', () => {
+            speedIndex = (speedIndex + 1) % SPEED_KEYS.length;
+            updateSpeedButtonLabel();
+            if (!autoScrollRunning) return;
+            stopAutoScroll();
+            startAutoScroll();
+        });
+
+        window.addEventListener('hashchange', () => {
+            const title = getTitleFromHash();
+            if (!title) {
+                closeSongDetail();
+                return;
+            }
+
+            const item = Array.from(document.querySelectorAll('.song-item')).find((el) => (el.getAttribute('data-song-title') || '').trim() === title.trim());
+            const artist = item?.getAttribute('data-song-artist') || item?.querySelector('.song-artist')?.textContent?.trim() || '';
+            openSongDetail(title, artist);
+        });
+
+        const initialTitle = getTitleFromHash();
+        if (initialTitle) {
+            const item = Array.from(document.querySelectorAll('.song-item')).find((el) => (el.getAttribute('data-song-title') || '').trim() === initialTitle.trim());
+            const artist = item?.getAttribute('data-song-artist') || item?.querySelector('.song-artist')?.textContent?.trim() || '';
+            openSongDetail(initialTitle, artist);
+        }
+
+        updateSpeedButtonLabel();
+    </script>
+</body>
+</html>

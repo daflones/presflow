@@ -4,6 +4,7 @@ import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { SetlistPage } from './pages/SetlistPage'
 import { DashboardPage } from './pages/DashboardPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import WhatsAppChatPage from './pages/WhatsAppChatPage';
@@ -28,6 +29,10 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/setlist',
+    element: <SetlistPage />,
   },
   {
     path: '/form/:slug',

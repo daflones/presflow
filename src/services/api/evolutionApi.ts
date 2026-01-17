@@ -201,7 +201,6 @@ class EvolutionApiService {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error(`[EvolutionAPI] Error ${response.status}:`, error)
       throw new Error(`Evolution API Error: ${response.status} - ${error}`)
     }
 
@@ -271,7 +270,7 @@ class EvolutionApiService {
    * Send audio message (PTT format)
    */
   async sendAudio(instanceName: string, options: SendAudioOptions): Promise<any> {
-    return this.request(`/message/sendWhatsAppAudio/${instanceName}`, {
+    return this.request(`/message/sendAudio/${instanceName}`, {
       method: 'POST',
       body: JSON.stringify({
         number: this.formatNumber(options.number),
@@ -571,23 +570,26 @@ class EvolutionApiService {
     options: FindMessagesOptions | { remoteJid?: string; limit?: number; page?: number }
   ): Promise<MessageInfo[]> {
     const anyOpts: any = options as any
-    const remoteJid =
-      String(anyOpts?.remoteJid || anyOpts?.where?.key?.remoteJid || '').trim()
+    const remoteJid = String(anyOpts?.remoteJid || '').trim()
     const limit = Number(anyOpts?.limit ?? 50)
     const page = Number(anyOpts?.page ?? 1)
 
-    // Quando usamos o backend (/api), a rota proxy espera { remoteJid, limit, page }.
-    if (this.baseUrl === '/api') {
-      return this.request(`/chat/findMessages/${instanceName}`, {
-        method: 'POST',
-        body: JSON.stringify({ remoteJid, limit, page })
-      })
-    }
+    // Se alguém chamar no formato simplificado { remoteJid, limit, page }, converter para payload oficial.
+    const payload: any = anyOpts?.where
+      ? options
+      : {
+          where: {
+            key: {
+              remoteJid: remoteJid || String(anyOpts?.where?.key?.remoteJid || '').trim(),
+            },
+          },
+          limit,
+          page,
+        }
 
-    // Fallback compatível com Evolution direta (quando existir)
     return this.request(`/chat/findMessages/${instanceName}`, {
       method: 'POST',
-      body: JSON.stringify(options)
+      body: JSON.stringify(payload)
     })
   }
 
@@ -607,9 +609,9 @@ class EvolutionApiService {
    * Find all chats
    */
   async findChats(instanceName: string): Promise<ChatInfo[]> {
-    return this.request(`/chat/findChats/${instanceName}`, {
+    return this.request(`/chat/findChatsEnriched/${instanceName}`, {
       method: 'POST',
-      body: JSON.stringify({})
+      body: JSON.stringify({ limitPics: 12 })
     })
   }
 
