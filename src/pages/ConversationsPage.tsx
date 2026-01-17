@@ -323,30 +323,6 @@ export function ConversationsPage() {
     }
   }
 
-  async function ensureProfilePic(instanceName: string, remoteJid: string) {
-    if (!remoteJid) return;
-    if (profilePicCacheRef.current.has(remoteJid)) return;
-    const number = remoteJid.split('@')[0];
-    if (!number) return;
-
-    try {
-      const authHeaders = await getAuthHeaders();
-      const r = await fetch(`${API_BASE}/chat/fetchProfilePictureUrl/${instanceName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ number })
-      });
-      const data = await r.json().catch(() => null);
-      const url = String(data?.profilePictureUrl || data?.profilePicUrl || '').trim();
-      if (!url) return;
-      profilePicCacheRef.current.set(remoteJid, url);
-      setChats((prev) => prev.map((c) => (c.remoteJid === remoteJid ? { ...c, profilePicUrl: url } : c)));
-      setSelectedChat((prev) => (prev?.remoteJid === remoteJid ? { ...prev, profilePicUrl: url } : prev));
-    } catch {
-      // ignore
-    }
-  }
-
   // Buscar mensagens quando chat é selecionado
   useEffect(() => {
     if (selectedChat && selectedInstance) {
