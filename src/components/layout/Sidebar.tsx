@@ -1,4 +1,4 @@
-import { Church, MessageSquare, Calendar, Users, Bot, Phone, Bell, FileText, Shield, Settings, Smartphone } from 'lucide-react';
+import { Church, MessageSquare, Calendar, Users, Bot, Bell, FileText, Shield, Settings, Smartphone } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 

@@ -3,7 +3,6 @@ import {
   LayoutDashboard, 
   Cable, 
   Bot, 
-  MessageSquare, 
   Contact, 
   Calendar, 
   BellDot, 
@@ -43,11 +42,6 @@ export function Header() {
                 isActive ? 'scale-110' : 'group-hover:scale-110'
               }`} />
               <span>{item.label}</span>
-              {item.isPill && (
-                <span className='ml-1 text-xs bg-white/20 backdrop-blur-sm text-white px-2 py-0.5 rounded-full font-semibold'>
-                  PAB
-                </span>
-              )}
             </Link>
           );
         })}
