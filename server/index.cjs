@@ -331,10 +331,6 @@ app.post('/api/chat/findChatsEnriched/:instanceName', ensureInstanceAccess, asyn
             map.set(s, String(name));
             const num = extractNumberFromJid(s);
             if (num) map.set(num, String(name));
-            if (/^\d{6,}$/.test(s)) {
-              map.set(`${s}@s.whatsapp.net`, String(name));
-              map.set(`${s}@lid`, String(name));
-            }
           }
         }
         contactsMap = map;
@@ -370,8 +366,8 @@ app.post('/api/chat/findChatsEnriched/:instanceName', ensureInstanceAccess, asyn
         (typeof chat?.profile_picture_url === 'string' && chat.profile_picture_url.trim()) ||
         '';
 
-      if (!profilePictureUrl && number && remainingPics > 0) {
-        const picKey = `${instanceName}:${number}`;
+      if (!profilePictureUrl && remainingPics > 0) {
+        const picKey = `${instanceName}:${remoteJid}`;
         const cached = getCached(__cache.profilePicByInstanceNumber, picKey);
         if (cached) {
           profilePictureUrl = cached;
@@ -384,7 +380,7 @@ app.post('/api/chat/findChatsEnriched/:instanceName', ensureInstanceAccess, asyn
                 'Content-Type': 'application/json',
                 'apikey': EVOLUTION_API_KEY
               },
-              body: JSON.stringify({ number })
+              body: JSON.stringify({ number: remoteJid })
             });
             const picData = await picResp.json().catch(() => null);
             const url = String(picData?.profilePictureUrl || picData?.profilePicUrl || '').trim();

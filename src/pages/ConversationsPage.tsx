@@ -210,7 +210,6 @@ export function ConversationsPage() {
   const jidAliasRef = useRef<Map<string, string>>(new Map());
   const contactNameCacheRef = useRef<Map<string, string>>(new Map());
   const profilePicCacheRef = useRef<Map<string, string>>(new Map());
-  const chatRemoteJidsByChatIdRef = useRef<Map<string, string[]>>(new Map());
   const contactsLoadedForInstanceRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -396,7 +395,6 @@ export function ConversationsPage() {
       
       if (Array.isArray(data)) {
         const grouped = new Map<string, Chat>();
-        const chatRemoteJids = new Map<string, Set<string>>();
 
         for (const chat of data) {
           const rawJid = extractRemoteJidFromChat(chat);
@@ -441,13 +439,8 @@ export function ConversationsPage() {
           const existing = grouped.get(stableKey);
           if (!existing) {
             grouped.set(stableKey, incoming);
-            chatRemoteJids.set(incoming.id, new Set([rawJid]));
             continue;
           }
-
-          const set = chatRemoteJids.get(existing.id) || new Set<string>();
-          set.add(rawJid);
-          chatRemoteJids.set(existing.id, set);
 
           const repTs = existing.lastMessageTime || 0;
           const curTs = incoming.lastMessageTime || 0;
@@ -466,9 +459,6 @@ export function ConversationsPage() {
         }
 
         const ordered = Array.from(grouped.values()).sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
-        chatRemoteJidsByChatIdRef.current = new Map(
-          ordered.map((c) => [c.id, Array.from(chatRemoteJids.get(c.id) || new Set([c.remoteJid]))])
-        );
         setChats(ordered);
 
       }
@@ -484,44 +474,28 @@ export function ConversationsPage() {
     setIsLoadingMessages(true);
     try {
       const authHeaders = await getAuthHeaders();
-      const jids = chatRemoteJidsByChatIdRef.current.get(selectedChat.id) || [selectedChat.remoteJid];
+      const response = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          where: {
+            key: {
+              remoteJid: selectedChat.remoteJid,
+            },
+          },
+          limit: 20,
+          page: page,
+        }),
+      });
+      const d = await response.json();
 
-      const responses = await Promise.all(
-        jids.map(async (jid) => {
-          const response = await fetch(`${API_BASE}/chat/findMessages/${selectedInstance}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders },
-            body: JSON.stringify({
-              where: {
-                key: {
-                  remoteJid: jid
-                }
-              },
-              limit: 20,
-              page: page
-            })
-          });
-          return response.json();
-        })
-      );
+      const allRecords: any[] =
+        (d?.messages && Array.isArray(d.messages.records) && d.messages.records) ||
+        (Array.isArray(d) && d) ||
+        (Array.isArray(d?.messages) && d.messages) ||
+        [];
 
-      const allRecords: any[] = [];
-      const chunkSizes: number[] = [];
-
-      for (const d of responses) {
-        if (d?.messages && Array.isArray(d.messages.records)) {
-          allRecords.push(...d.messages.records);
-          chunkSizes.push(d.messages.records.length);
-        } else if (Array.isArray(d)) {
-          allRecords.push(...d);
-          chunkSizes.push(d.length);
-        } else if (Array.isArray(d?.messages)) {
-          allRecords.push(...d.messages);
-          chunkSizes.push(d.messages.length);
-        } else {
-          chunkSizes.push(0);
-        }
-      }
+      const chunkSize = allRecords.length;
 
       const dedup = new Map<string, Message>();
       for (const msg of allRecords) {
@@ -546,7 +520,7 @@ export function ConversationsPage() {
         setMessages(prev => [...mergedMessages, ...prev]);
       }
 
-      setHasMoreMessages(chunkSizes.some((n) => n === 20));
+      setHasMoreMessages(chunkSize === 20);
       setCurrentPage(page);
     } catch (error) {
       console.error('Erro ao buscar mensagens:', error);

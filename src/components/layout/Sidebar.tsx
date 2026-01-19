@@ -14,7 +14,6 @@ const navigationItems: NavigationItem[] = [
   { name: 'WhatsApp Web', href: '/whatsapp-web', icon: Smartphone },
   { name: 'Agente IA', href: '/agente-ia', icon: Bot },
   { name: 'Arquivos IA', href: '/arquivos-ia', icon: FileText },
-  { name: 'Conversas', href: '/conversas', icon: Phone },
   { name: 'Contatos', href: '/contatos', icon: Users },
   { name: 'Calendário', href: '/calendario', icon: Calendar },
   { name: 'Avisos', href: '/avisos', icon: Bell },

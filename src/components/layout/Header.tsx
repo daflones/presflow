@@ -16,7 +16,6 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/conexoes', label: 'Conexões', icon: Cable },
   { href: '/agente-ia', label: 'Agente IA', icon: Bot },
-  { href: '/conversas', label: 'Conversas', icon: MessageSquare, isPill: true },
   { href: '/contatos', label: 'Contatos / CRM', icon: Contact },
   { href: '/calendario', label: 'Calendário', icon: Calendar },
   { href: '/avisos', label: 'Intenções de Missas / Avisos', icon: BellDot },

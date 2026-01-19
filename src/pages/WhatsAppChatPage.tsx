@@ -478,7 +478,6 @@ export default function WhatsAppChatPage() {
   const isFetchingMessagesRef = useRef(false)
   const chatsRef = useRef<WhatsAppChat[]>([])
   const messagesRef = useRef<WhatsAppMessage[]>([])
-  const chatRemoteJidsByChatIdRef = useRef<Map<string, string[]>>(new Map())
   const selectedChatIdRef = useRef<string | null>(null)
   const messagesRequestTokenRef = useRef(0)
   const shouldAutoScrollRef = useRef(true)
@@ -789,7 +788,6 @@ export default function WhatsAppChatPage() {
 
       const nowIso = new Date().toISOString()
       const grouped = new Map<string, WhatsAppChat>()
-      const chatRemoteJids = new Map<string, Set<string>>()
 
       for (const apiChat of apiChats) {
         let remoteJid = ''
@@ -864,12 +862,7 @@ export default function WhatsAppChatPage() {
         const existing = grouped.get(stableKey)
         if (!existing) {
           grouped.set(stableKey, { ...chat, id: `${instanceName}:${stableKey}`, remote_jid: remoteJid })
-          chatRemoteJids.set(`${instanceName}:${stableKey}`, new Set([remoteJid]))
         } else {
-          const set = chatRemoteJids.get(existing.id) || new Set<string>()
-          set.add(remoteJid)
-          chatRemoteJids.set(existing.id, set)
-
           const repTs = existing.last_message_at ? new Date(existing.last_message_at).getTime() : 0
           const curTs = chat.last_message_at ? new Date(chat.last_message_at).getTime() : 0
           const preferCurrentForPreview = curTs >= repTs
@@ -902,10 +895,6 @@ export default function WhatsAppChatPage() {
       }
 
       const nextChats = Array.from(grouped.values())
-      chatRemoteJidsByChatIdRef.current = new Map(
-        nextChats.map((c) => [c.id, Array.from(chatRemoteJids.get(c.id) || new Set([c.remote_jid]))])
-      )
-
       setChats(nextChats)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
@@ -972,28 +961,18 @@ export default function WhatsAppChatPage() {
     }
     
     try {
-      const jids = chatRemoteJidsByChatIdRef.current.get(chat.id) || [chat.remote_jid]
+      const r = await evolutionApi.findMessages(instanceName, {
+        where: {
+          key: {
+            remoteJid: chat.remote_jid,
+          },
+        },
+        limit: 100,
+      })
 
-      const responses = await Promise.all(
-        jids.map(async (jid) => {
-          const r = await evolutionApi.findMessages(instanceName, {
-            where: {
-              key: {
-                remoteJid: jid
-              }
-            },
-            limit: 100
-          })
-
-          const apiMessages = Array.isArray(r)
-            ? r
-            : (r as any)?.messages?.records || (r as any)?.messages || (r as any)?.data || []
-
-          return Array.isArray(apiMessages) ? apiMessages : []
-        })
-      )
-
-      const apiMessages = responses.flat()
+      const apiMessages = Array.isArray(r)
+        ? r
+        : (r as any)?.messages?.records || (r as any)?.messages || (r as any)?.data || []
 
       const nowIso = new Date().toISOString()
       const mappedMessages: WhatsAppMessage[] = []
