@@ -1,0 +1,1980 @@
+{
+    "messages": {
+        "total": 9529,
+        "pages": 191,
+        "currentPage": 1,
+        "records": [
+            {
+                "id": "cmko19jd802bgpp4k5tgwwpug",
+                "key": {
+                    "id": "3EB0D7F266FEC19314FED8",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Posso ajudar com mais alguma coisa? 😊"
+                },
+                "messageTimestamp": 1769000569,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827769,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko19fqp02bcpp4ktix3gd2h",
+                "key": {
+                    "id": "3EB0B24BFA88925D98385C",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Se precisar de ajuda especial ou transporte, recomendo contatar a equipe do Santuário pelo telefone (31) 3652-3600 ou WhatsApp (31) 3652-3635 para verificar possíveis alternativas que possam oferecer suporte."
+                },
+                "messageTimestamp": 1769000564,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827764,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko19c4f02b8pp4knu1l03l3",
+                "key": {
+                    "id": "3EB0518A6A722DCFFF5981",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Para quem não pode caminhar, infelizmente não há transporte público específico nesse trecho."
+                },
+                "messageTimestamp": 1769000559,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827759,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko198i502b2pp4kgln9hghb",
+                "key": {
+                    "id": "3EB0C8A48F57C1E755C03E",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Olá! Do trevo da Serra da Piedade até a Estação da Piedade, onde estão as vans para subir ao Santuário, o trajeto geralmente é feito a pé, pois é uma curta distância."
+                },
+                "messageTimestamp": 1769000554,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827754,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko189tx02awpp4kpmheqowi",
+                "key": {
+                    "id": "3EB0A7BABDFD9D08B7DDD3",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "mas do trevo da serra até a estação piedade, qual a opção",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "yv8FOcxjrYMFQ+PVQ7V2ZS6qGLXUskb+lCSguhvdIXM=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1769000510,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "trigger": 1,
+                        "initiator": 0,
+                        "initiatedByMe": false
+                    },
+                    "statusAttributions": [],
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827450,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko12pru02akpp4kfbyoarmk",
+                "key": {
+                    "id": "3EB0F3E17295F6AEF9F23A",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Posso ajudar com mais alguma coisa? 😊"
+                },
+                "messageTimestamp": 1769000250,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827450,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko12m5202agpp4kgr6vxpx9",
+                "key": {
+                    "id": "3EB007D81DBEEF3B09D5B4",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Caso tenha dificuldades para caminhar até o local das vans, recomendo entrar em contato com o Santuário pelo telefone (31) 3652-3600 ou WhatsApp (31) 3652-3635 para verificar opções de apoio ou transporte especial que possam lhe ajudar nesse trajeto."
+                },
+                "messageTimestamp": 1769000246,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827446,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko12iit02acpp4ks0f2935i",
+                "key": {
+                    "id": "3EB0D88A0F139EB43FB7B2",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Se você estiver no trevo da Estação da Piedade, a distância é pequena e pode ser feita a pé."
+                },
+                "messageTimestamp": 1769000241,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827441,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko12ewb02a8pp4kt30hjvxe",
+                "key": {
+                    "id": "3EB026430E70DF05BEF124",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Olá! A Estação da Piedade é o ponto onde geralmente os visitantes deixam os carros e pegam as vans para subir até o topo do Santuário."
+                },
+                "messageTimestamp": 1769000236,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827436,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko11le902a2pp4kmeed5xk5",
+                "key": {
+                    "id": "3EB0C61DE60F84739037A4",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Do trevo da estação piedade até a estação piedade onde estão as vans, qual a opção?",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "JX51L0lUZK6lD2WdCaFOC3m1NJwSugPkd/mqrrmd/O0=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1769000198,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "trigger": 1,
+                        "initiator": 0,
+                        "initiatedByMe": false
+                    },
+                    "statusAttributions": [],
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827354,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko10n9r029wpp4klui9q5e2",
+                "key": {
+                    "id": "3EB040F1B498EFF7C980CF",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Posso ajudar com mais alguma coisa? 😊"
+                },
+                "messageTimestamp": 1769000154,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827354,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko10jne029qpp4kp3kul7x2",
+                "key": {
+                    "id": "3EB0477624376C2E7704AF",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Se desejar, posso ajudar a fornecer mais informações ou indicar os contatos para esse serviço de transporte."
+                },
+                "messageTimestamp": 1769000149,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827349,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko10g13029kpp4kt4guhoj0",
+                "key": {
+                    "id": "3EB0060F80D40750A1A2B8",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Além disso, veículos particulares de pessoas com mobilidade reduzida permanente também podem subir até o Santuário mediante autorização."
+                },
+                "messageTimestamp": 1769000144,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827344,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko10cf1029epp4kdounrlzy",
+                "key": {
+                    "id": "3EB0A26F3CC1D35AE9F04F",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Compreendo! Para pessoas que têm dificuldade de caminhar, o Santuário dispõe de serviço de vans que fazem o percurso até o topo da Serra da Piedade, facilitando o acesso."
+                },
+                "messageTimestamp": 1769000140,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827340,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0zhmu0298pp4kdgev1sj5",
+                "key": {
+                    "id": "3EB0EA52D70D16D6248307",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Não tenho como caminhar, alguma outra opção?",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "G/7UU9u5yHB2rejiXKCaKmW9HC9Qei7Y3iv0f1Sd47g=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1769000100,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "trigger": 1,
+                        "initiator": 0,
+                        "initiatedByMe": false
+                    },
+                    "statusAttributions": [],
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827174,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0wsny0292pp4k5kpjjl1z",
+                "key": {
+                    "id": "3EB0F88A85197EFA4B1C7A",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Posso ajudar com mais alguma coisa? 😊"
+                },
+                "messageTimestamp": 1768999974,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827174,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0wp1v028upp4kla3sfexk",
+                "key": {
+                    "id": "3EB09D5D4B2320AA8F95DA",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Quer que eu te envie o link com mais detalhes ou te ajude com o agendamento da visita?"
+                },
+                "messageTimestamp": 1768999970,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827170,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0wlfr028opp4kuu9b9ler",
+                "key": {
+                    "id": "3EB0E88890A2071288557B",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "- Também há o Expresso Crer, que sai da Matriz Nossa Senhora do Bonsucesso (Caeté) em horários específicos."
+                },
+                "messageTimestamp": 1768999965,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827165,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0whth028ipp4keeuuzmsr",
+                "key": {
+                    "id": "3EB05ED288C458C2030B25",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "- Descer no trevo da Serra da Piedade e subir a pé até o Santuário, uma caminhada agradável com ar puro e belas vistas."
+                },
+                "messageTimestamp": 1768999960,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827160,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0we7f028app4kbyn65ctx",
+                "key": {
+                    "id": "3EB0BF3732272644C37D0F",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "- Pegar ônibus na Estação São Gabriel pelas linhas da Viação Saritur ou linhas 4800 e 4810 com destino a Caeté."
+                },
+                "messageTimestamp": 1768999955,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827155,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0wal40286pp4k5c4ftdup",
+                "key": {
+                    "id": "3EB08AF38D9F057543B6D0",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Olá! Para ir do Belo Horizonte ao Santuário Basílica Nossa Senhora da Piedade de transporte público, você pode:"
+                },
+                "messageTimestamp": 1768999951,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827151,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0v5v00280pp4kesx3a1uy",
+                "key": {
+                    "id": "3EB0DE68E553FD0FFDA5B2",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Qual a opção de transporte saindo de Belo Horizonte",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "e0tv4EKII70K+L6SHD88XhMVkiI84uFfiJ93IJMnY/Q=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999898,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "trigger": 1,
+                        "initiator": 0,
+                        "initiatedByMe": false
+                    },
+                    "statusAttributions": [],
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827074,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0un5d027ipp4knhzpkal6",
+                "key": {
+                    "id": "3EB0C0430F9F8B8CB981E0",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Se quiser, posso ajudar você com algo específico dessas dúvidas ou de outro assunto. Posso ajudar com mais alguma coisa? 😊"
+                },
+                "messageTimestamp": 1768999874,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827074,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0ujjg027cpp4kw49muqfz",
+                "key": {
+                    "id": "3EB049D6F97B16BAC18F20",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "5. O que há para visitar?  \nR: Ermida da Padroeira, Basílica das Romarias, Cripta de São José, Via Sacra e vistas panorâmicas da Serra da Piedade."
+                },
+                "messageTimestamp": 1768999869,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827069,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0ufxc0276pp4kl7x7lxnf",
+                "key": {
+                    "id": "3EB044005DD882E037580A",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "4. O que fazer no Santuário?  \nR: Oração, contemplação das basílicas, Jardim das Oliveiras, Caminho das Dores de Maria, Calvário e Cripta São José, além de apreciar a natureza."
+                },
+                "messageTimestamp": 1768999864,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827064,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0ucam0270pp4k3t5d1n0m",
+                "key": {
+                    "id": "3EB0DE4C0A9222F8AE71CF",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "3. Tem como almoçar no Santuário?  \nR: Sim! No Restaurante Dom João Resende Costa. Reservas pelos telefones (31) 3652-3642/3641 ou WhatsApp (31) 99947-7177."
+                },
+                "messageTimestamp": 1768999860,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827060,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0u8n7026upp4kf9nfh75x",
+                "key": {
+                    "id": "3EB04738FBEAFCE7DFF12C",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "2. É preciso agendar para ir no Santuário?  \nR: Sim, o acesso é controlado e há taxa de visitação. Detalhes no site acima."
+                },
+                "messageTimestamp": 1768999855,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827055,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0u50s026mpp4ktugk610j",
+                "key": {
+                    "id": "3EB0AD0756FE5226F0F9A4",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "1. Como faço para agendar minha visita ao Santuário?  \nR: O agendamento é feito exclusivamente pelo site oficial, sem espera ou fila: https://sistemas.arquidiocesebh.org.br/EGP.Form/VisitaSensp"
+                },
+                "messageTimestamp": 1768999850,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827050,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0u1c0026ipp4kjpbbs9in",
+                "key": {
+                    "id": "3EB0DD4A6860DED2043E82",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Claro! Aqui estão algumas respostas rápidas para perguntas frequentes no Santuário Basílica Nossa Senhora da Piedade:"
+                },
+                "messageTimestamp": 1768999846,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768827046,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0t1g0026cpp4kqy9wll8e",
+                "key": {
+                    "id": "3EB0B625B34631F62424F7",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "11",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "qp7GGSqjY5IaluxKblGt08sf2IkDjNKfa/VH0UlWhXY=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999799,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "trigger": 1,
+                        "initiator": 0,
+                        "initiatedByMe": false
+                    },
+                    "statusAttributions": [],
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826986,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0srg40266pp4kwiezt1oa",
+                "key": {
+                    "id": "3EB0782E86B6DDE7155BD9",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Digite o número da opção ou me conte o que você precisa! 😊"
+                },
+                "messageTimestamp": 1768999786,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826986,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0snua0260pp4klppl8g34",
+                "key": {
+                    "id": "3EB0D5A1083FD50734F1C9",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "01 ⛪ Missas, Visitas e Eventos\n02 🤝 Doações, Ofertas e Parcerias Sociais\n03 💖 Família dos Devotos\n04 🙋🏻‍♀️ Intenções de Missas\n05 🙏 Pedido de Oração\n06 📆 Sacramentos\n07 🛏️ Hospedagem\n08 📷 Ensaio Fotográfico e Uso de Drone\n09 📍 Endereço e Como Chegar\n10 🗣️ Redes Sociais\n11 ⁉️ Perguntas Frequentes\n12 🆘 Trabalhe Conosco (CLT, Voluntário, Fornecedor)"
+                },
+                "messageTimestamp": 1768999781,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826981,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0sk85025spp4ksf8vzl53",
+                "key": {
+                    "id": "3EB097E17330E7A823A497",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Como posso ajudar você hoje?"
+                },
+                "messageTimestamp": 1768999777,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826977,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0sgm0025mpp4k4hnoyvci",
+                "key": {
+                    "id": "3EB019CAD1EFBEDD074452",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Bem-vindo(a) à Santuário Basílica Nossa Senhora da Piedade!"
+                },
+                "messageTimestamp": 1768999772,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826972,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0scyh025gpp4k9h2n8ut8",
+                "key": {
+                    "id": "3EB021A93074EE306000F7",
+                    "fromMe": true,
+                    "remoteJid": "553198468857@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Oi, tudo bem? 🙏  "
+                },
+                "messageTimestamp": 1768999767,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826967,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0rhnk025app4ku371r9sd",
+                "key": {
+                    "id": "3EB09D8BE738EDA8FDD6FE",
+                    "fromMe": false,
+                    "remoteJid": "553198468857@s.whatsapp.net",
+                    "participant": "",
+                    "remoteJidAlt": "95893902639126@lid",
+                    "addressingMode": "pn"
+                },
+                "pushName": "Julia Pinheiro",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Bom dia",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "gWn6JfSOhxtNqTQwXCDlNG4N8vQwmR25LLG9p2IZegU=",
+                        "limitSharingV2": {
+                            "trigger": 0,
+                            "initiatedByMe": false
+                        },
+                        "deviceListMetadata": {
+                            "senderKeyHash": "z2hljX4oOLZMzw==",
+                            "senderTimestamp": {
+                                "low": 1768956146,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "senderAccountType": 0,
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "receiverAccountType": 0,
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999726,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": null,
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0lkq90256pp4kde01fzsj",
+                "key": {
+                    "id": "3EB0E5DD1875409EC1C612",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Que Deus conforte seu coração. 🙏"
+                },
+                "messageTimestamp": 1768999451,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826651,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0lh3w0252pp4kcuewuig4",
+                "key": {
+                    "id": "3EB09EC0DE666B5874349B",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "A equipe pastoral entrará em contato para os detalhes."
+                },
+                "messageTimestamp": 1768999446,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826646,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0ldhf024ypp4kw4n5i7ki",
+                "key": {
+                    "id": "3EB0A406C6737A0039C7B7",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "📅 Data da missa: 21/01/2026"
+                },
+                "messageTimestamp": 1768999441,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826641,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0l9u8024upp4k3rpd2hks",
+                "key": {
+                    "id": "3EB0F424896855826F9EE0",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "✝️ Em memória de: Nestor Soares Pena, Emídia Vieira Guimarães, José Vieira Pena, Antônio Vieira Pena, Geraldo Raimundo Vieira Pena, Aparecida Maria Coura, Dilma de Castro Pena, Pedro de Castro Godoi e Robson Pena de Castro"
+                },
+                "messageTimestamp": 1768999437,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826637,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0l687024qpp4ktfgank9e",
+                "key": {
+                    "id": "3EB0E0411BF73692FE60D8",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Intenção de missa registrada:"
+                },
+                "messageTimestamp": 1768999432,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826632,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    },
+                    {
+                        "status": "DELIVERY_ACK"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0l2m7024mpp4koeu2gn8u",
+                "key": {
+                    "id": "3EB0EE80ED678EC8805ADC",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Meus sinceros sentimentos pela sua perda. 🕊️"
+                },
+                "messageTimestamp": 1768999427,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826627,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0k7ki024gpp4ksirynr9u",
+                "key": {
+                    "id": "AC859A6CEC71882199C868DA81DC3F4A",
+                    "fromMe": false,
+                    "remoteJid": "6116184424629@lid",
+                    "participant": "",
+                    "remoteJidAlt": "553198238517@s.whatsapp.net",
+                    "addressingMode": "lid"
+                },
+                "pushName": "Aparecida",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Não, muito obrigada!",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "208bv0PHjcXpr79cqjdHe08g7ksXdX9DLAIVpBmp5Fw=",
+                        "deviceListMetadata": {
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999387,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "android",
+                "contextInfo": null,
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0ig9r0248pp4kaoozqv90",
+                "key": {
+                    "id": "3EB02F5ABE3B469EAD81E3",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Você gostaria de adicionar alguma mensagem ou observação especial para a equipe pastoral?"
+                },
+                "messageTimestamp": 1768999305,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826505,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0icng0244pp4k38owlcnf",
+                "key": {
+                    "id": "3EB0B481257AFA5B47FD2E",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Entendo, Aparecida. Então, vamos registrar a missa em memória pelas almas que você citou, com a data do falecimento informada como \"data desconhecida\" e a missa para hoje, 21/01/2026."
+                },
+                "messageTimestamp": 1768999300,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826500,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0hifs023ypp4kwprhgi1m",
+                "key": {
+                    "id": "AC8DE721710C36CE594CDAD9171E7720",
+                    "fromMe": false,
+                    "remoteJid": "6116184424629@lid",
+                    "participant": "",
+                    "remoteJidAlt": "553198238517@s.whatsapp.net",
+                    "addressingMode": "lid"
+                },
+                "pushName": "Aparecida",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Dia 21, hoje",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "3ukz+3k6rPXcYxDVC54+PVnXksurlph/UN9RynaEsKE=",
+                        "deviceListMetadata": {
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999262,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "android",
+                "contextInfo": {
+                    "stanzaId": "3EB05BEB7A83D16F3C94E3",
+                    "quotedType": 0,
+                    "participant": "73685146812652@lid",
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "quotedMessage": {
+                        "conversation": "2. Qual data você gostaria para a missa? Se não tiver preferência, podemos deixar a definir pela paróquia."
+                    },
+                    "statusAttributions": []
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0hbgg023spp4kc3lfjzwx",
+                "key": {
+                    "id": "AC2A184F86D6EF501125588A35423FB5",
+                    "fromMe": false,
+                    "remoteJid": "6116184424629@lid",
+                    "participant": "",
+                    "remoteJidAlt": "553198238517@s.whatsapp.net",
+                    "addressingMode": "lid"
+                },
+                "pushName": "Aparecida",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Não sei a data certa de falecimento",
+                    "messageContextInfo": {
+                        "threadId": [],
+                        "messageSecret": "KbJMOnvcAAkiETmXIqmg3NOeMqSlCgst8bsPTh6veqc=",
+                        "deviceListMetadata": {
+                            "recipientKeyHash": "H3anaSlNBA5qTA==",
+                            "senderKeyIndexes": [],
+                            "recipientTimestamp": {
+                                "low": 1768251765,
+                                "high": 0,
+                                "unsigned": true
+                            },
+                            "recipientKeyIndexes": []
+                        },
+                        "deviceListMetadataVersion": 2
+                    }
+                },
+                "messageTimestamp": 1768999252,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "android",
+                "contextInfo": {
+                    "stanzaId": "3EB0D56896CCCBC28381D1",
+                    "quotedType": 0,
+                    "participant": "73685146812652@lid",
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "quotedMessage": {
+                        "conversation": "1. A data do falecimento de cada uma dessas pessoas, ou se não souber a data exata, pelo menos o mês e o ano?"
+                    },
+                    "statusAttributions": []
+                },
+                "MessageUpdate": []
+            },
+            {
+                "id": "cmko0fjcw023opp4kkookrqj3",
+                "key": {
+                    "id": "3EB06B55F5D4860B31C276",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "Assim registraremos com todo cuidado."
+                },
+                "messageTimestamp": 1768999169,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826369,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0ffql023epp4k8g263vxn",
+                "key": {
+                    "id": "3EB05BEB7A83D16F3C94E3",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "2. Qual data você gostaria para a missa? Se não tiver preferência, podemos deixar a definir pela paróquia."
+                },
+                "messageTimestamp": 1768999164,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826364,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            },
+            {
+                "id": "cmko0fc3y023app4k56w3pfeh",
+                "key": {
+                    "id": "3EB0D56896CCCBC28381D1",
+                    "fromMe": true,
+                    "remoteJid": "553198238517@s.whatsapp.net"
+                },
+                "pushName": "Você",
+                "messageType": "conversation",
+                "message": {
+                    "conversation": "1. A data do falecimento de cada uma dessas pessoas, ou se não souber a data exata, pelo menos o mês e o ano?"
+                },
+                "messageTimestamp": 1768999160,
+                "instanceId": "af05ac9d-2e7c-4429-a7b1-ee25a28e6064",
+                "source": "web",
+                "contextInfo": {
+                    "mentionedJid": [],
+                    "groupMentions": [],
+                    "disappearingMode": {
+                        "initiator": 0
+                    },
+                    "ephemeralSettingTimestamp": {
+                        "low": 1768826360,
+                        "high": 0,
+                        "unsigned": false
+                    }
+                },
+                "MessageUpdate": [
+                    {
+                        "status": "DELIVERY_ACK"
+                    },
+                    {
+                        "status": "READ"
+                    }
+                ]
+            }
+        ]
+    }
+}
+
+
+Deve analisar pois é recebido assim de find messages, e dá pra ser usado o remotejid que vem de find chat para filtrar por chat as mensagens e inserir essas mensagens no campo da conversa igreja/fiel (chat apenas para visualizar e findmessages para organizar mnesagens no chat da aba conversas)

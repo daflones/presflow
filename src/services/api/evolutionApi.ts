@@ -116,7 +116,20 @@ export interface FindMessagesOptions {
     }
     message?: any
   }
+  // Evolution API usa `offset` para paginação (quantidade por página)
+  // Mantemos `limit` por compatibilidade interna e mapeamos para `offset`.
   limit?: number
+  page?: number
+  offset?: number
+}
+
+export interface FindMessagesResponse {
+  messages: {
+    total: number
+    pages: number
+    currentPage: number
+    records: MessageInfo[]
+  }
 }
 
 export interface ProfileInfo {
@@ -567,24 +580,34 @@ class EvolutionApiService {
    */
   async findMessages(
     instanceName: string,
-    options: FindMessagesOptions | { remoteJid?: string; limit?: number; page?: number }
-  ): Promise<MessageInfo[]> {
+    options: FindMessagesOptions | { remoteJid?: string; limit?: number; offset?: number; page?: number }
+  ): Promise<FindMessagesResponse | MessageInfo[]> {
     const anyOpts: any = options as any
     const remoteJid = String(anyOpts?.remoteJid || '').trim()
-    const limit = Number(anyOpts?.limit ?? 50)
+    const offset = Number(anyOpts?.offset ?? anyOpts?.limit ?? 50)
     const page = Number(anyOpts?.page ?? 1)
 
     // Se alguém chamar no formato simplificado { remoteJid, limit, page }, converter para payload oficial.
+    // Também permitir chamada GLOBAL (sem filtro) quando remoteJid não for informado.
     const payload: any = anyOpts?.where
-      ? options
-      : {
+      ? {
+          ...options,
+          // garantir que sempre enviamos offset (Evolution)
+          offset: Number((options as any)?.offset ?? (options as any)?.limit ?? 50),
+        }
+      : remoteJid
+      ? {
           where: {
             key: {
               remoteJid: remoteJid || String(anyOpts?.where?.key?.remoteJid || '').trim(),
             },
           },
-          limit,
           page,
+          offset,
+        }
+      : {
+          page,
+          offset,
         }
 
     return this.request(`/chat/findMessages/${instanceName}`, {
@@ -609,9 +632,9 @@ class EvolutionApiService {
    * Find all chats
    */
   async findChats(instanceName: string): Promise<ChatInfo[]> {
-    return this.request(`/chat/findChatsEnriched/${instanceName}`, {
+    return this.request(`/chat/findChats/${instanceName}`, {
       method: 'POST',
-      body: JSON.stringify({ limitPics: 12 })
+      body: JSON.stringify({})
     })
   }
 

@@ -26,11 +26,75 @@ import {
   Square
 } from 'lucide-react'
 import { evolutionApi } from '../services/api/evolutionApi'
-import { whatsappMessagesService } from '../services/supabase/whatsappMessages'
-import type { WhatsAppChat, WhatsAppMessage } from '../services/supabase/whatsappMessages'
 import { useWhatsAppInstance } from '../hooks/useWhatsApp'
 import { toast } from 'sonner'
 import { useAuth } from '../contexts/AuthContext'
+
+type WhatsAppChat = {
+  id: string
+  church_id: string
+  instance_name: string
+  remote_jid: string
+  contact_name?: string
+  contact_push_name?: string
+  profile_picture_url?: string
+  is_group?: boolean
+  unread_count?: number
+  last_message_at?: string
+  last_message_preview?: string
+  is_archived?: boolean
+  is_pinned?: boolean
+  created_at: string
+  updated_at: string
+}
+
+type WhatsAppMessage = {
+  id: string
+  church_id: string
+  chat_id: string
+  instance_name: string
+  message_id: string
+  remote_jid: string
+  from_me: boolean
+  sender_jid?: string
+  sender_name?: string
+  message_type:
+    | 'text'
+    | 'image'
+    | 'audio'
+    | 'video'
+    | 'document'
+    | 'sticker'
+    | 'location'
+    | 'contact'
+    | 'poll'
+    | 'reaction'
+  text_content?: string
+  caption?: string
+  media_url?: string
+  media_mimetype?: string
+  media_filename?: string
+  media_size?: number
+  media_duration?: number
+  media_base64?: string
+  thumbnail_base64?: string
+  latitude?: number
+  longitude?: number
+  location_name?: string
+  location_address?: string
+  vcard?: string
+  status?: string
+  is_edited?: boolean
+  is_deleted?: boolean
+  is_forwarded?: boolean
+  quoted_message_id?: string
+  quoted_message_preview?: string
+  reaction_emoji?: string
+  reaction_to_message_id?: string
+  message_timestamp: string
+  created_at: string
+  updated_at: string
+}
 
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -63,7 +127,13 @@ async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
 // MESSAGE BUBBLE COMPONENT
 // =====================================================
 
-function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; onMediaClick?: (message: WhatsAppMessage) => void }) {
+function MessageBubble({
+  message,
+  onMediaClick,
+}: {
+  message: WhatsAppMessage
+  onMediaClick?: (message: WhatsAppMessage, opts?: { openModal?: boolean }) => void
+}) {
   const isFromMe = message.from_me
   const [isPlaying, setIsPlaying] = useState(false)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
@@ -94,7 +164,7 @@ function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; on
     // Se ainda não temos base64 carregado, buscar on-demand
     if (!message.media_base64) {
       setShouldAutoPlay(true)
-      ;(onMediaClick as any)?.(message, { openModal: false })
+      onMediaClick?.(message, { openModal: false })
       return
     }
 
@@ -363,8 +433,6 @@ function MessageBubble({ message, onMediaClick }: { message: WhatsAppMessage; on
     </div>
   )
 }
-
-// =====================================================
 // CHAT LIST ITEM COMPONENT
 // =====================================================
 
@@ -417,7 +485,7 @@ function ChatListItem({
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500 truncate">{chat.last_message_preview || 'Sem mensagens'}</p>
-          {chat.unread_count > 0 && (
+          {(chat.unread_count || 0) > 0 && (
             <span className="bg-green-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
               {chat.unread_count}
             </span>
@@ -436,6 +504,23 @@ export default function WhatsAppChatPage() {
   const navigate = useNavigate()
   const { data: instance } = useWhatsAppInstance()
   const { canSendWhatsapp } = useAuth()
+
+  const waDebugRaw = String(((import.meta as any)?.env?.VITE_WA_DEBUG ?? '')).trim().toLowerCase()
+  const WA_DEBUG = waDebugRaw === '1' || waDebugRaw === 'true' || waDebugRaw === 'yes'
+  const waDebug = useCallback(
+    (...args: any[]) => {
+      if (!WA_DEBUG) return
+      // padronizar prefixo para facilitar filtro no console
+      // eslint-disable-next-line no-console
+      console.log('[wa]', ...args)
+    },
+    [WA_DEBUG]
+  )
+
+  useEffect(() => {
+    if (!WA_DEBUG) return
+    waDebug('debug enabled', { VITE_WA_DEBUG: waDebugRaw })
+  }, [WA_DEBUG, waDebugRaw, waDebug])
   
   const [chats, setChats] = useState<WhatsAppChat[]>([])
   const [selectedChat, setSelectedChat] = useState<WhatsAppChat | null>(null)
@@ -491,9 +576,7 @@ export default function WhatsAppChatPage() {
   const jidAliasRef = useRef<Map<string, string>>(new Map())
 
   // Neste modo a tela é "fonte de verdade = Evolution".
-  // Persistir em Supabase exige `chat_id` UUID real. Como aqui usamos um `id` sintético,
-  // deixamos persistência desligada para não quebrar o carregamento (erro 22P02).
-  const persistToSupabase = false
+  // Não persistimos conversas/mensagens no Supabase nesta tela.
 
   const instanceName = instance?.instanceName
 
@@ -753,6 +836,7 @@ export default function WhatsAppChatPage() {
       // Fonte de verdade: Evolution API (v2: POST /chat/findChats/{instance})
       const apiResponse = await evolutionApi.findChats(instanceName)
       const apiChats: any[] = Array.isArray(apiResponse) ? apiResponse : []
+      waDebug('findChats', { instanceName, count: apiChats.length })
 
       // Resolver nomes em lote (evita chamar fetchProfile para cada chat e reduz erro 400 em massa)
       if (!contactsLoadedRef.current) {
@@ -789,21 +873,48 @@ export default function WhatsAppChatPage() {
       const nowIso = new Date().toISOString()
       const grouped = new Map<string, WhatsAppChat>()
 
-      for (const apiChat of apiChats) {
-        let remoteJid = ''
+      const scoreRemoteJidForHistory = (jid: string): number => {
+        if (!jid) return 0
+        const extracted = evolutionApi.extractNumber(jid)
+        const digits = extracted.replace(/\D/g, '')
+        // Heurística:
+        // - Alguns chats que trazem histórico completo vêm com IDs numéricos bem longos.
+        // - Preferir @lid quando existir.
+        // - Não normalizar JID; apenas definir preferência de exibição.
+        let score = 0
+        if (/@lid$/i.test(jid)) score += 100
+        if (digits.length >= 14) score += 80
+        if (digits.length >= 16) score += 20
+        return score
+      }
 
-        // IMPORTANTE:
-        // usar o remoteJid do próprio chat retornado pelo FindChats.
-        // lastMessage.key.remoteJid pode vir em outro formato (ex.: @lid) e gerar duplicatas.
-        if (apiChat.remoteJid && apiChat.remoteJid.includes('@')) {
-          remoteJid = apiChat.remoteJid
-        } else if (apiChat.jid && apiChat.jid.includes('@')) {
-          remoteJid = apiChat.jid
-        } else if (apiChat.id && typeof apiChat.id === 'string' && apiChat.id.includes('@')) {
-          remoteJid = apiChat.id
+      const shouldHideShortNumericChat = (jid: string): boolean => {
+        if (!jid) return false
+        // Regra solicitada: ocultar na LISTA quando o identificador exibido é "curto".
+        // Aqui avaliamos pela quantidade de dígitos do número extraído do JID,
+        // independente de ter sufixo (@s.whatsapp.net/@lid) ou vir puro.
+        const extracted = evolutionApi.extractNumber(jid)
+        const digits = String(extracted || '').replace(/\D/g, '')
+        if (!digits) return false
+        // Ex: 553175956874 (12 dígitos) deve sumir.
+        // Ex: 237511825702964 (15 dígitos) deve aparecer.
+        return digits.length < 14
+      }
+
+      for (const apiChat of apiChats) {
+        // Usar exclusivamente o remoteJid retornado pelo findChats
+        const remoteJid = typeof apiChat?.remoteJid === 'string' ? apiChat.remoteJid.trim() : ''
+        if (!remoteJid) continue
+
+        if (shouldHideShortNumericChat(remoteJid)) {
+          waDebug('hide chat (short numeric)', { remoteJid })
+          continue
         }
 
-        if (!remoteJid) continue
+        // Unificar visualização quando existirem dois chats para a mesma pessoa.
+        // Não normaliza JID: apenas usa o alias vindo do findContacts (jidAliasRef)
+        // e agrupa por esse "canonical".
+        const aliasCanonical = jidAliasRef.current.get(remoteJid) || remoteJid
 
         const isGroup = remoteJid.includes('@g.us')
         if (isGroup) continue
@@ -850,25 +961,29 @@ export default function WhatsAppChatPage() {
           updated_at: nowIso,
         }
 
-        const stableChatIdRaw =
-          (typeof apiChat?.chatId === 'string' && apiChat.chatId.trim()) ||
-          (typeof apiChat?.chat_id === 'string' && apiChat.chat_id.trim()) ||
-          (typeof apiChat?.conversationId === 'string' && apiChat.conversationId.trim()) ||
-          (typeof apiChat?.conversation_id === 'string' && apiChat.conversation_id.trim()) ||
-          ''
-        const picKey = String(profilePicUrl || '').trim()
-        const hasPicKey = /^https?:\/\//i.test(picKey)
-        const stableKey = (hasPicKey ? `pic:${picKey}` : '') || stableChatIdRaw || remoteJid
+        // Agrupar por canonical para reduzir duplicatas (lid vs s.whatsapp.net) na lista.
+        // Mesmo agrupado, mantemos `remote_jid` do item mais recente para filtrar findMessages.
+        const stableKey = aliasCanonical
         const existing = grouped.get(stableKey)
         if (!existing) {
-          grouped.set(stableKey, { ...chat, id: `${instanceName}:${stableKey}`, remote_jid: remoteJid })
+          grouped.set(stableKey, {
+            ...chat,
+            id: `${instanceName}:${stableKey}`,
+            remote_jid: remoteJid,
+          })
         } else {
           const repTs = existing.last_message_at ? new Date(existing.last_message_at).getTime() : 0
           const curTs = chat.last_message_at ? new Date(chat.last_message_at).getTime() : 0
           const preferCurrentForPreview = curTs >= repTs
+
+          const existingScore = scoreRemoteJidForHistory(existing.remote_jid)
+          const currentScore = scoreRemoteJidForHistory(remoteJid)
+          const preferCurrentRemoteJid = currentScore > existingScore
           grouped.set(stableKey, {
             ...existing,
-            // remote_jid é sempre o PRIMEIRO visto no grupo
+            // Preferir o remote_jid que tende a ter histórico completo.
+            // Caso empate, manter o do chat mais recente (preview) como antes.
+            remote_jid: preferCurrentRemoteJid ? remoteJid : preferCurrentForPreview ? remoteJid : existing.remote_jid,
             unread_count: (existing.unread_count || 0) + (chat.unread_count || 0),
             contact_name: existing.contact_name || chat.contact_name,
             contact_push_name: existing.contact_push_name || chat.contact_push_name,
@@ -879,22 +994,11 @@ export default function WhatsAppChatPage() {
           })
         }
 
-        // Persistência opcional (desligada por padrão)
-        if (persistToSupabase) {
-          whatsappMessagesService
-            .createOrUpdateChat({
-              instance_name: instanceName,
-              remote_jid: remoteJid,
-              contact_name: chat.contact_name,
-              contact_push_name: chat.contact_push_name,
-              profile_picture_url: chat.profile_picture_url,
-              is_group: false,
-            })
-            .catch(() => {})
-        }
+        // persistência removida nesta tela
       }
 
       const nextChats = Array.from(grouped.values())
+      waDebug('loadChats grouped', { instanceName, groupedCount: nextChats.length })
       setChats(nextChats)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
@@ -903,7 +1007,7 @@ export default function WhatsAppChatPage() {
       setIsLoading(false)
       isFetchingChatsRef.current = false
     }
-  }, [instanceName])
+  }, [instanceName, waDebug])
 
   const ensureProfilePic = useCallback(
     async (chat: WhatsAppChat) => {
@@ -961,18 +1065,94 @@ export default function WhatsAppChatPage() {
     }
     
     try {
-      const r = await evolutionApi.findMessages(instanceName, {
-        where: {
-          key: {
-            remoteJid: chat.remote_jid,
-          },
-        },
-        limit: 100,
+      waDebug('openChat', {
+        chatId: chat.id,
+        remoteJid: chat.remote_jid,
+        extracted: evolutionApi.extractNumber(chat.remote_jid),
+        contactName: chat.contact_name,
       })
 
-      const apiMessages = Array.isArray(r)
-        ? r
-        : (r as any)?.messages?.records || (r as any)?.messages || (r as any)?.data || []
+      const fetchByRemoteJid = async (remoteJid: string) => {
+        waDebug('findMessages request', { remoteJid })
+        const r = await evolutionApi.findMessages(instanceName, {
+          where: {
+            key: {
+              remoteJid,
+            },
+          },
+          page: 1,
+          offset: 100,
+        })
+
+        const records = Array.isArray(r)
+          ? r
+          : (r as any)?.messages?.records || (r as any)?.messages || (r as any)?.data || []
+        waDebug('findMessages response', { remoteJid, count: Array.isArray(records) ? records.length : 0 })
+        return records
+      }
+
+      const apiMessagesPrimary = await fetchByRemoteJid(chat.remote_jid)
+
+      // Merge: quando existem 2 chats para a mesma pessoa (ex.: @lid e @s.whatsapp.net),
+      // a Evolution pode separar o histórico entre eles.
+      // Não normalizamos JID: apenas buscamos o "irmão" (mesmo número extraído) e mesclamos.
+      let apiMessages: any[] = Array.isArray(apiMessagesPrimary) ? apiMessagesPrimary : []
+      waDebug('messages primary', { remoteJid: chat.remote_jid, count: apiMessages.length })
+
+      const mergeByKeyId = (a: any[], b: any[]) => {
+        const byKeyId = new Map<string, any>()
+        for (const m of a || []) {
+          const id = m?.key?.id
+          if (id) byKeyId.set(id, m)
+        }
+        for (const m of b || []) {
+          const id = m?.key?.id
+          if (id) byKeyId.set(id, m)
+        }
+        return Array.from(byKeyId.values())
+      }
+      const extracted = evolutionApi.extractNumber(chat.remote_jid)
+      if (extracted) {
+        const allChats = chatsRef.current || []
+        const sibling = allChats.find((c) => {
+          if (!c?.remote_jid) return false
+          if (c.remote_jid === chat.remote_jid) return false
+          return evolutionApi.extractNumber(c.remote_jid) === extracted
+        })
+
+        if (sibling?.remote_jid) {
+          waDebug('messages sibling detected', { extracted, siblingRemoteJid: sibling.remote_jid })
+          const apiMessagesSecondary = await fetchByRemoteJid(sibling.remote_jid)
+          if (Array.isArray(apiMessagesSecondary) && apiMessagesSecondary.length > 0) {
+            apiMessages = mergeByKeyId(apiMessages, apiMessagesSecondary)
+            waDebug('messages merged sibling', { totalAfterMerge: apiMessages.length })
+          }
+        }
+      }
+
+      // Merge por remoteJidAlt: em chats @lid, o telefone real pode aparecer só em remoteJidAlt.
+      // Se os records retornados tiverem remoteJidAlt, buscar também por ele.
+      const altRemoteJids = new Set<string>()
+      for (const m of apiMessagesPrimary || []) {
+        const alt = m?.key?.remoteJidAlt
+        if (typeof alt === 'string') {
+          const s = alt.trim()
+          if (s) altRemoteJids.add(s)
+        }
+      }
+      if (altRemoteJids.size > 0) {
+        waDebug('messages remoteJidAlt detected', { alts: Array.from(altRemoteJids) })
+      }
+      if (altRemoteJids.size > 0) {
+        for (const alt of altRemoteJids) {
+          if (alt === chat.remote_jid) continue
+          const altMessages = await fetchByRemoteJid(alt)
+          if (Array.isArray(altMessages) && altMessages.length > 0) {
+            apiMessages = mergeByKeyId(apiMessages, altMessages)
+            waDebug('messages merged alt', { alt, totalAfterMerge: apiMessages.length })
+          }
+        }
+      }
 
       const nowIso = new Date().toISOString()
       const mappedMessages: WhatsAppMessage[] = []
@@ -1026,26 +1206,7 @@ export default function WhatsAppChatPage() {
 
           mappedMessages.push(m)
 
-          // Persistência opcional (desligada por padrão)
-          if (persistToSupabase) {
-            whatsappMessagesService
-              .createMessage({
-                chat_id: chat.id,
-                instance_name: instanceName,
-                message_id: msg.key.id,
-                remote_jid: msg.key.remoteJid,
-                from_me: !!msg.key.fromMe,
-                sender_jid: msg.key.participant,
-                sender_name: msg.pushName,
-                message_type: messageType,
-                text_content: textContent,
-                caption: m.caption,
-                media_mimetype: m.media_mimetype,
-                media_filename: m.media_filename,
-                message_timestamp: timestampIso,
-              })
-              .catch(() => {})
-          }
+          // persistência removida nesta tela
         }
       }
 
@@ -1084,9 +1245,7 @@ export default function WhatsAppChatPage() {
       })
       setMessages(merged)
 
-      if (persistToSupabase) {
-        await whatsappMessagesService.updateChatUnreadCount(chat.id, 0)
-      }
+      // persistência removida nesta tela
 
       // Só rolar para o fim se o usuário já estava no fim (ou próximo)
       if (shouldAutoScrollRef.current) {

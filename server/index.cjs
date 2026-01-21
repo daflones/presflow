@@ -6,6 +6,14 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[backend] unhandledRejection', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[backend] uncaughtException', err);
+});
+
 // Configurações da Evolution API
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'https://api.evolution-api.com';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
@@ -827,17 +835,12 @@ app.post('/api/chat/findChats/:instanceName', ensureInstanceAccess, async (req, 
       return res.status(response.status).json(data);
     }
 
-    // Não inventar remoteJid a partir de owner/lastMessage.
-    // Apenas repassar quando o próprio chat vier com remoteJid/jid/chatId/id.
+    // Usar o remoteJid exatamente como a Evolution retorna no chat.
+    // Apenas garantir que o objeto tenha um campo `remoteJid` quando vier em outra propriedade.
     if (Array.isArray(data)) {
       const sanitized = data
         .map((chat) => {
-          const remoteJid =
-            (chat && typeof chat.remoteJid === 'string' && chat.remoteJid.includes('@') && chat.remoteJid) ||
-            (chat && typeof chat.jid === 'string' && chat.jid.includes('@') && chat.jid) ||
-            (chat && typeof chat.id === 'string' && chat.id.includes('@') && chat.id) ||
-            '';
-
+          const remoteJid = chat && typeof chat.remoteJid === 'string' ? chat.remoteJid.trim() : '';
           if (!remoteJid) return null;
 
           return {
@@ -1364,5 +1367,8 @@ if (process.env.NODE_ENV === 'production') {
 
 // Inicializar servidor
 app.listen(PORT, () => {
-  // intentionally silent
+  console.log(`[backend] listening on http://localhost:${PORT}`);
+  console.log(`[backend] EVOLUTION_API_URL=${EVOLUTION_API_URL}`);
+  console.log(`[backend] EVOLUTION_API_KEY configured=${Boolean(EVOLUTION_API_KEY)}`);
+  console.log(`[backend] SUPABASE_URL configured=${Boolean(SUPABASE_URL)}`);
 });
