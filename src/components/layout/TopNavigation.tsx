@@ -11,6 +11,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Conexões', href: '/whatsapp', icon: MessageSquare },
+  { name: 'Conversas', href: '/conversas', icon: MessageSquare },
   { name: 'Agente IA', href: '/agente-ia', icon: Bot },
   { name: 'Contatos / CRM', href: '/contatos', icon: Users },
   { name: 'Calendário', href: '/calendario', icon: Calendar },
