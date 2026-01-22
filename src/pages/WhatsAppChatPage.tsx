@@ -33,6 +33,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getUserData } from '../lib/user'
 
+function normalizeContactSearchTerm(value: string) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const digits = raw.replace(/\D/g, '')
+  const rawNoSpaces = raw.replace(/\s/g, '')
+  const isNumeric = digits.length > 0 && digits.length === rawNoSpaces.length
+  if (isNumeric && digits.startsWith('55') && digits.length > 2) return digits.slice(2)
+  return raw
+}
+
 type WhatsAppChat = {
   id: string
   church_id: string
@@ -160,9 +170,7 @@ const MessageBubble = memo(function MessageBubble({
     setShowSenderMenu(false)
     const senderNameRaw = String(message.sender_name || '').trim()
     if (senderNameRaw) {
-      const digits = senderNameRaw.replace(/\D/g, '')
-      const isNumeric = digits.length > 0 && digits.length === senderNameRaw.replace(/\s/g, '').length
-      const normalized = isNumeric && digits.startsWith('55') && digits.length > 2 ? digits.slice(2) : senderNameRaw
+      const normalized = normalizeContactSearchTerm(senderNameRaw)
       navigate(`/contatos?search=${encodeURIComponent(normalized)}`)
       return
     }
@@ -269,14 +277,10 @@ const MessageBubble = memo(function MessageBubble({
     return `${mm}:${ss.toString().padStart(2, '0')}`
   }
 
-  const renderContent = () => {
-    if (message.is_deleted) {
-      return <span className="italic text-gray-500">Mensagem apagada</span>
-    }
-
+  const renderMessageContent = () => {
     switch (message.message_type) {
       case 'text':
-        return <p className="whitespace-pre-wrap break-words">{message.text_content}</p>
+        return <p className="text-sm">{message.text_content}</p>
 
       case 'image':
         return (
@@ -293,19 +297,17 @@ const MessageBubble = memo(function MessageBubble({
                 alt="Imagem"
                 className="max-w-xs rounded-lg"
               />
-            ) : message.media_url ? (
+            ) : message.media_url && (/^https?:\/\//i.test(message.media_url) || /^data:/i.test(message.media_url)) ? (
               <img 
                 src={message.media_url}
                 alt="Imagem"
                 className="max-w-xs rounded-lg"
               />
             ) : (
-              <div className="flex items-center gap-2 p-4 bg-gray-100 rounded-lg">
-                <ImageIcon className="w-8 h-8 text-gray-400" />
-                <span>Imagem</span>
+              <div className="w-64 h-40 bg-gray-200 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500">Clique para carregar</p>
               </div>
             )}
-            {message.caption && <p className="mt-2">{message.caption}</p>}
           </div>
         )
 
@@ -472,7 +474,7 @@ const MessageBubble = memo(function MessageBubble({
           </div>
         )}
 
-        {renderContent()}
+        {renderMessageContent()}
 
         <div className={`flex items-center gap-1 mt-1 ${isFromMe ? 'justify-end' : 'justify-start'}`}>
           <span className="text-[10px] text-gray-500">{formatTime(message.message_timestamp)}</span>
@@ -1741,6 +1743,27 @@ export default function WhatsAppChatPage() {
         })
       }
 
+      // Best-effort: ao enviar qualquer mídia, pausar IA
+      try {
+        const profile = await getUserData()
+        const churchId = profile?.church_id || null
+        const displayName = String(selectedChat.contact_name || selectedChat.contact_push_name || '').trim()
+        if (churchId && displayName) {
+          const pauseKey = getPauseKey(churchId, displayName)
+          const nowIsoForPause = new Date().toISOString()
+          if (pauseKey && !localStorage.getItem(pauseKey)) {
+            localStorage.setItem(pauseKey, nowIsoForPause)
+          }
+          await supabase
+            .from('clients')
+            .update({ atendimento_ia: 'pause' })
+            .eq('church_id', churchId)
+            .eq('name', displayName)
+        }
+      } catch (e) {
+        console.warn('[WhatsAppChatPage] Falha ao pausar atendimento_ia ao enviar mídia:', e)
+      }
+
       // Forçar scroll após envio de mídia
       shouldAutoScrollRef.current = true
       userScrolledUpRef.current = false
@@ -2107,9 +2130,20 @@ export default function WhatsAppChatPage() {
               
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-gray-900">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const display =
+                        selectedChat.contact_name ||
+                        selectedChat.contact_push_name ||
+                        selectedChat.remote_jid.split('@')[0]
+                      const normalized = normalizeContactSearchTerm(display)
+                      navigate(`/contatos?search=${encodeURIComponent(normalized)}`)
+                    }}
+                    className="font-medium text-gray-900 hover:underline text-left"
+                  >
                     {selectedChat.contact_name || selectedChat.contact_push_name || selectedChat.remote_jid.split('@')[0]}
-                  </h3>
+                  </button>
                   {(() => {
                     const n = String(selectedChat.contact_name || selectedChat.contact_push_name || '').trim()
                     const s = n ? iaStatusByName[n] : undefined
