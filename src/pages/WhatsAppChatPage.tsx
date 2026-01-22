@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Cropper from 'react-easy-crop'
-import { 
-  Send, 
-  Paperclip, 
-  Mic, 
-  Image as ImageIcon, 
+import {
+  Send,
+  Paperclip,
+  Mic,
+  Image as ImageIcon,
   FileText, 
   ArrowLeft,
   MoreVertical,
@@ -30,6 +30,8 @@ import { evolutionApi } from '../services/api/evolutionApi'
 import { useWhatsAppInstance } from '../hooks/useWhatsApp'
 import { toast } from 'sonner'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { getUserData } from '../lib/user'
 
 type WhatsAppChat = {
   id: string
@@ -128,7 +130,7 @@ async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
 // MESSAGE BUBBLE COMPONENT
 // =====================================================
 
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   message,
   onMediaClick,
 }: {
@@ -156,9 +158,12 @@ function MessageBubble({
 
   const handleViewClientProfile = () => {
     setShowSenderMenu(false)
-    const senderName = String(message.sender_name || '').trim()
-    if (senderName) {
-      navigate(`/contatos?search=${encodeURIComponent(senderName)}`)
+    const senderNameRaw = String(message.sender_name || '').trim()
+    if (senderNameRaw) {
+      const digits = senderNameRaw.replace(/\D/g, '')
+      const isNumeric = digits.length > 0 && digits.length === senderNameRaw.replace(/\s/g, '').length
+      const normalized = isNumeric && digits.startsWith('55') && digits.length > 2 ? digits.slice(2) : senderNameRaw
+      navigate(`/contatos?search=${encodeURIComponent(normalized)}`)
       return
     }
     navigate('/contatos')
@@ -477,18 +482,20 @@ function MessageBubble({
       </div>
     </div>
   )
-}
+})
 // CHAT LIST ITEM COMPONENT
 // =====================================================
 
-function ChatListItem({ 
+const ChatListItem = memo(function ChatListItem({ 
   chat, 
   isSelected, 
-  onClick 
+  onClick,
+  iaStatus
 }: { 
   chat: WhatsAppChat
   isSelected: boolean
-  onClick: () => void 
+  onClick: () => void
+  iaStatus?: string | null
 }) {
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return ''
@@ -503,6 +510,11 @@ function ChatListItem({
   }
 
   const displayName = chat.contact_name || chat.contact_push_name || chat.remote_jid.split('@')[0]
+  const iaBadge = iaStatus === 'pause'
+    ? { label: 'IA Pausada', className: 'bg-blue-50 text-blue-700 ring-blue-100' }
+    : iaStatus === null
+      ? { label: 'IA Ativa', className: 'bg-emerald-50 text-emerald-700 ring-emerald-100' }
+      : null
 
   return (
     <div 
@@ -525,7 +537,14 @@ function ChatListItem({
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <h3 className="font-medium text-gray-900 truncate">{displayName}</h3>
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="font-medium text-gray-900 truncate">{displayName}</h3>
+            {iaBadge && (
+              <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${iaBadge.className}`}>
+                {iaBadge.label}
+              </span>
+            )}
+          </div>
           <span className="text-xs text-gray-500">{formatTime(chat.last_message_at)}</span>
         </div>
         <div className="flex items-center justify-between">
@@ -539,7 +558,7 @@ function ChatListItem({
       </div>
     </div>
   )
-}
+})
 
 // =====================================================
 // MAIN CHAT PAGE COMPONENT
@@ -574,6 +593,7 @@ export default function WhatsAppChatPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [iaStatusByName, setIaStatusByName] = useState<Record<string, string | null>>({})
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [mediaPreview, setMediaPreview] = useState<WhatsAppMessage | null>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -612,6 +632,7 @@ export default function WhatsAppChatPage() {
   const messagesRequestTokenRef = useRef(0)
   const shouldAutoScrollRef = useRef(true)
   const userScrolledUpRef = useRef(false)
+  const lastSentRef = useRef<{ text: string; at: number } | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
@@ -625,9 +646,75 @@ export default function WhatsAppChatPage() {
 
   const instanceName = instance?.instanceName
 
+  const loadIaStatusesByNames = useCallback(async (names: string[]) => {
+    const unique = Array.from(new Set((names || []).map((n) => String(n || '').trim()).filter(Boolean)))
+    if (unique.length === 0) return
+    try {
+      const profile = await getUserData()
+      const churchId = profile?.church_id
+      if (!churchId) return
+
+      const { data, error } = await supabase
+        .from('clients')
+        .select('name,atendimento_ia')
+        .eq('church_id', churchId)
+        .in('name', unique)
+
+      if (error) throw error
+
+      setIaStatusByName((prev) => {
+        const next = { ...prev }
+        for (const row of data || []) {
+          const name = String((row as any)?.name || '').trim()
+          if (!name) continue
+          const v = (row as any)?.atendimento_ia ?? null
+          next[name] = v === null ? null : String(v)
+        }
+        return next
+      })
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    const names = (chats || [])
+      .map((c) => String(c?.contact_name || c?.contact_push_name || '').trim())
+      .filter(Boolean)
+    if (names.length === 0) return
+    void loadIaStatusesByNames(names)
+  }, [chats])
+
+  const getPauseKey = useCallback((churchId: string, clientName: string) => {
+    const c = String(churchId || '').trim()
+    const n = String(clientName || '').trim()
+    if (!c || !n) return null
+    return `wa_pause_started_at:${c}:${n}`
+  }, [])
+
+  const getPersistedNameCacheKey = useCallback((name?: string | null) => {
+    const key = String(name || '').trim()
+    if (!key) return null
+    return `wa_name_cache:${key}`
+  }, [])
+
   useEffect(() => {
     contactsLoadedRef.current = false
     profileNameCacheRef.current = new Map()
+    const cacheKey = getPersistedNameCacheKey(instanceName)
+    if (cacheKey) {
+      try {
+        const raw = localStorage.getItem(cacheKey)
+        const parsed = raw ? JSON.parse(raw) : null
+        const entries: [string, string][] = Array.isArray(parsed) ? parsed : []
+        for (const [k, v] of entries) {
+          if (!k || !v) continue
+          profileNameCacheRef.current.set(String(k), String(v))
+        }
+      } catch {
+        // ignore
+      }
+    }
   }, [instanceName])
 
   useEffect(() => {
@@ -1285,10 +1372,73 @@ export default function WhatsAppChatPage() {
       const byId = new Map<string, WhatsAppMessage>()
       for (const m of dedupedExisting) byId.set(m.id, m)
       for (const m of mappedMessages) byId.set(m.id, m)
-      const merged = Array.from(byId.values()).sort((a, b) => {
+      let merged = Array.from(byId.values()).sort((a, b) => {
         return new Date(a.message_timestamp).getTime() - new Date(b.message_timestamp).getTime()
       })
+
+      // Evitar duplicação: remover mensagens otimistas (local_...) quando já temos o histórico real.
+      // A mensagem real da Evolution chega com outro ID, então a otimista não deve permanecer.
+      merged = merged.filter((m) => {
+        const mid = String(m?.message_id || '')
+        if (!mid.startsWith('local_')) return true
+        // se foi uma mensagem enviada recentemente, descartamos a otimista após o refresh
+        const last = lastSentRef.current
+        if (!last) return false
+        if (Date.now() - last.at > 5 * 60 * 1000) return false
+        const t = String(m?.text_content || '').trim()
+        return t && t !== last.text
+      })
       setMessages(merged)
+
+      // Se o chat ainda não tem nome (ou está só com número), tentar inferir pelo sender_name
+      // das mensagens recebidas.
+      const jidBase = String(chat.remote_jid || '').split('@')[0]
+      const isNumericJid = /^\d+$/.test(jidBase)
+      const hasFriendlyName = Boolean(
+        String(chat.contact_name || '').trim() || String(chat.contact_push_name || '').trim()
+      )
+
+      if (!hasFriendlyName || isNumericJid) {
+        const freq = new Map<string, number>()
+        for (const m of merged || []) {
+          // Preferir mensagens recebidas (fiel)
+          if (m?.from_me) continue
+          const name = String(m?.sender_name || '').trim()
+          if (!name) continue
+          freq.set(name, (freq.get(name) || 0) + 1)
+        }
+        let bestName = ''
+        let bestCount = 0
+        for (const [name, count] of freq.entries()) {
+          if (count > bestCount) {
+            bestName = name
+            bestCount = count
+          }
+        }
+
+        if (bestName) {
+          const extractedRemote = evolutionApi.extractNumber(chat.remote_jid)
+          profileNameCacheRef.current.set(chat.remote_jid, bestName)
+          if (extractedRemote) {
+            profileNameCacheRef.current.set(extractedRemote, bestName)
+            profileNameCacheRef.current.set(`${extractedRemote}@s.whatsapp.net`, bestName)
+            profileNameCacheRef.current.set(`${extractedRemote}@lid`, bestName)
+          }
+
+          const cacheKey = getPersistedNameCacheKey(instanceName)
+          if (cacheKey) {
+            try {
+              const entries = Array.from(profileNameCacheRef.current.entries())
+              localStorage.setItem(cacheKey, JSON.stringify(entries))
+            } catch {
+              // ignore
+            }
+          }
+
+          setChats((prev) => prev.map((c) => (c.id === chat.id ? { ...c, contact_name: bestName } : c)))
+          setSelectedChat((prev) => (prev?.id === chat.id ? { ...prev, contact_name: bestName } : prev))
+        }
+      }
 
       // persistência removida nesta tela
 
@@ -1373,6 +1523,7 @@ export default function WhatsAppChatPage() {
     if (!newMessage.trim() || !selectedChat || !instanceName) return
     
     const textToSend = newMessage.trim()
+    lastSentRef.current = { text: textToSend, at: Date.now() }
 
     // UX: limpar imediatamente
     setNewMessage('')
@@ -1427,12 +1578,119 @@ export default function WhatsAppChatPage() {
         text: textToSend
       })
 
+      const shouldFinalize = textToSend === 'Atendimento finalizado'
+      let profileChurchId: string | null = null
+      let displayName = String(selectedChat.contact_name || selectedChat.contact_push_name || '').trim()
+      try {
+        const profile = await getUserData()
+        profileChurchId = profile?.church_id || null
+      } catch {
+        profileChurchId = null
+      }
+
       // Atualizar histórico a partir da Evolution (sem depender de Supabase)
       // Forçar scroll após envio (usuário acabou de enviar)
       shouldAutoScrollRef.current = true
       userScrolledUpRef.current = false
       await loadMessages(selectedChat)
-      
+
+      // Após loadMessages, selectedChat pode ter sido enriquecido com contact_name inferido
+      displayName = String(selectedChat.contact_name || selectedChat.contact_push_name || displayName || '').trim()
+
+      // Best-effort: manter atendimento_ia em pause / finalizar e anexar ultima_conversa
+      try {
+        const churchId = profileChurchId
+        if (!churchId || !displayName) {
+          // nada a fazer
+        } else {
+          const pauseKey = getPauseKey(churchId, displayName)
+          const nowIsoForPause = nowIso
+
+          if (!shouldFinalize) {
+            // Ao enviar qualquer mensagem, pausar IA e registrar início do pause (se ainda não existe)
+            if (pauseKey && !localStorage.getItem(pauseKey)) {
+              localStorage.setItem(pauseKey, nowIsoForPause)
+            }
+            await supabase
+              .from('clients')
+              .update({ atendimento_ia: 'pause' })
+              .eq('church_id', churchId)
+              .eq('name', displayName)
+          } else {
+            // Finalizar: montar bloco de conversa desde o início do pause
+            const startedAtRaw = pauseKey ? localStorage.getItem(pauseKey) : null
+            const startedAtMs = startedAtRaw ? new Date(startedAtRaw).getTime() : NaN
+            const startedOk = Number.isFinite(startedAtMs)
+
+            const allMsgs = messagesRef.current || []
+            const msgsSince = startedOk
+              ? allMsgs.filter((m) => new Date(m.message_timestamp).getTime() >= startedAtMs)
+              : allMsgs
+
+            const agentLines: string[] = []
+            const agentSeen = new Set<string>()
+            for (const m of msgsSince) {
+              if (!m?.from_me) continue
+              const mid = String(m?.message_id || '')
+              if (mid.startsWith('local_')) continue
+              const t = String(m.text_content || '').trim()
+              if (!t) continue
+              if (t === 'Atendimento finalizado') continue
+              if (agentSeen.has(t)) continue
+              agentSeen.add(t)
+              agentLines.push(t)
+            }
+
+            let lastClientLine = ''
+            for (let i = msgsSince.length - 1; i >= 0; i--) {
+              const m = msgsSince[i]
+              if (m?.from_me) continue
+              const mid = String(m?.message_id || '')
+              if (mid.startsWith('local_')) continue
+              const t = String(m?.text_content || '').trim()
+              if (!t) continue
+              lastClientLine = `[${m.message_timestamp}] ${t}`
+              break
+            }
+
+            const blockParts: string[] = []
+            if (agentLines.length > 0) {
+              blockParts.push('O que o agente principal já enviou:')
+              blockParts.push(agentLines.join('\n\n'))
+            }
+            if (lastClientLine) {
+              blockParts.push(`Ultima mensagem do cliente:${lastClientLine}`)
+            }
+
+            const block = blockParts.join('\n\n').trim()
+
+            // Anexar em ultima_conversa (não sobrescrever) e limpar atendimento_ia
+            const { data: rows, error: fetchErr } = await supabase
+              .from('clients')
+              .select('id,ultima_conversa')
+              .eq('church_id', churchId)
+              .eq('name', displayName)
+
+            if (fetchErr) throw fetchErr
+            for (const r of rows || []) {
+              const existing = String((r as any)?.ultima_conversa || '').trim()
+              const next = block ? (existing ? `${existing}\n\n${block}` : block) : existing
+              // eslint-disable-next-line no-await-in-loop
+              await supabase
+                .from('clients')
+                .update({ atendimento_ia: null, ultima_conversa: next || null })
+                .eq('id', (r as any).id)
+            }
+
+            if (pauseKey) {
+              localStorage.removeItem(pauseKey)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[WhatsAppChatPage] Falha ao atualizar atendimento_ia/ultima_conversa:', e)
+      }
+
       // Scroll to bottom (sempre ao enviar)
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1805,19 +2063,24 @@ export default function WhatsAppChatPage() {
               Nenhuma conversa encontrada
             </div>
           ) : (
-            filteredChats.map(chat => (
-              <ChatListItem
-                key={chat.id}
-                chat={chat}
-                isSelected={selectedChat?.id === chat.id}
-                onClick={() => setSelectedChat(chat)}
-              />
-            ))
+            filteredChats.map((chat) => {
+              const n = String(chat.contact_name || chat.contact_push_name || '').trim()
+              const iaStatus = n ? iaStatusByName[n] : undefined
+              return (
+                <ChatListItem
+                  key={chat.id}
+                  chat={chat}
+                  isSelected={selectedChat?.id === chat.id}
+                  onClick={() => setSelectedChat(chat)}
+                  iaStatus={iaStatus}
+                />
+              )
+            })
           )}
         </div>
+
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedChat ? (
           <>
@@ -1843,9 +2106,30 @@ export default function WhatsAppChatPage() {
               )}
               
               <div className="flex-1">
-                <h3 className="font-medium text-gray-900">
-                  {selectedChat.contact_name || selectedChat.contact_push_name || selectedChat.remote_jid.split('@')[0]}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-gray-900">
+                    {selectedChat.contact_name || selectedChat.contact_push_name || selectedChat.remote_jid.split('@')[0]}
+                  </h3>
+                  {(() => {
+                    const n = String(selectedChat.contact_name || selectedChat.contact_push_name || '').trim()
+                    const s = n ? iaStatusByName[n] : undefined
+                    if (s === 'pause') {
+                      return (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-100">
+                          IA Pausada
+                        </span>
+                      )
+                    }
+                    if (s === null) {
+                      return (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-100">
+                          IA Ativa
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
                 <p className="text-sm text-gray-500">
                   {selectedChat.remote_jid.split('@')[0]}
                 </p>
@@ -1858,6 +2142,14 @@ export default function WhatsAppChatPage() {
                 <button className="p-2 hover:bg-gray-200 rounded-full">
                   <MoreVertical className="w-5 h-5 text-gray-600" />
                 </button>
+              </div>
+            </div>
+
+            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200">
+              <div className="inline-flex items-start gap-2 rounded-lg bg-white/70 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+                <span>
+                  Ao finalizar uma conversa com o fiél, digite a palavra: <strong>Atendimento finalizado</strong>. Copie exatamente da forma como está escrito
+                </span>
               </div>
             </div>
 
