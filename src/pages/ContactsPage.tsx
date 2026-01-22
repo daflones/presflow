@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, Pencil, Trash2, Eye, X, Phone, Mail, Tag, UserRound, Building2, LayoutGrid, List, Calendar } from 'lucide-react';
 import { clientsService, calendarService, serviceAppointmentsService } from '../services/supabase';
 import type { Client as DbClient, ClientStatus, ClientCategory, CalendarEvent, ServiceAppointment } from '../types/database';
@@ -169,8 +170,20 @@ function KanbanCard({
 
 export function ContactsPage() {
   const { canEditClients } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(searchParams.get('search') || '');
+
+  // Se veio com parâmetro search na URL, limpar após usar
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl) {
+      setQuery(searchFromUrl);
+      // Remover o parâmetro da URL para não poluir
+      searchParams.delete('search');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [activeId, setActiveId] = useState<string | null>(null);

@@ -23,7 +23,8 @@ import {
   Camera,
   MapPin,
   User,
-  Square
+  Square,
+  UserCircle
 } from 'lucide-react'
 import { evolutionApi } from '../services/api/evolutionApi'
 import { useWhatsAppInstance } from '../hooks/useWhatsApp'
@@ -134,8 +135,34 @@ function MessageBubble({
   message: WhatsAppMessage
   onMediaClick?: (message: WhatsAppMessage, opts?: { openModal?: boolean }) => void
 }) {
+  const navigate = useNavigate()
   const isFromMe = message.from_me
   const [isPlaying, setIsPlaying] = useState(false)
+  const [showSenderMenu, setShowSenderMenu] = useState(false)
+  const senderMenuRef = useRef<HTMLDivElement>(null)
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (senderMenuRef.current && !senderMenuRef.current.contains(e.target as Node)) {
+        setShowSenderMenu(false)
+      }
+    }
+    if (showSenderMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showSenderMenu])
+
+  const handleViewClientProfile = () => {
+    setShowSenderMenu(false)
+    const senderName = String(message.sender_name || '').trim()
+    if (senderName) {
+      navigate(`/contatos?search=${encodeURIComponent(senderName)}`)
+      return
+    }
+    navigate('/contatos')
+  }
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
   const [audioDuration, setAudioDuration] = useState<number>(message.media_duration || 0)
   const [audioCurrentTime, setAudioCurrentTime] = useState<number>(0)
@@ -413,7 +440,25 @@ function MessageBubble({
         }`}
       >
         {!isFromMe && message.sender_name && (
-          <p className="text-xs font-medium text-green-600 mb-1">{message.sender_name}</p>
+          <div className="relative" ref={senderMenuRef}>
+            <button
+              onClick={() => setShowSenderMenu(!showSenderMenu)}
+              className="text-xs font-medium text-green-600 mb-1 hover:underline cursor-pointer focus:outline-none"
+            >
+              {message.sender_name}
+            </button>
+            {showSenderMenu && (
+              <div className="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-lg border z-50 min-w-[180px]">
+                <button
+                  onClick={handleViewClientProfile}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  <UserCircle className="w-4 h-4" />
+                  Ver perfil do cliente
+                </button>
+              </div>
+            )}
+          </div>
         )}
         
         {message.quoted_message_preview && (
