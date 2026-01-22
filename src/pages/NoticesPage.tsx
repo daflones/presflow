@@ -23,20 +23,24 @@ import { useAuth } from '../contexts/AuthContext';
 import { supportTicketsService, ticketMessagesService } from '../services/supabase';
 import type { SupportTicket, SupportTicketMessage, TicketStatus, TicketPrioridade } from '../types/database';
 
-const statusConfig: Record<TicketStatus, { label: string; color: string; bgColor: string }> = {
+const statusConfigMap: Record<TicketStatus, { label: string; color: string; bgColor: string }> = {
   pendente: { label: 'Pendente', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20 border-yellow-500/30' },
   em_andamento: { label: 'Em Andamento', color: 'text-blue-400', bgColor: 'bg-blue-500/20 border-blue-500/30' },
   aguardando_resposta: { label: 'Aguardando', color: 'text-purple-400', bgColor: 'bg-purple-500/20 border-purple-500/30' },
   resolvido: { label: 'Resolvido', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/30' },
   cancelado: { label: 'Cancelado', color: 'text-gray-400', bgColor: 'bg-gray-500/20 border-gray-500/30' },
 };
+const defaultStatus = { label: 'Desconhecido', color: 'text-gray-400', bgColor: 'bg-gray-500/20 border-gray-500/30' };
+const statusConfig = (status: TicketStatus | string) => statusConfigMap[status as TicketStatus] || defaultStatus;
 
-const prioridadeConfig: Record<TicketPrioridade, { label: string; color: string; bgColor: string }> = {
+const prioridadeConfigMap: Record<TicketPrioridade, { label: string; color: string; bgColor: string }> = {
   baixa: { label: 'Baixa', color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
   normal: { label: 'Normal', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
   alta: { label: 'Alta', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
   urgente: { label: 'Urgente', color: 'text-red-400', bgColor: 'bg-red-500/20' },
 };
+const defaultPrioridade = { label: 'Normal', color: 'text-blue-400', bgColor: 'bg-blue-500/20' };
+const prioridadeConfig = (prioridade: TicketPrioridade | string) => prioridadeConfigMap[prioridade as TicketPrioridade] || defaultPrioridade;
 
 const MASS_INTENTION_CATEGORY = 'intencao_missa';
 const NOTICE_CATEGORY = 'aviso';
@@ -600,11 +604,11 @@ export function NoticesPage() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[ticket.status].bgColor} ${statusConfig[ticket.status].color}`}>
-                              {statusConfig[ticket.status].label}
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig(ticket.status).bgColor} ${statusConfig(ticket.status).color}`}>
+                              {statusConfig(ticket.status).label}
                             </span>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${prioridadeConfig[ticket.prioridade].bgColor} ${prioridadeConfig[ticket.prioridade].color}`}>
-                              {prioridadeConfig[ticket.prioridade].label}
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${prioridadeConfig(ticket.prioridade).bgColor} ${prioridadeConfig(ticket.prioridade).color}`}>
+                              {prioridadeConfig(ticket.prioridade).label}
                             </span>
                           </div>
                         </div>
@@ -774,11 +778,11 @@ export function NoticesPage() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig[ticket.status].bgColor} ${statusConfig[ticket.status].color}`}>
-                              {statusConfig[ticket.status].label}
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${statusConfig(ticket.status).bgColor} ${statusConfig(ticket.status).color}`}>
+                              {statusConfig(ticket.status).label}
                             </span>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${prioridadeConfig[ticket.prioridade].bgColor} ${prioridadeConfig[ticket.prioridade].color}`}>
-                              {prioridadeConfig[ticket.prioridade].label}
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${prioridadeConfig(ticket.prioridade).bgColor} ${prioridadeConfig(ticket.prioridade).color}`}>
+                              {prioridadeConfig(ticket.prioridade).label}
                             </span>
                           </div>
                         </div>
@@ -1304,8 +1308,8 @@ export function NoticesPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Prioridade:</span>
-                  <span className={prioridadeConfig[selectedTicket.prioridade].color}>
-                    {prioridadeConfig[selectedTicket.prioridade].label}
+                  <span className={prioridadeConfig(selectedTicket.prioridade).color}>
+                    {prioridadeConfig(selectedTicket.prioridade).label}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

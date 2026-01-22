@@ -1319,6 +1319,84 @@ app.post('/api/auth/create-user', async (req, res) => {
 // ENDPOINTS DE FORMULÁRIO DE VISITAÇÃO
 // ==========================================
 
+// ==========================================
+// ROTAS DO CALENDÁRIO (bypass RLS para funcionários)
+// ==========================================
+
+app.get('/api/calendar/events/:churchId', async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    if (!churchId) {
+      return res.status(400).json({ error: 'churchId é obrigatório' });
+    }
+
+    const data = await supabaseRequest(
+      `calendar_events?church_id=eq.${churchId}&order=start_at.asc`
+    );
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('[calendar/events] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar eventos', details: error.message });
+  }
+});
+
+app.get('/api/calendar/appointments/:churchId', async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    if (!churchId) {
+      return res.status(400).json({ error: 'churchId é obrigatório' });
+    }
+
+    const data = await supabaseRequest(
+      `service_appointments?church_id=eq.${churchId}&order=data_agendamento.asc`
+    );
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('[calendar/appointments] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar agendamentos', details: error.message });
+  }
+});
+
+app.get('/api/calendar/services/:churchId', async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    if (!churchId) {
+      return res.status(400).json({ error: 'churchId é obrigatório' });
+    }
+
+    const data = await supabaseRequest(
+      `church_services?church_id=eq.${churchId}&ativo=eq.true&order=nome.asc`
+    );
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('[calendar/services] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar serviços', details: error.message });
+  }
+});
+
+app.get('/api/calendar/clients/:churchId', async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    if (!churchId) {
+      return res.status(400).json({ error: 'churchId é obrigatório' });
+    }
+
+    const data = await supabaseRequest(
+      `clients?church_id=eq.${churchId}&order=name.asc`
+    );
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('[calendar/clients] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar clientes', details: error.message });
+  }
+});
+
+// ==========================================
+
 app.post('/api/forms/submit', async (req, res) => {
   try {
     const responseData = req.body;

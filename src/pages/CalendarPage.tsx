@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
-import { calendarService, clientsService, churchServicesService, serviceAppointmentsService } from '../services/supabase';
+import { calendarService, serviceAppointmentsService } from '../services/supabase';
+import axios from 'axios';
 import type { CalendarEvent as DbCalendarEvent, Client, ChurchService, ServiceAppointment } from '../types/database';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -179,19 +180,34 @@ export function CalendarPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
 
-  // Carregar eventos e clientes do Supabase
+  // Carregar eventos e clientes do Supabase (via backend para bypass RLS)
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const profile = await getUserData();
       const churchId = profile?.church_id;
 
-      const [eventsData, clientsData, appointmentsData, servicesData] = await Promise.all([
-        calendarService.getAll(),
-        clientsService.getAll(),
-        serviceAppointmentsService.getAll(),
-        churchId ? churchServicesService.listActiveByChurch(churchId) : Promise.resolve([]),
+      if (!churchId) {
+        console.warn('[CalendarPage] Sem church_id, não é possível carregar dados');
+        setEvents([]);
+        setClients([]);
+        setServices([]);
+        return;
+      }
+
+      // Usar rotas do backend que fazem bypass de RLS
+      const baseUrl = import.meta.env.DEV ? 'http://localhost:3001' : '';
+      const [eventsRes, appointmentsRes, servicesRes, clientsRes] = await Promise.all([
+        axios.get(`${baseUrl}/api/calendar/events/${churchId}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/api/calendar/appointments/${churchId}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/api/calendar/services/${churchId}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/api/calendar/clients/${churchId}`).catch(() => ({ data: [] })),
       ]);
+
+      const eventsData = eventsRes.data || [];
+      const appointmentsData = appointmentsRes.data || [];
+      const servicesData = servicesRes.data || [];
+      const clientsData = clientsRes.data || [];
 
       setClients(clientsData);
       setServices(servicesData);
@@ -201,7 +217,7 @@ export function CalendarPage() {
 
       const merged = [
         ...eventsData.map(dbEventToLocal),
-        ...(appointmentsData || []).map((a) => serviceAppointmentToLocal(a, servicesById.get(a.service_id))),
+        ...(appointmentsData || []).map((a: ServiceAppointment) => serviceAppointmentToLocal(a, servicesById.get(a.service_id))),
       ].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
       setEvents(merged);
